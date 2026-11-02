@@ -297,8 +297,9 @@ re-encoded into app storage with its location metadata removed.
 
 ### Backwoods mode (T-Satellite and similar)
 Backwoods mode is Northvane's light-packing mode. It turns on automatically
-on a satellite connection (or always or never, as you choose) and only
-downloads what you allow.
+on a satellite connection, or on mobile data while Android's **Data Saver** is
+on (even if Northvane is set to "Unrestricted data"), or always or never, as
+you choose. It only downloads what you allow.
 
 - The manifest declares
   `android.telephony.PROPERTY_SATELLITE_DATA_OPTIMIZED`, so on Android 16+ the

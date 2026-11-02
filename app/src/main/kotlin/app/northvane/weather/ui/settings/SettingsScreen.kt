@@ -150,7 +150,7 @@ private fun SettingsIndex(state: MainUiState, onBack: () -> Unit, nav: SettingsN
         }
         SectionCard(null) {
             NavRow("Backwoods mode", when (s.dataSaver) {
-                DataSaverMode.AUTO -> "Turns on by itself on satellite connections"
+                DataSaverMode.AUTO -> "Turns on by itself on satellite or with Data Saver"
                 DataSaverMode.ALWAYS -> "Always on"
                 DataSaverMode.OFF -> "Off"
             } + if (s.showStaleData) " · showing stale data" else "") { nav.openPage(SettingsPage.SATELLITE) }
@@ -393,11 +393,13 @@ private fun SatellitePage(state: MainUiState, container: AppContainer, onBack: (
         SectionCard(null) {
             Hint(
                 "Backwoods mode is Northvane's light-packing mode for satellite connections such as T-Mobile T-Satellite: " +
-                    "choose exactly what it may download. Anything you turn off keeps its last downloaded data.",
+                    "choose exactly what it may download. Anything you turn off keeps its last downloaded data. " +
+                    "When set to automatic, it also turns on while Android's Data Saver is on and you're on mobile data, " +
+                    "even if Northvane has unrestricted data.",
             )
             ChoiceDropdown("Backwoods mode turns on", DataSaverMode.entries, s.dataSaver, {
                 when (it) {
-                    DataSaverMode.AUTO -> "Automatically on satellite connections"
+                    DataSaverMode.AUTO -> "Automatically on satellite or with Data Saver"
                     DataSaverMode.ALWAYS -> "Always"
                     DataSaverMode.OFF -> "Never"
                 }
@@ -450,7 +452,7 @@ private fun SatellitePage(state: MainUiState, container: AppContainer, onBack: (
                 network.constrained -> "bandwidth-limited"
                 network.metered -> "mobile data"
                 else -> "unmetered"
-            } + (if (state.liteMode) " · Backwoods mode is on" else "") + ". Over satellite, a WeeWX or AI server is only reachable at a public address.",
+            } + (if (network.dataSaver) " · Android Data Saver is on" else "") + (if (state.liteMode) " · Backwoods mode is on" else "") + ". Over satellite, a WeeWX or AI server is only reachable at a public address.",
         )
     }
 }

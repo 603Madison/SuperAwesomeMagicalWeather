@@ -3,6 +3,14 @@
 All notable changes to Northvane. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.4.2] - 2026-11-02
+
+### Changed
+- Backwoods mode now also turns on automatically when Android's **Data Saver** is on and you're on mobile data, even if Northvane is set to "Unrestricted data". It stays off on unmetered Wi-Fi, where Data Saver doesn't apply, and "Never" still means never.
+
+### Fixed
+- A repository test that could fail at random because the fake network recorded parallel requests unsafely.
+
 ## [1.4.1] - 2026-10-29
 
 ### Changed

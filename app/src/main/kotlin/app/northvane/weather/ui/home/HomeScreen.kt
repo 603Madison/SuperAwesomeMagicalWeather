@@ -252,6 +252,7 @@ private fun HomeContent(
                             DataSaverBanner(
                                 forced = state.settings.dataSaver == DataSaverMode.ALWAYS,
                                 satellite = state.network.satellite,
+                                dataSaver = state.network.dataSaver && !state.network.constrained,
                                 allowed = state.settings.satelliteFeatures,
                             )
                         }
@@ -706,7 +707,7 @@ private fun SourcesFooter(snapshot: WeatherSnapshot, time: TimeFormat) {
 }
 
 @Composable
-private fun DataSaverBanner(forced: Boolean, satellite: Boolean, allowed: Set<SatelliteFeature>) {
+private fun DataSaverBanner(forced: Boolean, satellite: Boolean, allowed: Set<SatelliteFeature>, dataSaver: Boolean = false) {
     val paused = SatelliteFeature.entries.filter { it !in allowed && it != SatelliteFeature.OWM_FALLBACK }
     Card(
         shape = RoundedCornerShape(20.dp),
@@ -718,7 +719,12 @@ private fun DataSaverBanner(forced: Boolean, satellite: Boolean, allowed: Set<Sa
             Spacer(Modifier.width(12.dp))
             Column {
                 Text(
-                    if (forced) "Backwoods mode is on" else if (satellite) "Backwoods mode: satellite connection" else "Backwoods mode: limited connection",
+                    when {
+                        forced -> "Backwoods mode is on"
+                        satellite -> "Backwoods mode: satellite connection"
+                        dataSaver -> "Backwoods mode: Android Data Saver is on"
+                        else -> "Backwoods mode: limited connection"
+                    },
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                 )

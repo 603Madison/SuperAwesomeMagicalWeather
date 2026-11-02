@@ -1,6 +1,9 @@
 package app.northvane.weather.net
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -8,6 +11,7 @@ import android.net.NetworkRequest
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import androidx.core.content.ContextCompat
 import app.northvane.core.model.Section
 import app.northvane.core.repo.FetchPlan
 import app.northvane.weather.data.AppSettings
@@ -24,6 +28,11 @@ data class NetworkStatus(
     /** Network lacks NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED: data should be used sparingly. */
     val constrained: Boolean = false,
     val metered: Boolean = false,
+    /**
+     * Android's Data Saver is on. Reported even when Northvane is set to
+     * "Unrestricted data", since the user still asked the phone to save data.
+     */
+    val dataSaver: Boolean = false,
 )
 
 /**
@@ -34,7 +43,8 @@ data class NetworkStatus(
  * transport is satellite.
  */
 class ConnectivityMonitor(context: Context) {
-    private val cm = context.applicationContext.getSystemService(ConnectivityManager::class.java)
+    private val app = context.applicationContext
+    private val cm = app.getSystemService(ConnectivityManager::class.java)
     private val _status = MutableStateFlow(NetworkStatus())
     val status: StateFlow<NetworkStatus> = _status.asStateFlow()
 
@@ -69,6 +79,20 @@ class ConnectivityMonitor(context: Context) {
         if (!registered) {
             runCatching { cm.registerDefaultNetworkCallback(callback) }
         }
+        // Data Saver can be switched without the network changing.
+        val dataSaverReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                _status.value = _status.value.copy(dataSaver = dataSaverOn())
+            }
+        }
+        runCatching {
+            // Sent by the system, so the receiver needn't be exported.
+            ContextCompat.registerReceiver(
+                app, dataSaverReceiver,
+                IntentFilter(ConnectivityManager.ACTION_RESTRICT_BACKGROUND_CHANGED),
+                ContextCompat.RECEIVER_NOT_EXPORTED,
+            )
+        }
         _status.value = current()
     }
 
@@ -87,15 +111,27 @@ class ConnectivityMonitor(context: Context) {
             satellite = modern && hasTransport(NetworkCapabilities.TRANSPORT_SATELLITE),
             constrained = modern && !hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED),
             metered = !hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED),
+            dataSaver = dataSaverOn(),
         )
     }
+
+    /** "Whitelisted" means Data Saver is on but this app is exempt, which still counts here. */
+    private fun dataSaverOn(): Boolean =
+        cm?.restrictBackgroundStatus.let {
+            it == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED ||
+                it == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_WHITELISTED
+        }
 }
 
-/** True when satellite limits apply: forced on, or automatic on a satellite/bandwidth-constrained network. */
+/**
+ * True when Backwoods limits apply: forced on, or automatic on a satellite or
+ * bandwidth-constrained network, or on metered data while Android's Data Saver
+ * is on (Data Saver doesn't apply to unmetered Wi-Fi, so neither does this).
+ */
 fun isLimited(settings: AppSettings, status: NetworkStatus): Boolean = when (settings.dataSaver) {
     DataSaverMode.ALWAYS -> true
     DataSaverMode.OFF -> false
-    DataSaverMode.AUTO -> status.satellite || status.constrained
+    DataSaverMode.AUTO -> status.satellite || status.constrained || (status.dataSaver && status.metered)
 }
 
 /** Whether [feature] may use the network right now. */
