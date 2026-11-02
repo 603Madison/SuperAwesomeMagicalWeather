@@ -14,7 +14,9 @@ val keystoreProps = Properties().apply {
     val file = rootProject.file("keystore.properties")
     if (file.exists()) file.inputStream().use { load(it) }
 }
-fun signingValue(property: String, env: String): String? = keystoreProps.getProperty(property) ?: System.getenv(env)
+// Blank counts as unset: CI passes optional secrets that weren't added as empty strings.
+fun signingValue(property: String, env: String): String? =
+    (keystoreProps.getProperty(property) ?: System.getenv(env))?.takeIf { it.isNotBlank() }
 val keystorePath = signingValue("storeFile", "RELEASE_KEYSTORE_FILE")
 
 android {
