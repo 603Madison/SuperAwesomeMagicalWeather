@@ -3,6 +3,12 @@
 All notable changes to Northvane. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.4.3] - 2026-11-02
+
+### Changed
+- Releases are now signed with Northvane's permanent release key, so future versions install as updates. This build is the regular `app.northvane.weather` app; earlier GitHub downloads were debug builds that install as a separate "debug" app, which you can uninstall once you've set this one up.
+- Release builds are no longer shrunk with R8 until a shrunk build has been tested on a device.
+
 ## [1.4.2] - 2026-11-02
 
 ### Changed

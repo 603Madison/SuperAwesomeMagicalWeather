@@ -6,13 +6,16 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-// Release signing credentials are never committed. Create keystore.properties
-// (git-ignored) next to settings.gradle.kts with storeFile, storePassword,
-// keyAlias and keyPassword to produce a signed release build.
+// Release APKs are signed with one permanent key, so each release installs as an
+// update over the last. Locally it comes from keystore.properties (git-ignored,
+// next to settings.gradle.kts); in CI from the RELEASE_KEYSTORE_* environment
+// variables. Without either, release builds are unsigned.
 val keystoreProps = Properties().apply {
     val file = rootProject.file("keystore.properties")
     if (file.exists()) file.inputStream().use { load(it) }
 }
+fun signingValue(property: String, env: String): String? = keystoreProps.getProperty(property) ?: System.getenv(env)
+val keystorePath = signingValue("storeFile", "RELEASE_KEYSTORE_FILE")
 
 android {
     namespace = "app.northvane.weather"
@@ -22,32 +25,33 @@ android {
         applicationId = "app.northvane.weather"
         minSdk = 26
         targetSdk = 37
-        versionCode = 7
-        versionName = "1.4.2"
+        versionCode = 8
+        versionName = "1.4.3"
     }
 
     signingConfigs {
-        if (!keystoreProps.isEmpty) {
+        if (keystorePath != null) {
             create("release") {
-                storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
-                storePassword = keystoreProps.getProperty("storePassword")
-                keyAlias = keystoreProps.getProperty("keyAlias")
-                keyPassword = keystoreProps.getProperty("keyPassword")
+                storeFile = rootProject.file(keystorePath)
+                storePassword = signingValue("storePassword", "RELEASE_KEYSTORE_PASSWORD")
+                keyAlias = signingValue("keyAlias", "RELEASE_KEY_ALIAS") ?: "northvane"
+                keyPassword = signingValue("keyPassword", "RELEASE_KEY_PASSWORD") ?: storePassword
             }
         }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // R8 shrinking stays off until a shrunk build has been tested on a device:
+            // serialization, MapLibre and WorkManager all rely on reflection. Rules are in
+            // proguard-rules.pro.
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            if (!keystoreProps.isEmpty) {
-                signingConfig = signingConfigs.getByName("release")
-            }
+            if (keystorePath != null) signingConfig = signingConfigs.getByName("release")
         }
         debug {
             applicationIdSuffix = ".debug"
