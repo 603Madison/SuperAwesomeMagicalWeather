@@ -1,5 +1,6 @@
 package app.northvane.weather
 
+import app.northvane.weather.ui.radar.NowcastBuilder
 import app.northvane.core.aurora.AuroraClient
 import android.app.Application
 import app.northvane.core.net.HttpClients
@@ -64,6 +65,7 @@ class AppContainer(val app: Application) {
     val owm: OwmClient by lazy { OwmClient(http) }
     val weewx: WeeWxClient by lazy { WeeWxClient(HttpClients.localServerClients(http)) }
     val radar: RadarService by lazy { RadarService(http) }
+    val nowcast: NowcastBuilder by lazy { NowcastBuilder(http) }
     val pollen: PollenClient by lazy { PollenClient(http) }
     val airNow: AirNowClient by lazy { AirNowClient(http) }
     val trafficClient: TrafficClient by lazy { TrafficClient(http) }

@@ -59,6 +59,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import app.northvane.core.radar.RadarFrame
 import app.northvane.core.radar.RadarSource
 import app.northvane.core.radar.SatelliteImagery
 import app.northvane.core.util.Solar
@@ -127,13 +128,12 @@ fun RadarScreen(state: MainUiState, container: AppContainer, onOpenSettings: () 
                 location == null -> CenteredMessage("Add a location on the Today tab to see radar.")
                 paused -> SatellitePaused(
                     onLoadAnyway = {
-                        loadOnSatellite = true
-                        vm.load()
+                        loadOnSatellite = true // the radar then loads like any other visit
                     },
                     onOpenSettings = onOpenSettings,
                 )
                 else -> {
-                    LaunchedEffect(Unit) { vm.ensureLoaded() }
+                    LaunchedEffect(location.point) { vm.ensureLoaded(location.point) }
                     val settings = state.settings
                     val satelliteAllowed = !state.liteMode || SatelliteFeature.SATELLITE_IMAGERY in settings.satelliteFeatures || loadOnSatellite
                     val imagery = remember(settings.satelliteImagery, location.latitude, location.longitude, radar.loadedAt) {
@@ -244,7 +244,7 @@ private fun Controls(
                             style = MaterialTheme.typography.titleMedium,
                         )
                         Spacer(Modifier.width(8.dp))
-                        frame?.let { FrameBadge(it.isForecast, state.index == state.lastPastIndex) }
+                        frame?.let { FrameBadge(it, state.index == state.lastPastIndex) }
                     }
                     if (state.frames.size > 1) {
                         Slider(
@@ -260,7 +260,8 @@ private fun Controls(
                 buildString {
                     append(state.source.attribution)
                     if (satellite) append(" · ${SatelliteImagery.ATTRIBUTION}")
-                    if (state.frames.any { it.isForecast }) append(" · Future: NOAA HRRR model via Iowa Environmental Mesonet")
+                    if (state.frames.any { it.nowcast != null }) append(" · Nowcast: latest radar carried along its recent motion")
+                    if (state.frames.any { it.isForecast && it.nowcast == null }) append(" · Model: NOAA HRRR via Iowa Environmental Mesonet")
                 },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -299,9 +300,10 @@ private fun SatelliteToggle(on: Boolean, allowed: Boolean, label: String, onTogg
 }
 
 @Composable
-private fun FrameBadge(forecast: Boolean, latest: Boolean) {
+private fun FrameBadge(frame: RadarFrame, latest: Boolean) {
     val (label, color) = when {
-        forecast -> "Forecast" to MaterialTheme.colorScheme.tertiary
+        frame.nowcast != null -> "Nowcast" to MaterialTheme.colorScheme.tertiary
+        frame.isForecast -> "Model" to MaterialTheme.colorScheme.secondary
         latest -> "Latest" to MaterialTheme.colorScheme.primary
         else -> "Past" to MaterialTheme.colorScheme.onSurfaceVariant
     }

@@ -32,4 +32,8 @@ dependencies {
 tasks.test {
     // Opt-in tests against the live weather services: ./gradlew :core:test -Pnorthvane.live=true
     systemProperty("northvane.live", providers.gradleProperty("northvane.live").getOrElse("false"))
+    // Optional knobs for the live nowcast check, e.g. -Pnowcast.lead=60 -Pnowcast.source=noaa
+    listOf("nowcast.lead", "nowcast.source", "nowcast.lat", "nowcast.lon").forEach { key ->
+        providers.gradleProperty(key).orNull?.let { systemProperty(key, it) }
+    }
 }

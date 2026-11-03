@@ -30,8 +30,10 @@ enum class RadarSource(val label: String, val attribution: String) {
 data class RadarFrame(
     val time: Instant,
     val isForecast: Boolean,
-    /** XYZ (or WMS-style `{bbox-epsg-3857}`) tile URL template for MapLibre. */
+    /** XYZ (or WMS-style `{bbox-epsg-3857}`) tile URL template for MapLibre; empty for a [nowcast] image. */
     val tileUrl: String,
+    /** A forecast image extrapolated from recent radar, instead of map tiles. */
+    val nowcast: NowcastImage? = null,
 )
 
 /**

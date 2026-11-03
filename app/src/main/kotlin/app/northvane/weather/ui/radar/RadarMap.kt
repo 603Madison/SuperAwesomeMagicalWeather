@@ -18,7 +18,9 @@ import app.northvane.core.radar.RadarFrame
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
+import android.graphics.Bitmap
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.geometry.LatLngQuad
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
@@ -27,6 +29,7 @@ import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.layers.RasterLayer
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.android.style.sources.ImageSource
 import org.maplibre.android.style.sources.RasterSource
 import org.maplibre.android.style.sources.TileSet
 import org.maplibre.geojson.Feature
@@ -128,10 +131,21 @@ fun RadarMap(
         layerIds = frames.mapIndexed { i, frame ->
             val sourceId = "radar-src-$i"
             val layerId = "radar-layer-$i"
-            val tiles = TileSet("2.2.0", frame.tileUrl)
-            tiles.setMinZoom(0f)
-            tiles.setMaxZoom(10f)
-            s.addSource(RasterSource(sourceId, tiles, 256))
+            val nowcast = frame.nowcast
+            if (nowcast != null) {
+                // Computed on the phone: one image stretched over its tile area.
+                val bitmap = Bitmap.createBitmap(nowcast.pixels, nowcast.width, nowcast.height, Bitmap.Config.ARGB_8888)
+                val quad = LatLngQuad(
+                    LatLng(nowcast.north, nowcast.west), LatLng(nowcast.north, nowcast.east),
+                    LatLng(nowcast.south, nowcast.east), LatLng(nowcast.south, nowcast.west),
+                )
+                s.addSource(ImageSource(sourceId, quad, bitmap))
+            } else {
+                val tiles = TileSet("2.2.0", frame.tileUrl)
+                tiles.setMinZoom(0f)
+                tiles.setMaxZoom(10f)
+                s.addSource(RasterSource(sourceId, tiles, 256))
+            }
             val layer = RasterLayer(layerId, sourceId).withProperties(
                 PropertyFactory.rasterOpacity(0f),
                 PropertyFactory.rasterFadeDuration(0f),

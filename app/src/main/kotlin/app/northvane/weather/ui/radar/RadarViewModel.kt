@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import app.northvane.core.model.GeoPoint
 import app.northvane.core.radar.RadarFrame
 import app.northvane.core.radar.RadarSource
 import app.northvane.core.repo.attempt
@@ -32,6 +33,8 @@ data class RadarUiState(
     val source: RadarSource = RadarSource.NOAA_MRMS,
     val futureCast: Boolean = true,
     val loadedAt: Instant? = null,
+    /** Where the nowcast was computed for. */
+    val center: GeoPoint? = null,
 ) {
     val current: RadarFrame? get() = frames.getOrNull(index)
     val lastPastIndex: Int get() = frames.indexOfLast { !it.isForecast }
@@ -43,10 +46,14 @@ class RadarViewModel(private val container: AppContainer) : ViewModel() {
     private var playJob: Job? = null
     private var loadJob: Job? = null
 
-    fun ensureLoaded() {
+    private var center: GeoPoint? = null
+
+    fun ensureLoaded(at: GeoPoint) {
         val s = _state.value
+        val moved = s.center != null && s.center != at
+        center = at
         val stale = s.loadedAt == null || Duration.between(s.loadedAt, Instant.now()) > Duration.ofMinutes(5)
-        if ((s.frames.isEmpty() || stale) && loadJob?.isActive != true) load()
+        if ((s.frames.isEmpty() || stale || moved) && (loadJob?.isActive != true || moved)) load()
     }
 
     fun load() {
@@ -60,9 +67,26 @@ class RadarViewModel(private val container: AppContainer) : ViewModel() {
                 it.copy(loading = true, source = settings.radarSource, futureCast = settings.futureCastEnabled, message = null)
             }
             val now = Instant.now()
-            val past = attempt { container.radar.pastFrames(settings.radarSource, now) }.getOrDefault(emptyList())
+            val at = center
+            // The nowcast measures motion over the last half hour; the map shows the newest frames.
+            val history = attempt { container.radar.pastFrames(settings.radarSource, now, count = 40) }.getOrDefault(emptyList())
+            val past = history.takeLast(PAST_FRAMES)
             val future = if (futureAllowed) {
-                attempt { container.radar.futureFrames(now, settings.futureCastMinutes) }.getOrDefault(emptyList())
+                // Radar nowcast first (it starts from what the radar sees), then the HRRR model beyond it.
+                val nowcast = if (at != null && history.isNotEmpty()) {
+                    attempt { container.nowcast.build(history, at, minOf(NOWCAST_MINUTES, settings.futureCastMinutes)) }.getOrDefault(emptyList())
+                } else {
+                    emptyList()
+                }
+                val modelAfter = nowcast.lastOrNull()?.time
+                val remaining = settings.futureCastMinutes - (modelAfter?.let { Duration.between(now, it).toMinutes().toInt() } ?: 0)
+                val model = if (remaining >= 15) {
+                    attempt { container.radar.futureFrames(now, settings.futureCastMinutes) }.getOrDefault(emptyList())
+                        .filter { modelAfter == null || it.time.isAfter(modelAfter) }
+                } else {
+                    emptyList()
+                }
+                nowcast + model
             } else {
                 emptyList()
             }
@@ -73,6 +97,7 @@ class RadarViewModel(private val container: AppContainer) : ViewModel() {
                     index = (past.size - 1).coerceAtLeast(0),
                     loading = false,
                     loadedAt = now,
+                    center = at,
                     message = if (frames.isEmpty()) "Radar is unavailable right now. Try again shortly." else null,
                 )
             }
@@ -117,6 +142,10 @@ class RadarViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     companion object {
+        /** Extrapolated radar is better than the model for about the first hour or two. */
+        const val NOWCAST_MINUTES = 90
+        private const val PAST_FRAMES = 7
+
         fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {
             initializer { RadarViewModel(container) }
         }

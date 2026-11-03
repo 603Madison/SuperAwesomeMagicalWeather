@@ -3,6 +3,11 @@
 All notable changes to Northvane. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.5.2] - 2026-11-03
+
+### Changed
+- **Better future cast.** The first 90 minutes now come from a radar nowcast: Northvane measures how the rain moved over the last half hour and carries the latest radar forward, instead of jumping to the HRRR model, which often misses light rain entirely. Model frames follow beyond 90 minutes and are labeled **Model**; nowcast frames are labeled **Nowcast**.
+
 ## [1.5.1] - 2026-11-03
 
 ### Added
