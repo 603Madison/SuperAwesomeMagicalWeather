@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Northvane</string>
+    <string name="app_name">SuperAwesomeMagicalWeather</string>
     <string name="channel_warnings">Warnings</string>
     <string name="channel_warnings_desc">NWS warnings: tornado, severe thunderstorm, flash flood, winter storm and other hazards that are occurring or imminent.</string>
     <string name="channel_watches">Watches</string>

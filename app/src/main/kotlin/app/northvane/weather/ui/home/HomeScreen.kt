@@ -387,7 +387,7 @@ private fun LocationTopBar(
                         Spacer(Modifier.width(4.dp))
                     }
                     Text(
-                        state.selected?.displayName ?: "Northvane",
+                        state.selected?.displayName ?: "SuperAwesomeMagicalWeather",
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.widthIn(max = 240.dp),
@@ -808,7 +808,7 @@ private fun Onboarding(modifier: Modifier, onUseLocation: () -> Unit, onSearch: 
     ) {
         WeatherIcon(WeatherCondition.PARTLY_CLOUDY, isDay = true, size = 120.dp)
         Spacer(Modifier.height(24.dp))
-        Text("Welcome to Northvane", style = MaterialTheme.typography.headlineSmall)
+        Text("Welcome to SuperAwesomeMagicalWeather", style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(8.dp))
         Text(
             "Free forecasts, radar and alerts from the National Weather Service, with optional data from your own WeeWX station.",

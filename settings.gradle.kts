@@ -28,7 +28,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Northvane"
+rootProject.name = "SuperAwesomeMagicalWeather"
 include(":core")
 include(":app")
 include(":mini")

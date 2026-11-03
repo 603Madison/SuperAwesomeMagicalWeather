@@ -6,7 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-// Northvane Mini ships with the same version as the main app, from one place.
+// SuperAwesomeMagicalWeather Mini ships with the same version as the main app, from one place.
 val appBuild = rootProject.file("app/build.gradle.kts").readText()
 val sharedVersionName = Regex("""versionName = "([^"]+)"""").find(appBuild)!!.groupValues[1]
 val sharedVersionCode = Regex("""versionCode = (\d+)""").find(appBuild)!!.groupValues[1].toInt()

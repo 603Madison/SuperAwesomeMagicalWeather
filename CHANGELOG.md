@@ -1,7 +1,17 @@
 # Changelog
 
-All notable changes to Northvane. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+All notable changes to SuperAwesomeMagicalWeather (called Northvane before 1.7.0). The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
+
+## [1.7.0] - 2026-11-03
+
+### Changed
+- **Northvane is now SuperAwesomeMagicalWeather**, and Northvane Mini is SuperAwesomeMagicalWeather Mini: app names, screens, notifications, release downloads and docs. It installs as an update over Northvane (same package and signing key), and your places and settings stay. On Mini's home screen the place name is now the title, since the full app name doesn't fit next to it on a flip phone.
+
+### Security
+- **LAN servers can't redirect you onto the internet in plain text.** The connection used for a WeeWX station or AI server on `http://` can now only reach private-network addresses, including after a redirect, and never goes through a proxy.
+- **Damaged downloads can't crash the app.** The future cast's GRIB2 decoder checks every size and bit width before allocating memory, and radar pictures are checked for size before decoding (in both apps).
+- **Release workflow hardening.** Inputs are checked and passed only through environment variables (no command injection), GitHub Actions are pinned to commit hashes with Dependabot updates, and the signing key is restored only after the tests.
 
 ## [1.6.2] - 2026-11-03
 

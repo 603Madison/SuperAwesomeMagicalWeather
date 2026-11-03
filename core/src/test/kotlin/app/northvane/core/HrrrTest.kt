@@ -108,7 +108,7 @@ class HrrrTest {
     @Test
     fun liveNewestRun() = runBlocking {
         assumeTrue(System.getProperty("northvane.live") == "true")
-        val http = HttpClients.create("Northvane-test", cacheDir = null)
+        val http = HttpClients.create("SuperAwesomeMagicalWeather-test", cacheDir = null)
         val now = Instant.now()
         val area = TileArea.around(portland.first, portland.second, zoom = 7, cols = 4, rows = 4) // as the app does
         val service = RadarService(http)

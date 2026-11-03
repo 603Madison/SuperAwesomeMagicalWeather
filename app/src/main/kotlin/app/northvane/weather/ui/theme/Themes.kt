@@ -13,7 +13,7 @@ enum class ThemeKind { STATIC, DYNAMIC, CUSTOM }
 
 /** The app's color themes. Static ones are fixed; dynamic ones follow the current weather. */
 enum class AppTheme(val label: String, val description: String, val kind: ThemeKind) {
-    NORTHVANE("Northvane", "Clean, bright blue", ThemeKind.STATIC),
+    NORTHVANE("SuperAwesomeMagicalWeather", "Clean, bright blue", ThemeKind.STATIC),
     HARBOR("Harbor", "Sea glass and Casco Bay fog", ThemeKind.STATIC),
     EVERGREEN("Evergreen", "White pine and granite", ThemeKind.STATIC),
     MAPLE("Maple", "Sugar maple reds and amber", ThemeKind.STATIC),

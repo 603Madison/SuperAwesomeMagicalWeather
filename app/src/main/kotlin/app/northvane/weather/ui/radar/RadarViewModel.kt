@@ -131,8 +131,14 @@ class RadarViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     companion object {
+        private const val MAX_IMAGE_EDGE = 2048
+
         /** ARGB pixels of a PNG, for calibrating the forecast against the radar. */
         private fun decodePng(bytes: ByteArray): IntArray? {
+            // Read the size first: a small file can claim a huge picture and exhaust memory when decoded.
+            val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            if (bounds.outWidth !in 1..MAX_IMAGE_EDGE || bounds.outHeight !in 1..MAX_IMAGE_EDGE) return null
             val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
             return IntArray(bitmap.width * bitmap.height).also {
                 bitmap.getPixels(it, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)

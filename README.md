@@ -1,12 +1,12 @@
-# Northvane
+# SuperAwesomeMagicalWeather
 
-[![CI](https://github.com/603Madison/Northvane-Weather/actions/workflows/ci.yml/badge.svg)](https://github.com/603Madison/Northvane-Weather/actions/workflows/ci.yml)
+[![CI](https://github.com/603Madison/SuperAwesomeMagicalWeather/actions/workflows/ci.yml/badge.svg)](https://github.com/603Madison/SuperAwesomeMagicalWeather/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Latest release](https://img.shields.io/github/v/release/603Madison/Northvane-Weather?label=download)](https://github.com/603Madison/Northvane-Weather/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/603Madison/SuperAwesomeMagicalWeather?label=download)](https://github.com/603Madison/SuperAwesomeMagicalWeather/releases/latest)
 
 A clean, private weather app for Android.
 
-Northvane shows current conditions, hourly and 10-day forecasts, animated radar
+SuperAwesomeMagicalWeather shows current conditions, hourly and 10-day forecasts, animated radar
 with a future cast, and National Weather Service alerts. It uses free NOAA/NWS
 data, can take current conditions from **your own WeeWX station**, and keeps
 working over **satellite links such as T-Mobile T-Satellite** in **Backwoods mode**. No API key is
@@ -60,17 +60,21 @@ built into the app, and there are no accounts, ads or analytics.
 
 ## Install
 
-**[Download the latest APK](https://github.com/603Madison/Northvane-Weather/releases/latest)**
-(older versions are under [all releases](https://github.com/603Madison/Northvane-Weather/releases)),
+**[Download the latest APK](https://github.com/603Madison/SuperAwesomeMagicalWeather/releases/latest)**
+(older versions are under [all releases](https://github.com/603Madison/SuperAwesomeMagicalWeather/releases)),
 check it against `SHA256SUMS.txt`, and open it on your phone (you'll be asked to
-allow installs from your browser or file manager). Northvane runs on Android 8.0+.
+allow installs from your browser or file manager). SuperAwesomeMagicalWeather runs on Android 8.0+.
 The satellite features need Android 16+ and a carrier that supports satellite data.
 
-### Northvane Mini (flip phones)
+SuperAwesomeMagicalWeather was called **Northvane** before 1.7.0. It installs as an update
+over Northvane (same package and signing key), so your places and settings carry over.
+Downloads up to 1.6.2 are named `Northvane-…apk`.
 
-Each release also has **Northvane-Mini**, a separate small app for Android flip
+### SuperAwesomeMagicalWeather Mini (flip phones)
+
+Each release also has **SuperAwesomeMagicalWeather-Mini**, a separate small app for Android flip
 phones (Kyocera DuraXV, Sonim XP3plus, TCL Flip, CAT S22 Flip and similar). It
-installs alongside Northvane and is built for 2.4–2.8" screens and keypads:
+installs alongside SuperAwesomeMagicalWeather and is built for 2.4–2.8" screens and keypads:
 
 - **Everything works from the d-pad and keys**, with or without a
   touchscreen: ▲▼ to move, OK to select, the right soft key (or Back) to go
@@ -86,9 +90,9 @@ installs alongside Northvane and is built for 2.4–2.8" screens and keypads:
   `*` `#` zoom, 2 4 6 8 pan, OK plays.
 - Light on data (about 25 KB per forecast refresh, ~60 KB per radar frame) and
   on memory, for Android Go phones. Same forecast engine and sources as
-  Northvane; no accounts, ads or tracking.
+  SuperAwesomeMagicalWeather; no accounts, ads or tracking.
 
-<img src="docs/screenshots/mini_home.png" width="240" alt="Northvane Mini home screen at 480×640">
+<img src="docs/screenshots/mini_home.png" width="240" alt="SuperAwesomeMagicalWeather Mini home screen at 480×640">
 
 ## Status
 
@@ -166,7 +170,7 @@ afternoon storms, and New England seasonal notes (black flies, ticks, hunting
 season blaze orange, short days).
 
 ### Garden (optional, off by default)
-Pick what you're growing and how you'll start it, and Northvane builds a
+Pick what you're growing and how you'll start it, and SuperAwesomeMagicalWeather builds a
 schedule from your **local frost dates**. These are computed once from 30 years of NOAA
 daily lows for your spot (median and 1-in-10 dates):
 - **Planting card** (only in planting season): start seeds indoors, harden
@@ -234,17 +238,17 @@ so mud season shows up while the ground thaws from the top over still-frozen
 subsoil (validated against Concord, NH, winter–spring 2026).
 
 ### Fall foliage (optional)
-There's no free machine-readable foliage feed, so Northvane estimates the color
+There's no free machine-readable foliage feed, so SuperAwesomeMagicalWeather estimates the color
 stage and peak from latitude, elevation and this fall's observed night-time
 temperatures (cool nights hurry color, a warm fall delays it, hard freezes and
 drought drop leaves early), and flags windy or very wet days that will strip
 leaves. Links to the official Maine and New Hampshire reports.
 
 ### Pollen (optional, your own key)
-NOAA/NWS don't forecast pollen. Northvane can use the **Google Pollen API**
+NOAA/NWS don't forecast pollen. SuperAwesomeMagicalWeather can use the **Google Pollen API**
 (5-day tree, grass and weed levels and main plants). It needs your own key,
 and Settings › Data sources explains the cost. Google gives 5,000 free requests a
-month, then charges US$10 per 1,000 (prices checked October 2026). Northvane asks at most
+month, then charges US$10 per 1,000 (prices checked October 2026). SuperAwesomeMagicalWeather asks at most
 every 6 hours per place (about 124 a month), so typical use is free. The key is
 sent in a header and never in the URL. Coordinates are rounded to about 1 km, and
 the request carries the app's package and certificate so you can restrict the key.
@@ -297,7 +301,7 @@ and walkway tips. Turn both on in Settings › Today screen.
 ### Aurora forecast (on by default)
 NOAA's Space Weather Prediction Center publishes the planetary K-index for the
 past three days and the next three, free and the same for everyone (no
-location is sent). Northvane works out your geomagnetic latitude and how far
+location is sent). SuperAwesomeMagicalWeather works out your geomagnetic latitude and how far
 south the auroral oval reaches at each Kp, then checks when it's dark and how
 cloudy the hourly forecast is. The card appears on the Today screen only when
 the aurora may be visible from where you are: through a phone camera, low on
@@ -345,7 +349,7 @@ need a burn permit.
   from NOAA's open data on AWS rather than pre-rendered tiles. Each 15-minute
   frame comes from the newest run that has already published it (runs appear
   about an hour after they start and fill in over the next hour), so the first
-  hour is usually from a run under two hours old. Northvane downloads only the
+  hour is usually from a run under two hours old. SuperAwesomeMagicalWeather downloads only the
   simulated **composite** reflectivity (the strongest echo in each column,
   which is what a radar mosaic shows far from the radars; it matched NOAA's
   radar over Maine noticeably better than reflectivity 1 km above ground),
@@ -385,7 +389,7 @@ need a burn permit.
   now, then starting this week). Radius 10, 25 or 50 miles.
 
 ### Themes
-Seven static themes (Northvane, Harbor, Evergreen, Maple, Lupine, Aurora,
+Seven static themes (SuperAwesomeMagicalWeather, Harbor, Evergreen, Maple, Lupine, Aurora,
 Driftwood), each with its own colors, background and hero card. There are also
 two **weather themes**: **Live sky** follows the current conditions (sunny
 blue, storm violet, rainy slate, snowy white, night navy) and **Temperature**
@@ -394,9 +398,9 @@ and a gradient, or your own photo with adjustable dimming. The photo is
 re-encoded into app storage with its location metadata removed.
 
 ### Backwoods mode (T-Satellite and similar)
-Backwoods mode is Northvane's light-packing mode. It turns on automatically
+Backwoods mode is SuperAwesomeMagicalWeather's light-packing mode. It turns on automatically
 on a satellite connection, or on mobile data while Android's **Data Saver** is
-on (even if Northvane is set to "Unrestricted data"), or always or never, as
+on (even if SuperAwesomeMagicalWeather is set to "Unrestricted data"), or always or never, as
 you choose. It only downloads what you allow.
 
 - The manifest declares
@@ -508,20 +512,20 @@ docs/   Security and privacy notes.
 - Satellite imagery: NOAA nowCOAST (GOES-East/West).
 - Basemap: OpenFreeMap; © OpenMapTiles; © OpenStreetMap contributors.
 - Optional: Google Pollen API, OpenWeatherMap (your own accounts and keys).
-- Activity, mud, foliage, outage, frozen pipe, ice, aurora, sap and burn outlooks are Northvane's own estimates.
+- Activity, mud, foliage, outage, frozen pipe, ice, aurora, sap and burn outlooks are SuperAwesomeMagicalWeather's own estimates.
 
 See [`docs/SECURITY.md`](docs/SECURITY.md) for the security and privacy design, [`SECURITY.md`](SECURITY.md) for reporting vulnerabilities, [`CHANGELOG.md`](CHANGELOG.md) for release notes and [`docs/RELEASING.md`](docs/RELEASING.md) for how releases are made.
 
 ## License
 
-Northvane is free software: you can redistribute it and/or modify it under
+SuperAwesomeMagicalWeather is free software: you can redistribute it and/or modify it under
 the terms of the **GNU General Public License** as published by the Free
 Software Foundation, either **version 3** of the License, or (at your option)
 any later version. It is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
 FITNESS FOR A PARTICULAR PURPOSE. See [`LICENSE`](LICENSE) for the full text.
 
-Copyright © 2026 Northvane contributors. SPDX-License-Identifier: `GPL-3.0-or-later`.
+Copyright © 2026 SuperAwesomeMagicalWeather contributors. SPDX-License-Identifier: `GPL-3.0-or-later`.
 
 Weather data and map tiles remain under their providers' own terms (see
 *Data sources and attribution* above).

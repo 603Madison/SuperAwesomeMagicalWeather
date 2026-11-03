@@ -104,7 +104,7 @@ class CanadaAndAiTest {
         }
         val base = HttpClients.create("t", null).newBuilder().addInterceptor(fake).build()
         val repo = WeatherRepository(
-            NwsClient(base, { "Northvane/test" }), OwmClient(base), WeeWxClient(HttpClients.localServerClients(base)), MemoryCache(),
+            NwsClient(base, { "SuperAwesomeMagicalWeather/test" }), OwmClient(base), WeeWxClient(HttpClients.localServerClients(base)), MemoryCache(),
             clock = { captured }, eccc = EcccClient(base),
         )
         val snapshot = repo.fetch(SavedLocation("fr", "Fredericton", 45.96, -66.64), SourceConfig(), FetchPlan.FULL)

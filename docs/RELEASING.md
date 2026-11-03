@@ -48,7 +48,7 @@ and can't be re-signed, because their code doesn't read the signing secrets.
 
 ```bash
 sha256sum -c SHA256SUMS.txt
-apksigner verify --print-certs Northvane-v1.4.3.apk
+apksigner verify --print-certs SuperAwesomeMagicalWeather-v1.4.3.apk
 ```
 
 The signing certificate fingerprint should be the same on every release.

@@ -34,14 +34,14 @@ class MiniApp : Application() {
     }
 }
 
-/** Manual dependency container; one per process. Uses the same forecast engine as Northvane. */
+/** Manual dependency container; one per process. Uses the same forecast engine as SuperAwesomeMagicalWeather. */
 class MiniContainer(app: Application) {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val store = MiniStore(app)
     val deviceLocation = DeviceLocation(app)
 
     private val http: OkHttpClient by lazy {
-        HttpClients.create(userAgent = "Northvane-Mini/${BuildConfig.VERSION_NAME} (Android)", cacheDir = File(app.cacheDir, "http"))
+        HttpClients.create(userAgent = "SuperAwesomeMagicalWeather-Mini/${BuildConfig.VERSION_NAME} (Android)", cacheDir = File(app.cacheDir, "http"))
     }
 
     val repository: WeatherRepository by lazy {

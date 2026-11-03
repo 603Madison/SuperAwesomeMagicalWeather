@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class WeeWxFormat(val label: String) {
     AUTO("Auto-detect"),
-    NORTHVANE_JSON("Northvane JSON template"),
+    NORTHVANE_JSON("SuperAwesomeMagicalWeather JSON template"),
     CUMULUS_REALTIME("realtime.txt (weewx-crt)"),
     CLIENTRAW("clientraw.txt"),
 }

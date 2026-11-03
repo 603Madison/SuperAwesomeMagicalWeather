@@ -5,8 +5,13 @@ import okhttp3.Interceptor
 import okhttp3.Request
 import okhttp3.Response
 import java.io.IOException
+import java.net.ConnectException
 import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.Socket
+import java.net.SocketAddress
 import java.net.UnknownHostException
+import javax.net.SocketFactory
 
 /**
  * Request tag marking a request as a user-configured local-network server
@@ -50,6 +55,32 @@ class PrivateNetworkDns(private val delegate: Dns = Dns.SYSTEM) : Dns {
             )
         }
         return privateOnly
+    }
+}
+
+/**
+ * Sockets for cleartext local-network requests that refuse to connect anywhere
+ * but a private-network address. [PrivateNetworkDns] isn't consulted for IP
+ * addresses written in the URL, so without this a local server could redirect
+ * a request to http://<public address>/.
+ */
+class PrivateNetworkSocketFactory : SocketFactory() {
+    override fun createSocket(): Socket = GuardedSocket()
+    override fun createSocket(host: String, port: Int): Socket = createSocket().apply { connect(InetSocketAddress(host, port)) }
+    override fun createSocket(host: InetAddress, port: Int): Socket = createSocket().apply { connect(InetSocketAddress(host, port)) }
+    override fun createSocket(host: String, port: Int, localHost: InetAddress?, localPort: Int): Socket =
+        createSocket().apply { bind(InetSocketAddress(localHost, localPort)); connect(InetSocketAddress(host, port)) }
+    override fun createSocket(address: InetAddress, port: Int, localAddress: InetAddress?, localPort: Int): Socket =
+        createSocket().apply { bind(InetSocketAddress(localAddress, localPort)); connect(InetSocketAddress(address, port)) }
+
+    private class GuardedSocket : Socket() {
+        override fun connect(endpoint: SocketAddress, timeout: Int) {
+            val address = (endpoint as? InetSocketAddress)?.address
+            if (address == null || !UrlPolicy.isPrivateAddress(address)) {
+                throw ConnectException("Plain HTTP is only allowed for servers on your local network")
+            }
+            super.connect(endpoint, timeout)
+        }
     }
 }
 

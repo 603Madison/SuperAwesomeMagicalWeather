@@ -60,7 +60,7 @@ object WeeWxParsers {
         val o = runCatching { NorthvaneJson.parseToJsonElement(body).asObj() }.getOrNull()
             ?: throw ParseException("Station JSON could not be parsed")
         if (o.long("northvane_format") == null) {
-            throw ParseException("JSON is not in the Northvane template format (see weewx/README.md)")
+            throw ParseException("JSON is not in the SuperAwesomeMagicalWeather template format (see weewx/README.md)")
         }
         val heatIndex = o.dbl("heatindex_C")
         val windChill = o.dbl("windchill_C")

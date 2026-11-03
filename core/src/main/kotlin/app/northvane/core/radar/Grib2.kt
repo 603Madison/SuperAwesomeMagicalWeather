@@ -73,7 +73,18 @@ class LambertGrid(
 object Grib2 {
     private const val EARTH_RADIUS_SHAPE_6 = 6_371_229.0
 
-    fun decode(bytes: ByteArray): GribField {
+    /**
+     * The data comes from the network, so every size in it is checked before
+     * anything is allocated: a damaged or hostile file fails with a
+     * [ParseException] instead of exhausting memory.
+     */
+    fun decode(bytes: ByteArray): GribField = try {
+        decodeChecked(bytes)
+    } catch (e: IndexOutOfBoundsException) {
+        throw ParseException("Truncated GRIB2 section")
+    }
+
+    private fun decodeChecked(bytes: ByteArray): GribField {
         if (bytes.size < 16 || String(bytes, 0, 4, Charsets.US_ASCII) != "GRIB" || bytes[7].toInt() != 2) {
             throw ParseException("Not a GRIB2 message")
         }
@@ -86,12 +97,12 @@ object Grib2 {
         while (pos + 4 <= bytes.size) {
             if (String(bytes, pos, 4, Charsets.US_ASCII) == "7777") break
             val length = u32(bytes, pos).toInt()
-            if (length < 5 || pos + length > bytes.size) throw ParseException("Truncated GRIB2 message")
+            if (length < 5 || length > bytes.size - pos) throw ParseException("Truncated GRIB2 message")
             val section = bytes.copyOfRange(pos, pos + length)
             when (section[4].toInt()) {
                 3 -> grid = lambert(section)
                 5 -> {
-                    points = u32(section, 5).toInt()
+                    points = checkedCount(u32(section, 5), MAX_POINTS, "point count")
                     drsTemplate = u16(section, 9)
                     drs = section
                 }
@@ -103,7 +114,7 @@ object Grib2 {
         val g = grid ?: throw ParseException("GRIB2 message has no grid")
         val d = drs ?: throw ParseException("GRIB2 message has no data representation")
         val payload = data ?: throw ParseException("GRIB2 message has no data")
-        if (points != g.nx * g.ny) throw ParseException("GRIB2 point count doesn't match the grid")
+        if (points.toLong() != g.nx.toLong() * g.ny) throw ParseException("GRIB2 point count doesn't match the grid")
         val values = when (drsTemplate) {
             0 -> simple(d, payload, points)
             2, 3 -> complex(d, payload, points, spatial = drsTemplate == 3)
@@ -117,9 +128,12 @@ object Grib2 {
         if (template != 30) throw ParseException("GRIB2 grid template 3.$template is not supported")
         val shape = u8(s, 14)
         val radius = if (shape == 6) EARTH_RADIUS_SHAPE_6 else 6_367_470.0
+        val nx = checkedCount(u32(s, 30), MAX_EDGE, "grid width")
+        val ny = checkedCount(u32(s, 34), MAX_EDGE, "grid height")
+        if (u32(s, 55) == 0L || u32(s, 59) == 0L) throw ParseException("GRIB2 grid spacing is zero")
         return LambertGrid(
-            nx = u32(s, 30).toInt(),
-            ny = u32(s, 34).toInt(),
+            nx = nx,
+            ny = ny,
             lat1 = signed32(s, 38) / 1e6,
             lon1 = signed32(s, 42) / 1e6,
             lov = signed32(s, 51) / 1e6,
@@ -146,6 +160,7 @@ object Grib2 {
 
     private fun simple(s: ByteArray, data: ByteArray, points: Int): FloatArray {
         val scale = Scale(s)
+        checkWidth(scale.bits, "value")
         val bits = BitReader(data, 5)
         return FloatArray(points) { scale.value(if (scale.bits == 0) 0 else bits.read(scale.bits)) }
     }
@@ -153,7 +168,8 @@ object Grib2 {
     private fun complex(s: ByteArray, data: ByteArray, points: Int, spatial: Boolean): FloatArray {
         val scale = Scale(s)
         if (u8(s, 22) != 0) throw ParseException("GRIB2 missing-value management is not supported")
-        val groups = u32(s, 31).toInt()
+        checkWidth(scale.bits, "value")
+        val groups = checkedCount(u32(s, 31), points.toLong(), "group count")
         val widthRef = u8(s, 35)
         val widthBits = u8(s, 36)
         val lengthRef = u32(s, 37)
@@ -162,6 +178,10 @@ object Grib2 {
         val lengthBits = u8(s, 46)
         val order = if (spatial) u8(s, 47) else 0
         val extraOctets = if (spatial) u8(s, 48) else 0
+        checkWidth(widthBits, "group width")
+        checkWidth(lengthBits, "group length")
+        if (order !in 0..2) throw ParseException("GRIB2 spatial differencing of order $order is not supported")
+        if (order > 0 && extraOctets !in 1..4) throw ParseException("GRIB2 spatial differencing uses $extraOctets octets")
 
         val bits = BitReader(data, 5)
         // Spatial differencing: the first value(s) and the minimum difference, sign and magnitude.
@@ -173,7 +193,7 @@ object Grib2 {
         }
         val refs = LongArray(groups) { if (scale.bits == 0) 0 else bits.read(scale.bits) }
         bits.align()
-        val widths = IntArray(groups) { (widthRef + if (widthBits == 0) 0 else bits.read(widthBits)).toInt() }
+        val widths = IntArray(groups) { (widthRef + if (widthBits == 0) 0 else bits.read(widthBits)).toInt().also { checkWidth(it, "group value") } }
         bits.align()
         val lengths = LongArray(groups) { lengthRef + (if (lengthBits == 0) 0 else bits.read(lengthBits)) * lengthIncrement }
         if (groups > 0) lengths[groups - 1] = lastLength
@@ -232,6 +252,20 @@ object Grib2 {
         fun align() {
             bit = (bit + 7) / 8 * 8
         }
+    }
+
+    /** The most values a field may hold: HRRR's CONUS grid is 1799 × 1059 (about 1.9 million). */
+    private const val MAX_POINTS = 8_000_000L
+    private const val MAX_EDGE = 10_000L
+
+    private fun checkedCount(value: Long, max: Long, what: String): Int {
+        if (value < 1 || value > max) throw ParseException("GRIB2 $what $value is out of range")
+        return value.toInt()
+    }
+
+    /** Packed values are at most 32 bits wide; anything wider would overflow. */
+    private fun checkWidth(bits: Int, what: String) {
+        if (bits !in 0..32) throw ParseException("GRIB2 $what width of $bits bits is not supported")
     }
 
     // GRIB2 is big-endian; positions are zero-based offsets into a section.

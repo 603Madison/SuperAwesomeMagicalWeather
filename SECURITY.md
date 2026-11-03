@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report security problems **privately** through GitHub:
-[Report a vulnerability](https://github.com/603Madison/Northvane-Weather/security/advisories/new).
+[Report a vulnerability](https://github.com/603Madison/SuperAwesomeMagicalWeather/security/advisories/new).
 Don't open a public issue for security bugs.
 
 Include what you found, how to reproduce it, and the app version. You'll get a reply as soon as the maintainer can; fixes ship in the next release and are noted in the changelog.

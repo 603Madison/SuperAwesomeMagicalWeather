@@ -48,6 +48,8 @@ object HttpClients {
             .followRedirects(true)
             .followSslRedirects(false)
             .addInterceptor(CleartextGuardInterceptor())
+            // Again on every hop, so a redirect can't take a request to plain HTTP on the internet.
+            .addNetworkInterceptor(CleartextGuardInterceptor())
             .addInterceptor(DefaultHeadersInterceptor(userAgent))
             .apply { if (cacheDir != null) cache(Cache(cacheDir, cacheBytes)) }
             .build()
@@ -55,7 +57,10 @@ object HttpClients {
     /** Client for user-configured local servers: no shared HTTP cache, LAN-only DNS for cleartext. */
     fun localServerClients(base: OkHttpClient): LocalServerClients = LocalServerClients(
         https = base.newBuilder().cache(null).build(),
-        cleartext = base.newBuilder().cache(null).dns(PrivateNetworkDns()).build(),
+        // LAN only, end to end: private addresses from DNS, sockets that can't reach anything else
+        // (redirects included), and no proxy in between.
+        cleartext = base.newBuilder().cache(null).dns(PrivateNetworkDns()).socketFactory(PrivateNetworkSocketFactory())
+            .proxy(java.net.Proxy.NO_PROXY).build(),
     )
 }
 

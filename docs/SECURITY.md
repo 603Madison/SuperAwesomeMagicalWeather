@@ -30,10 +30,14 @@ weather services described below.
   - hostnames used over `http` must *resolve* to private addresses
     (`PrivateNetworkDns`), which defeats DNS rebinding;
   - credentials (Basic auth, tokens, custom headers) are **never** sent over
-    `http`.
-- `CleartextGuardInterceptor` is a final in-app check on every request. An
-  `http://` request must be explicitly tagged as a local-server request and
-  must not carry an `Authorization` header.
+    `http`;
+  - the client for `http` servers can only open sockets to private-network
+    addresses (`PrivateNetworkSocketFactory`) and uses no proxy, so a redirect
+    to `http://<public IP>/` (IP addresses skip DNS) is refused before
+    anything is sent.
+- `CleartextGuardInterceptor` is a final in-app check on every request, and
+  runs again on every redirect hop. An `http://` request must be explicitly
+  tagged as a local-server request and must not carry an `Authorization` header.
 - The app targets API 37, so **Certificate Transparency** is enforced and
   **Encrypted Client Hello** is used where servers support it.
 - Redirects between http and https are never followed (`followSslRedirects(false)`).
@@ -133,16 +137,31 @@ weather services described below.
 - The optional NWS contact email is sent only to weather.gov, inside the
   User-Agent header, as NWS requests.
 
+## Untrusted data
+
+- Everything downloaded is parsed with size limits checked before memory is
+  allocated. The GRIB2 decoder (future cast) bounds the grid size, point and
+  group counts and bit widths, and turns any damaged file into a parse error
+  (tested with truncated and corrupted files). Radar pictures are checked for
+  their pixel size before they are decoded, in both apps.
+- Text from services (alerts, AI summaries) is only ever shown as plain text;
+  there are no WebViews.
+
 ## Supply chain and build
 
 - Dependencies resolve only from Google Maven and Maven Central, and modules
   cannot add repositories (`FAIL_ON_PROJECT_REPOS`). Google Maven is limited
   to Android/Google/AndroidX groups.
 - Versions are pinned in `gradle/libs.versions.toml`.
-- Release builds are minified and resource-shrunk. Signing keys are never
+- R8 shrinking is off for release builds for now. Signing keys are never
   committed (`keystore.properties` and `*.jks` are git-ignored).
+- GitHub Actions are pinned to commit hashes (Dependabot proposes updates).
+  The release workflow passes its inputs to scripts only through environment
+  variables and checks their format first, so a crafted version or commit
+  can't run commands. The signing key is restored only after the tests, for
+  the build step alone.
 
-## Northvane Mini
+## SuperAwesomeMagicalWeather Mini
 
 The flip-phone app keeps the same rules with a smaller surface: HTTPS only
 (cleartext is off for every host, since Mini has no local-server features), no

@@ -159,7 +159,7 @@ private fun SettingsIndex(state: MainUiState, onBack: () -> Unit, nav: SettingsN
             } + if (s.showStaleData) " · showing stale data" else "") { nav.openPage(SettingsPage.SATELLITE) }
             NavRow("Data sources & API keys", "NWS, Environment Canada, WeeWX, pollen, air quality, traffic, OpenWeatherMap", nav.openSources)
             NavRow("AI summary", if (s.aiEnabled) "${s.aiProvider.label} · ${s.aiModel.ifBlank { "no model" }}" else "Off") { nav.openPage(SettingsPage.AI) }
-            NavRow("About & privacy", "Northvane ${BuildConfig.VERSION_NAME}") { nav.openPage(SettingsPage.ABOUT) }
+            NavRow("About & privacy", "SuperAwesomeMagicalWeather ${BuildConfig.VERSION_NAME}") { nav.openPage(SettingsPage.ABOUT) }
         }
     }
 }
@@ -355,7 +355,7 @@ private fun AlertsPage(state: MainUiState, container: AppContainer, onBack: () -
             LabeledSwitch("Alert notifications", s.alertsEnabled, { enabled -> updateAlerts { setAlertsEnabled(enabled) } },
                 subtitle = "Background checks of NWS (US) and Environment Canada alerts")
             if (s.alertsEnabled && !notificationsAllowed) {
-                Text("Notifications are blocked for Northvane, so alerts can't reach you.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                Text("Notifications are blocked for SuperAwesomeMagicalWeather, so alerts can't reach you.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 FilledTonalButton(onClick = { if (needsRuntimePermission()) notificationPermission.launch(POST_NOTIFICATIONS) else openNotificationSettings() }) {
                     Text("Allow notifications")
                 }
@@ -437,10 +437,10 @@ private fun SatellitePage(state: MainUiState, container: AppContainer, onBack: (
     SettingsScaffold("Backwoods mode", onBack) {
         SectionCard(null) {
             Hint(
-                "Backwoods mode is Northvane's light-packing mode for satellite connections such as T-Mobile T-Satellite: " +
+                "Backwoods mode is SuperAwesomeMagicalWeather's light-packing mode for satellite connections such as T-Mobile T-Satellite: " +
                     "choose exactly what it may download. Anything you turn off keeps its last downloaded data. " +
                     "When set to automatic, it also turns on while Android's Data Saver is on and you're on mobile data, " +
-                    "even if Northvane has unrestricted data.",
+                    "even if SuperAwesomeMagicalWeather has unrestricted data.",
             )
             ChoiceDropdown("Backwoods mode turns on", DataSaverMode.entries, s.dataSaver, {
                 when (it) {
@@ -506,10 +506,10 @@ private fun SatellitePage(state: MainUiState, container: AppContainer, onBack: (
 private fun AboutPage(onBack: () -> Unit) {
     SettingsScaffold("About & privacy", onBack) {
         SectionCard(null) {
-            Text("Northvane ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyLarge)
+            Text("SuperAwesomeMagicalWeather ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyLarge)
             Hint(
                 "Free software under the GNU General Public License v3.0 or later. You can use, study, share and change it; " +
-                    "it comes with no warranty. Source code: github.com/603Madison/Northvane-Weather",
+                    "it comes with no warranty. Source code: github.com/603Madison/SuperAwesomeMagicalWeather",
             )
             Hint(
                 "No accounts, ads, analytics or trackers. Your locations, settings and keys stay on this device and are excluded from " +
@@ -525,7 +525,7 @@ private fun AboutPage(onBack: () -> Unit) {
             Text(
                 "Map data © OpenStreetMap contributors, © OpenMapTiles. Weather data: NOAA / National Weather Service; Environment and " +
                     "Climate Change Canada; NOAA Regional Climate Centers (ACIS); NOAA Space Weather Prediction Center. Pollen: Google Pollen " +
-                    "API. Activity, mud, foliage, garden, heating, outage, frozen pipe, ice, aurora, sap and burn outlooks are Northvane estimates. AI summaries are written by your own AI server.",
+                    "API. Activity, mud, foliage, garden, heating, outage, frozen pipe, ice, aurora, sap and burn outlooks are SuperAwesomeMagicalWeather estimates. AI summaries are written by your own AI server.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

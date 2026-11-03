@@ -55,7 +55,7 @@ class AppContainer(val app: Application) {
 
     private val http: OkHttpClient by lazy {
         HttpClients.create(
-            userAgent = "Northvane/${BuildConfig.VERSION_NAME} (Android)",
+            userAgent = "SuperAwesomeMagicalWeather/${BuildConfig.VERSION_NAME} (Android)",
             cacheDir = File(app.cacheDir, "http"),
         )
     }

@@ -88,6 +88,31 @@ class SecurityTest {
         assertEquals(1, fake.requests.size, "only the allowed request reached the network")
     }
 
+    /** A real server on this machine that redirects to a public address: the LAN client must not follow it out. */
+    @Test
+    fun lanClientCantBeRedirectedToThePublicInternet() {
+        val server = com.sun.net.httpserver.HttpServer.create(java.net.InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0)
+        server.createContext("/") { exchange ->
+            exchange.responseHeaders.add("Location", "http://203.0.113.7/stolen")
+            exchange.sendResponseHeaders(302, -1)
+            exchange.close()
+        }
+        server.start()
+        try {
+            val clients = app.northvane.core.net.HttpClients.localServerClients(
+                app.northvane.core.net.HttpClients.create("test", cacheDir = null),
+            )
+            val request = Request.Builder().url("http://127.0.0.1:${server.address.port}/weewx.json")
+                .tag(LanCleartextAllowed::class.java, LanCleartextAllowed).build()
+            val error = assertFailsWith<IOException> { clients.cleartext.newCall(request).execute().close() }
+            // OkHttp wraps the refusal in its own "Failed to connect"; the reason is underneath.
+            val reasons = generateSequence<Throwable>(error) { it.cause }.flatMap { sequenceOf(it) + it.suppressed.asSequence() }
+            assertTrue(reasons.any { "local network" in it.message.orEmpty() }, error.stackTraceToString())
+        } finally {
+            server.stop(0)
+        }
+    }
+
     @Test
     fun recognizesLikelyLocalNetworkHosts() {
         listOf("192.168.1.20", "10.0.0.5", "fd7a:115c:a1e0::1", "weewx.local", "pi.lan", "nas.home.arpa", "raspberrypi")
@@ -98,9 +123,9 @@ class SecurityTest {
 
     @Test
     fun userAgentSanitizesContact() {
-        assertEquals("Northvane/1.0 (Android weather app)", NwsClient.userAgent("1.0", "  "))
-        assertEquals("Northvane/1.0 (me@example.com)", NwsClient.userAgent("1.0", "me@example.com\r\nX-Evil: 1"
+        assertEquals("SuperAwesomeMagicalWeather/1.0 (Android weather app)", NwsClient.userAgent("1.0", "  "))
+        assertEquals("SuperAwesomeMagicalWeather/1.0 (me@example.com)", NwsClient.userAgent("1.0", "me@example.com\r\nX-Evil: 1"
             .substringBefore('\r')))
-        assertEquals("Northvane/1.0 (a@b.cX-Evil:1)", NwsClient.userAgent("1.0", "a@b.c\r\nX-Evil: 1"))
+        assertEquals("SuperAwesomeMagicalWeather/1.0 (a@b.cX-Evil:1)", NwsClient.userAgent("1.0", "a@b.c\r\nX-Evil: 1"))
     }
 }

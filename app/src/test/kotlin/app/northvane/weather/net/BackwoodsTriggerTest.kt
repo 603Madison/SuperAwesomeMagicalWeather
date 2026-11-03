@@ -11,7 +11,7 @@ class BackwoodsTriggerTest {
 
     @Test
     fun dataSaverOnMobileDataTurnsBackwoodsOn() {
-        // Data Saver is on whether or not Northvane is set to "Unrestricted data".
+        // Data Saver is on whether or not SuperAwesomeMagicalWeather is set to "Unrestricted data".
         assertTrue(isLimited(auto, NetworkStatus(metered = true, dataSaver = true)))
     }
 

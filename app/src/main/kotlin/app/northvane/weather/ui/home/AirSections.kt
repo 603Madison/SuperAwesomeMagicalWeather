@@ -253,7 +253,7 @@ internal fun AllergyBlock(
     Text("Your allergies", style = MaterialTheme.typography.titleSmall)
     val today = days.firstOrNull()
     if (!hasProfile || today == null) {
-        Small("Tell Northvane what you're allergic to (birch, grass, ragweed, mold…) for a daily score of how your allergies will be.")
+        Small("Tell SuperAwesomeMagicalWeather what you're allergic to (birch, grass, ragweed, mold…) for a daily score of how your allergies will be.")
         TextButton(onClick = onEditAllergies) { Text("Choose my allergies") }
         return
     }

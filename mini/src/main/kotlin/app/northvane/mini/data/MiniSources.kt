@@ -153,6 +153,10 @@ class RadarImages(private val http: OkHttpClient) {
                     val source = response.body.source()
                     if (source.request(MAX_BYTES + 1)) return@use null
                     val bytes = source.buffer.readByteArray()
+                    // Check the size before decoding: a small file can claim a huge picture.
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+                    if (bounds.outWidth !in 1..MAX_EDGE || bounds.outHeight !in 1..MAX_EDGE) return@use null
                     BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                 }
             }
@@ -163,6 +167,7 @@ class RadarImages(private val http: OkHttpClient) {
 
     private companion object {
         const val MAX_BYTES = 1024L * 1024
+        const val MAX_EDGE = 2048
         val STAMP: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMddHHmm").withZone(ZoneOffset.UTC)
     }
 }

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Northvane Mini talks only to public HTTPS services, so cleartext is off everywhere. -->
+<!-- SuperAwesomeMagicalWeather Mini talks only to public HTTPS services, so cleartext is off everywhere. -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>

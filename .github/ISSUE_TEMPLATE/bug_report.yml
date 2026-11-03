@@ -12,7 +12,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Northvane version
+      label: SuperAwesomeMagicalWeather version
       placeholder: "1.0.0"
   - type: input
     id: device

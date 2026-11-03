@@ -74,7 +74,7 @@ object AlertNotifier {
             id = "test-" + now.toEpochMilli(),
             threadId = "northvane-test",
             event = "Test Warning",
-            headline = "This is a test notification from Northvane. No action is needed.",
+            headline = "This is a test notification from SuperAwesomeMagicalWeather. No action is needed.",
             description = null,
             instruction = "Real warnings from the National Weather Service will look like this.",
             severity = AlertSeverity.SEVERE,

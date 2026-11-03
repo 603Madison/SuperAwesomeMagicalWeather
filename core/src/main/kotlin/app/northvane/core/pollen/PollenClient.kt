@@ -127,7 +127,7 @@ class PollenClient(
 /**
  * What a Pollen API key costs, shown where the user enters it. Google's
  * pay-as-you-go price list (checked October 2026): 5,000 free requests per
- * billing account each month, then US$10 per 1,000 requests. Northvane asks for
+ * billing account each month, then US$10 per 1,000 requests. SuperAwesomeMagicalWeather asks for
  * pollen at most once per [MIN_REFRESH_HOURS] per saved location, so normal
  * use stays inside the free allowance.
  */

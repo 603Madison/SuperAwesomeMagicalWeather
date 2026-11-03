@@ -185,7 +185,7 @@ fun DataSourcesScreen(
                     Text("Add WeeWX station")
                 }
                 Text(
-                    "Supported: the Northvane JSON template (recommended, see weewx/README.md in the project), " +
+                    "Supported: the SuperAwesomeMagicalWeather JSON template (recommended, see weewx/README.md in the project), " +
                         "realtime.txt from weewx-crt, or clientraw.txt.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -207,10 +207,10 @@ fun DataSourcesScreen(
             ApiKeySection(
                 title = "Air quality: EPA AirNow (optional)",
                 description = "Official AQI from EPA monitoring stations and state/local forecasts. Free: register at " +
-                    "docs.airnowapi.org and paste the key here. Without a key, Northvane uses Open-Meteo's air quality " +
+                    "docs.airnowapi.org and paste the key here. Without a key, SuperAwesomeMagicalWeather uses Open-Meteo's air quality " +
                     "model (free, no key, less precise near the ground).",
                 costLines = listOf(
-                    "Free government API (EPA). Limit: 500 requests per hour; Northvane uses at most 2 per place every 30 minutes.",
+                    "Free government API (EPA). Limit: 500 requests per hour; SuperAwesomeMagicalWeather uses at most 2 per place every 30 minutes.",
                     "AirNow only accepts the key inside the request URL, so those requests are never cached.",
                 ),
                 secretName = SecretStore.AIRNOW_API_KEY,
@@ -225,7 +225,7 @@ fun DataSourcesScreen(
                     "newengland511.org and request a developer key. Work zones on the Traffic tab come from the states' " +
                     "public WZDx feeds and need no key.",
                 costLines = listOf(
-                    "Free government API. It allows about 10 requests a minute; Northvane asks at most every 5 minutes while the Traffic tab is open.",
+                    "Free government API. It allows about 10 requests a minute; SuperAwesomeMagicalWeather asks at most every 5 minutes while the Traffic tab is open.",
                 ),
                 secretName = SecretStore.NE511_API_KEY,
                 validate = { if (TrafficClient.looks511Key(it)) null else "That doesn't look like a 511 developer key." },
@@ -734,7 +734,7 @@ private fun PollenSection(
 
     SectionCard("Pollen (Google Pollen API)") {
         Text(
-            "NOAA and the NWS don't forecast pollen, so Northvane uses Google's Pollen API: 5-day tree, grass and " +
+            "NOAA and the NWS don't forecast pollen, so SuperAwesomeMagicalWeather uses Google's Pollen API: 5-day tree, grass and " +
                 "weed levels on a 1 km grid, plus the main plants (birch, oak, ragweed…). It needs your own API key.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -749,7 +749,7 @@ private fun PollenSection(
                 val lines = listOf(
                     "Free for the first %,d requests each month.".format(PollenPricing.FREE_REQUESTS_PER_MONTH),
                     "After that, US$%.0f per 1,000 requests (1¢ each).".format(PollenPricing.USD_PER_1000),
-                    "Northvane asks at most once every ${PollenPricing.MIN_REFRESH_HOURS} hours per saved place. With your " +
+                    "SuperAwesomeMagicalWeather asks at most once every ${PollenPricing.MIN_REFRESH_HOURS} hours per saved place. With your " +
                         "$places place${if (places == 1) "" else "s"}, that's at most %,d requests a month, ".format(maxRequests) +
                         if (maxCost == 0.0) "so you'd pay $0." else "or up to about US$%.2f a month.".format(maxCost),
                     "Google needs a billing account (a card on file) to issue any Maps Platform key, even if you never pass the free tier.",

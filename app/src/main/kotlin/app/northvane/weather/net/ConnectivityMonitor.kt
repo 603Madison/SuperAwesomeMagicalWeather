@@ -29,7 +29,7 @@ data class NetworkStatus(
     val constrained: Boolean = false,
     val metered: Boolean = false,
     /**
-     * Android's Data Saver is on. Reported even when Northvane is set to
+     * Android's Data Saver is on. Reported even when SuperAwesomeMagicalWeather is set to
      * "Unrestricted data", since the user still asked the phone to save data.
      */
     val dataSaver: Boolean = false,

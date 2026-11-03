@@ -55,7 +55,7 @@ class WeatherRepositoryTest {
     private fun repo(fake: FakeNetwork, cache: NwsPointCache = MemoryCache(), extras: Boolean = false): WeatherRepository {
         val base = HttpClients.create("test-agent", cacheDir = null).newBuilder().addInterceptor(fake).build()
         return WeatherRepository(
-            nws = NwsClient(base, { "Northvane/test (tests)" }),
+            nws = NwsClient(base, { "SuperAwesomeMagicalWeather/test (tests)" }),
             owm = OwmClient(base),
             weewx = WeeWxClient(HttpClients.localServerClients(base)),
             pointCache = cache,
@@ -196,7 +196,7 @@ class WeatherRepositoryTest {
         assertTrue(snapshot.issues.isEmpty(), "issues: ${snapshot.issues}")
         assertNotNull(snapshot.sunrise)
         assertTrue(fake.requests.all { it.url.host == "api.weather.gov" })
-        assertTrue(fake.requests.all { it.header("User-Agent") == "Northvane/test (tests)" })
+        assertTrue(fake.requests.all { it.header("User-Agent") == "SuperAwesomeMagicalWeather/test (tests)" })
         assertTrue(fake.requests.none { it.url.host.contains("openweathermap") })
     }
 

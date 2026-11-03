@@ -39,7 +39,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 /**
- * Drives Northvane Mini with keys only, the way a flip phone without a
+ * Drives SuperAwesomeMagicalWeather Mini with keys only, the way a flip phone without a
  * touchscreen does: d-pad, OK, soft keys and number keys. Screenshots are
  * rendered at a typical flip-phone size (480×640, 2.8").
  */

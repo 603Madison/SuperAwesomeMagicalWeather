@@ -91,9 +91,9 @@ class NwsClient(
         fun userAgent(appVersion: String, contact: String?): String {
             val safeContact = contact?.trim()?.filter { it.code in 0x21..0x7E && it != '(' && it != ')' }?.take(100)
             return if (safeContact.isNullOrEmpty()) {
-                "Northvane/$appVersion (Android weather app)"
+                "SuperAwesomeMagicalWeather/$appVersion (Android weather app)"
             } else {
-                "Northvane/$appVersion ($safeContact)"
+                "SuperAwesomeMagicalWeather/$appVersion ($safeContact)"
             }
         }
     }

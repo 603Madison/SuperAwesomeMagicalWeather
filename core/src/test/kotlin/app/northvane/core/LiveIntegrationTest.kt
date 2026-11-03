@@ -33,7 +33,7 @@ class LiveIntegrationTest {
     @Before
     fun onlyWhenRequested() = assumeTrue(System.getProperty("northvane.live") == "true")
 
-    private val http = HttpClients.create("Northvane/test (integration tests)", cacheDir = null)
+    private val http = HttpClients.create("SuperAwesomeMagicalWeather/test (integration tests)", cacheDir = null)
 
     private val cache = object : NwsPointCache {
         val map = mutableMapOf<String, CachedNwsPoint>()
@@ -44,7 +44,7 @@ class LiveIntegrationTest {
     @Test
     fun fullRefreshFromNws() = runBlocking {
         val repo = WeatherRepository(
-            NwsClient(http, { "Northvane/test (integration tests)" }),
+            NwsClient(http, { "SuperAwesomeMagicalWeather/test (integration tests)" }),
             OwmClient(http),
             WeeWxClient(HttpClients.localServerClients(http)),
             cache,
@@ -91,7 +91,7 @@ class LiveIntegrationTest {
     @Test
     fun outlooksFromLiveNoaaHistory() = runBlocking {
         val repo = WeatherRepository(
-            NwsClient(http, { "Northvane/test (integration tests)" }),
+            NwsClient(http, { "SuperAwesomeMagicalWeather/test (integration tests)" }),
             OwmClient(http),
             WeeWxClient(HttpClients.localServerClients(http)),
             cache,

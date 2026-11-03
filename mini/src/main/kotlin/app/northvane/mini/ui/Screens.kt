@@ -152,7 +152,9 @@ fun MiniRoot(vm: MiniViewModel, openAlerts: Boolean, onExit: () -> Unit, hub: Ke
             androidx.compose.material3.Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Column(Modifier.fillMaxSize()) {
                 val route = stack.last()
-                TopBar(titleOf(route, state), state.place?.displayName)
+                // The app's name is long for a 2.4" screen: at home the place itself is the title.
+                val place = state.place?.displayName
+                if (route == Route.HOME && place != null) TopBar(place, null) else TopBar(titleOf(route, state), place)
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     androidx.compose.runtime.key(route) {
                         when {
@@ -179,7 +181,7 @@ fun MiniRoot(vm: MiniViewModel, openAlerts: Boolean, onExit: () -> Unit, hub: Ke
 }
 
 private fun titleOf(route: String, state: MiniState): String = when {
-    route == Route.HOME -> "Northvane"
+    route == Route.HOME -> "SuperAwesomeMagicalWeather"
     route == Route.HOURLY -> "Hourly"
     route == Route.DAYS -> "7-day"
     route.startsWith("day:") -> state.snapshot?.daily?.firstOrNull { it.date.toString() == route.substringAfter(':') }?.name ?: "Day"
@@ -191,7 +193,7 @@ private fun titleOf(route: String, state: MiniState): String = when {
     route == Route.ADD -> "Add a place"
     route == Route.SETTINGS -> "Settings"
     route == Route.HELP -> "Keys & help"
-    else -> "Northvane"
+    else -> "SuperAwesomeMagicalWeather"
 }
 
 private fun refreshKey(state: MiniState, refresh: () -> Unit) = SoftKey(if (state.loading) "Updating…" else "Refresh", refresh)
@@ -649,7 +651,7 @@ private fun HelpScreen() {
         ).forEach { Text("• $it", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 3.dp)) }
         Text("About", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 10.dp))
         Text(
-            "Northvane Mini ${BuildConfig.VERSION_NAME}. Forecasts and alerts from the National Weather Service " +
+            "SuperAwesomeMagicalWeather Mini ${BuildConfig.VERSION_NAME}. Forecasts and alerts from the National Weather Service " +
                 "(Environment Canada in Canada), radar pictures from the Iowa Environmental Mesonet (NWS NEXRAD), " +
                 "place search by Open-Meteo. No accounts, ads or tracking. Free software under the GNU GPL v3.",
             style = MaterialTheme.typography.bodySmall,

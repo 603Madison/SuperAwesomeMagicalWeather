@@ -1,13 +1,13 @@
-# Connecting Northvane to your WeeWX station
+# Connecting SuperAwesomeMagicalWeather to your WeeWX station
 
-Northvane can show **your own station's current conditions** in place of the
+SuperAwesomeMagicalWeather can show **your own station's current conditions** in place of the
 nearest NWS observation for one of your saved locations. The NWS still provides
 the sky condition (sunny, cloudy, …), the forecast and alerts, and fills in
 anything your station doesn't measure, such as visibility.
 
 You need a URL the app can fetch. Pick **one** of the options below.
 
-## Option A — Northvane JSON template (recommended)
+## Option A — SuperAwesomeMagicalWeather JSON template (recommended)
 
 A tiny skin that writes `northvane.json` with explicit metric units on every
 report cycle (usually every 5 minutes).
@@ -55,7 +55,7 @@ for temperature, humidity, dew point, wind, pressure and rain.
   custom headers (for example a reverse proxy's API key) are supported. They
   are stored encrypted with a hardware-backed Android Keystore key.
 - **Android 17+:** reaching a server on your home network needs the
-  **Nearby devices** permission. Northvane asks for it when you test or save such
+  **Nearby devices** permission. SuperAwesomeMagicalWeather asks for it when you test or save such
   a station. If it's denied, the station is skipped and NWS is used instead.
 - Self-signed certificates: install your CA certificate on the phone
   (Settings › Security › Encryption & credentials). The app trusts

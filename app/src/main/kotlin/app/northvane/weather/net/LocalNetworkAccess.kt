@@ -13,7 +13,7 @@ import java.net.InetAddress
 
 /**
  * Android 17 blocks connections to devices on the local network unless the
- * app holds ACCESS_LOCAL_NETWORK ("Nearby devices"). Northvane only needs it to
+ * app holds ACCESS_LOCAL_NETWORK ("Nearby devices"). SuperAwesomeMagicalWeather only needs it to
  * reach a WeeWX server on the user's own LAN.
  */
 object LocalNetworkAccess {
@@ -21,7 +21,7 @@ object LocalNetworkAccess {
     const val PERMISSION = "android.permission.ACCESS_LOCAL_NETWORK"
 
     const val DENIED_MESSAGE =
-        "Your station is on the local network. Allow \"Nearby devices\" for Northvane to use it."
+        "Your station is on the local network. Allow \"Nearby devices\" for SuperAwesomeMagicalWeather to use it."
 
     fun isEnforced(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN
 

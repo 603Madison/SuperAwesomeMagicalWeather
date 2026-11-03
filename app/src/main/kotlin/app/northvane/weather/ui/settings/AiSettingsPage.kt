@@ -100,7 +100,7 @@ internal fun AiSettingsPage(state: MainUiState, container: AppContainer, onBack:
         SectionCard(null) {
             Hint(
                 "A short summary of the forecast, written by your own AI server, at the top of the Today screen. " +
-                    "Northvane sends only the place name and the forecast numbers. Summaries are refreshed at most every 45 minutes.",
+                    "SuperAwesomeMagicalWeather sends only the place name and the forecast numbers. Summaries are refreshed at most every 45 minutes.",
             )
             LabeledSwitch(
                 "AI summary on Today", s.aiEnabled,

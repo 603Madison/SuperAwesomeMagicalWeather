@@ -250,7 +250,14 @@ fun TopBar(title: String, subtitle: String?) {
         Modifier.fillMaxWidth().background(colors.surfaceVariant).padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = MaterialTheme.typography.titleSmall, color = colors.onSurface, maxLines = 1)
+        Text(
+            title,
+            style = MaterialTheme.typography.titleSmall,
+            color = colors.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = subtitle == null),
+        )
         if (subtitle != null) {
             Text(
                 "  ·  $subtitle",

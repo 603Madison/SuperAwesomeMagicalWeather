@@ -31,6 +31,6 @@ You need JDK 17+ (21 works), Android Studio with AGP 9.4 support and the Android
 
 ## License
 
-Northvane is licensed under the GNU General Public License v3.0 or later
+SuperAwesomeMagicalWeather is licensed under the GNU General Public License v3.0 or later
 (`GPL-3.0-or-later`; see [`LICENSE`](LICENSE)). By contributing, you agree that
 your contributions are licensed under the same terms.
