@@ -3,6 +3,11 @@
 All notable changes to Northvane. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.6.1] - 2026-11-03
+
+### Changed
+- **Future cast calibrated to the radar.** Each model run is matched to the newest radar picture by quantile mapping (same amount of rain, same mix of light and heavy) and that correction carries through its forecast, capped at ±15 dBZ. Nothing is moved: where rain falls is still the model's forecast. The radar caption says when frames are calibrated.
+
 ## [1.6.0] - 2026-11-03
 
 ### Added

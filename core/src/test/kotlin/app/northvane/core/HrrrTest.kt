@@ -114,8 +114,12 @@ class HrrrTest {
         val service = RadarService(http)
         val latest = service.pastFrames(RadarSource.NOAA_MRMS, now).last()
         val started = System.nanoTime()
-        val frames = service.futureFrames(now, 120, after = latest.time, area = area)
-        println("Latest radar ${latest.time}; ${frames.size} model frames from run ${frames.firstOrNull()?.run} in ${(System.nanoTime() - started) / 1_000_000} ms")
+        val decode = { bytes: ByteArray ->
+            ImageIO.read(bytes.inputStream())?.let { img -> img.getRGB(0, 0, img.width, img.height, null, 0, img.width) }
+        }
+        val frames = service.futureFrames(now, 120, after = latest.time, area = area, decodePng = decode)
+        println("Latest radar ${latest.time}; ${frames.size} model frames from runs ${frames.mapNotNull { it.run }.distinct()} " +
+            "calibrated=${frames.count { it.calibrated }} in ${(System.nanoTime() - started) / 1_000_000} ms")
         assertTrue(frames.isNotEmpty() && frames.all { it.image != null })
         val out = java.io.File("build/hrrr").apply { mkdirs() }
         frames.forEachIndexed { k, f ->

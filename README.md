@@ -351,10 +351,17 @@ need a burn permit.
   radar over Maine noticeably better than reflectivity 1 km above ground),
   about 490 KB per frame by byte range, decodes the GRIB2 data on the phone,
   projects it onto sub-kilometer map pixels and colors it with the same scale
-  as NOAA's radar, so past and forecast frames look alike. Frames start right
-  after the newest radar scan, and the caption names the runs used. If NOAA's
-  data can't be reached, the Iowa Environmental Mesonet's HRRR tiles are used
-  instead.
+  as NOAA's radar, so past and forecast frames look alike. Each run is then
+  **calibrated to the newest radar** by quantile mapping: at the radar's time,
+  the model's reflectivity at each percentile is matched to the radar's, and
+  that correction is applied to the run's later frames (capped at ±15 dBZ).
+  This fixes a model that draws too little or too much rain on a given day
+  without moving anything; where the rain is still comes from the model. On a
+  day of light rain in Maine it brought the model's rain area in line with the
+  radar and raised the critical success index for light rain by 0.02–0.07 over
+  the next 90 minutes. Frames start right after the newest radar scan, and the
+  caption names the runs used. If NOAA's data can't be reached, the Iowa
+  Environmental Mesonet's HRRR tiles are used instead.
 - **Satellite imagery** toggle on the map: GOES-East/West visible by day and
   infrared at night (or pick visible, infrared or water vapor) from NOAA
   nowCOAST, drawn under the radar.

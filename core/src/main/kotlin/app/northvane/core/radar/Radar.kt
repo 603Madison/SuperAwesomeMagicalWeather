@@ -8,6 +8,7 @@ import app.northvane.core.json.obj
 import app.northvane.core.json.str
 import app.northvane.core.net.fetch
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.runInterruptible
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.longOrNull
@@ -36,6 +37,8 @@ data class RadarFrame(
     val image: RadarImage? = null,
     /** For model frames: when the model run started. */
     val run: Instant? = null,
+    /** For model frames: adjusted to match the newest radar (see [Calibration]). */
+    val calibrated: Boolean = false,
 )
 
 /**
@@ -62,16 +65,50 @@ class RadarService(
      * from now, over [area]: the newest HRRR run straight from NOAA, or IEM's
      * tiles of an older run if NOAA's data can't be reached.
      */
-    suspend fun futureFrames(now: Instant, horizonMinutes: Int = 120, after: Instant = now, area: TileArea? = null): List<RadarFrame> {
+    suspend fun futureFrames(
+        now: Instant,
+        horizonMinutes: Int = 120,
+        after: Instant = now,
+        area: TileArea? = null,
+        /** Decodes a PNG to ARGB pixels (platform code); enables calibration against the radar. */
+        decodePng: ((ByteArray) -> IntArray?)? = null,
+    ): List<RadarFrame> {
         val until = now.plus(Duration.ofMinutes(horizonMinutes.toLong()))
         if (area != null) {
+            val observed = if (decodePng != null) runCatchingNonCancel { observedRadar(area, after, decodePng) }.getOrNull() else null
             val direct = runCatchingNonCancel {
-                hrrr.frames(now, HrrrForecast.frameTimes(after, now, until), area)
+                hrrr.frames(now, HrrrForecast.frameTimes(after, now, until), area, observed)
             }.getOrNull().orEmpty()
             if (direct.isNotEmpty()) return direct
         }
         val init = latestHrrrRun(now)
         return hrrrFrames(init, now, horizonMinutes, iemBase).filter { it.time.isAfter(after) }
+    }
+
+    /**
+     * NOAA's radar over the whole [area] at [time], as one image at half the
+     * map resolution: what the model is calibrated against. Always NOAA's
+     * service, whose colors [Calibration.radarDbz] knows.
+     */
+    private suspend fun observedRadar(area: TileArea, time: Instant, decodePng: (ByteArray) -> IntArray?): ObservedRadar? {
+        val world = 2 * Math.PI * 6378137.0
+        val tile = world / (1 shl area.zoom)
+        val minX = -world / 2 + area.x0 * tile
+        val maxY = world / 2 - area.y0 * tile
+        val bbox = "%.2f,%.2f,%.2f,%.2f".format(java.util.Locale.ROOT, minX, maxY - area.rows * tile, minX + area.cols * tile, maxY)
+        val width = area.width / 2
+        val height = area.height / 2
+        val url = noaaTileUrl(noaaBase, time).replace("{bbox-epsg-3857}", bbox).replace("size=256,256", "size=$width,$height")
+        val bytes = runInterruptible(kotlinx.coroutines.Dispatchers.IO) {
+            http.newCall(Request.Builder().url(url).build()).execute().use { response ->
+                if (!response.isSuccessful) return@use null
+                val source = response.body.source()
+                if (source.request(4L * 1024 * 1024 + 1)) return@use null
+                source.buffer.readByteArray()
+            }
+        } ?: return null
+        val argb = decodePng(bytes)?.takeIf { it.size == width * height } ?: return null
+        return ObservedRadar(time, width, height, argb)
     }
 
     // --- NOAA MRMS (mapservices.weather.noaa.gov ArcGIS ImageServer) ---

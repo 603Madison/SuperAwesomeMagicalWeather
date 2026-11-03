@@ -75,7 +75,7 @@ class RadarViewModel(private val container: AppContainer) : ViewModel() {
                 // Zoom-7 pixels (under 1 km) so the map's usual zoom doesn't show blocks; about 11° by 8° around the place.
                 val area = at?.let { TileArea.around(it.latitude, it.longitude, zoom = 7, cols = 4, rows = 4) }
                 val after = past.lastOrNull()?.time ?: now
-                attempt { container.radar.futureFrames(now, settings.futureCastMinutes, after, area) }.getOrDefault(emptyList())
+                attempt { container.radar.futureFrames(now, settings.futureCastMinutes, after, area, ::decodePng) }.getOrDefault(emptyList())
             } else {
                 emptyList()
             }
@@ -131,6 +131,15 @@ class RadarViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     companion object {
+        /** ARGB pixels of a PNG, for calibrating the forecast against the radar. */
+        private fun decodePng(bytes: ByteArray): IntArray? {
+            val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+            return IntArray(bitmap.width * bitmap.height).also {
+                bitmap.getPixels(it, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+                bitmap.recycle()
+            }
+        }
+
         fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {
             initializer { RadarViewModel(container) }
         }

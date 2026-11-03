@@ -69,6 +69,12 @@ object ReflectivityPalette {
 
     fun color(index: Int): Int = table[index.coerceIn(0, table.lastIndex)]
 
+    /** Number of palette entries, including transparent index 0. */
+    val size: Int get() = table.size
+
+    /** The reflectivity a palette index stands for (index ≥ 1). */
+    fun dbz(index: Int): Float = (MIN_DBZ + (index - 1) / 2.0).toFloat()
+
     fun argb(dbz: Float): Int = color(index(dbz))
 
     private fun colorAt(dbz: Double): Int {
@@ -133,23 +139,53 @@ class HrrrForecast(
         return chosen
     }
 
-    /** Forecast frames for [times] from the newest runs that have them, drawn over [area]. */
-    suspend fun frames(now: Instant, times: List<Instant>, area: TileArea): List<RadarFrame> = coroutineScope {
+    /**
+     * Forecast frames for [times] from the newest runs that have them, drawn
+     * over [area]. With [observed] (the newest radar over the same area),
+     * each run is first calibrated against it ([Calibration]).
+     */
+    suspend fun frames(now: Instant, times: List<Instant>, area: TileArea, observed: ObservedRadar? = null): List<RadarFrame> = coroutineScope {
         val runs = runsFor(now, times)
         val mapping = withContext(Dispatchers.Default) { GridMapping(area) }
+        val calibrations = if (observed == null) {
+            emptyMap()
+        } else {
+            runs.values.distinct().associateWith { init -> runCatching { calibrate(init, observed, mapping) }.getOrNull() }
+        }
         val limit = Semaphore(3)
         runs.map { (time, init) ->
             async {
                 limit.withPermit {
                     val minutes = Duration.between(init, time).toMinutes()
                     val bytes = field(init, minutes) ?: return@withPermit null
+                    val calibration = calibrations[init]
                     withContext(Dispatchers.Default) {
-                        val image = mapping.render(Grib2.decode(bytes))
-                        RadarFrame(time, isForecast = true, tileUrl = "", image = image, run = init)
+                        val image = mapping.render(Grib2.decode(bytes), calibration)
+                        RadarFrame(time, isForecast = true, tileUrl = "", image = image, run = init, calibrated = calibration != null)
                     }
                 }
             }
         }.awaitAll().filterNotNull()
+    }
+
+    /** Compares the run's step nearest the radar's time with the radar itself. */
+    private suspend fun calibrate(init: Instant, observed: ObservedRadar, mapping: GridMapping): Calibration? {
+        val minutes = Math.round(Duration.between(init, observed.time).toMinutes() / 15.0) * 15
+        if (minutes < 15 || minutes > MAX_SUBHOURLY_MINUTES) return null
+        if (!Calibration.matches(observed.time, init.plusSeconds(minutes * 60))) return null
+        val bytes = field(init, minutes) ?: return null
+        return withContext(Dispatchers.Default) {
+            val model = mapping.sample(Grib2.decode(bytes))
+            // The radar image is coarser than the map pixels; compare at its resolution.
+            val w = mapping.width
+            val h = mapping.height
+            val sampled = FloatArray(observed.width * observed.height) { k ->
+                val x = (k % observed.width) * w / observed.width
+                val y = (k / observed.width) * h / observed.height
+                model[y * w + x]
+            }
+            Calibration.build(sampled, Calibration.radarDbz(observed.argb))
+        }
     }
 
     /** The REFD 1 km field for one forecast minute, from the cache or by byte range. */
@@ -198,6 +234,8 @@ class HrrrForecast(
      * one run (the grid never changes).
      */
     private class GridMapping(private val area: TileArea) {
+        val width: Int get() = area.width
+        val height: Int get() = area.height
         private var grid: LambertGrid? = null
         private lateinit var gi: FloatArray
         private lateinit var gj: FloatArray
@@ -224,25 +262,31 @@ class HrrrForecast(
             grid = g
         }
 
-        fun render(field: GribField): RadarImage {
+        /** Reflectivity at every map pixel (NaN outside the model's grid). */
+        fun sample(field: GribField): FloatArray {
             val g = field.grid
             prepare(g)
-            val w = area.width
-            val pixels = ByteArray(w * area.height)
-            for (k in pixels.indices) {
+            return FloatArray(area.width * area.height) { k ->
                 val i = gi[k]
                 val j = gj[k]
-                if (i < 0 || j < 0 || i > g.nx - 1 || j > g.ny - 1) continue
+                if (i < 0 || j < 0 || i > g.nx - 1 || j > g.ny - 1) return@FloatArray Float.NaN
                 // Bilinear between the four surrounding grid points.
                 val i0 = floor(i).toInt().coerceAtMost(g.nx - 2)
                 val j0 = floor(j).toInt().coerceAtMost(g.ny - 2)
                 val fi = i - i0
                 val fj = j - j0
-                val v = (field[i0, j0] * (1 - fi) + field[i0 + 1, j0] * fi) * (1 - fj) +
+                (field[i0, j0] * (1 - fi) + field[i0 + 1, j0] * fi) * (1 - fj) +
                     (field[i0, j0 + 1] * (1 - fi) + field[i0 + 1, j0 + 1] * fi) * fj
-                pixels[k] = ReflectivityPalette.index(v).toByte()
             }
-            return RadarImage(w, area.height, pixels, area.north, area.south, area.west, area.east)
+        }
+
+        fun render(field: GribField, calibration: Calibration? = null): RadarImage {
+            val values = sample(field)
+            val pixels = ByteArray(values.size) { k ->
+                val v = values[k]
+                if (v.isNaN()) 0 else ReflectivityPalette.index(calibration?.apply(v) ?: v).toByte()
+            }
+            return RadarImage(area.width, area.height, pixels, area.north, area.south, area.west, area.east)
         }
     }
 
