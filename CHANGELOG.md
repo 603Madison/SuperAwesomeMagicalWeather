@@ -7,6 +7,7 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ### Changed
 - **Northvane is now SuperAwesomeMagicalWeather**, and Northvane Mini is SuperAwesomeMagicalWeather Mini: app names, screens, notifications, release downloads and docs. It installs as an update over Northvane (same package and signing key), and your places and settings stay. On Mini's home screen the place name is now the title, since the full app name doesn't fit next to it on a flip phone.
+- **A shorter, clearer README**, organized by screen with feature tables and fresh screenshots. The technical details moved to `docs/HOW-IT-WORKS.md`.
 
 ### Security
 - **LAN servers can't redirect you onto the internet in plain text.** The connection used for a WeeWX station or AI server on `http://` can now only reach private-network addresses, including after a redirect, and never goes through a proxy.
