@@ -85,7 +85,7 @@ jobs:
           echo "RELEASE_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
       - name: Run tests
-        run: ./gradlew --no-daemon :core:test :app:testDebugUnitTest :app:lintDebug
+        run: ./gradlew --no-daemon :core:test :app:testDebugUnitTest :app:lintDebug :mini:testDebugUnitTest :mini:lintDebug
 
       - name: Build signed release APK
         env:
@@ -93,10 +93,16 @@ jobs:
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
-          ./gradlew --no-daemon :app:assembleRelease
+          ./gradlew --no-daemon :app:assembleRelease :mini:assembleRelease
           cp app/build/outputs/apk/release/app-release.apk "Northvane-${TAG}.apk"
-          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "Northvane-${TAG}.apk" | grep -i "SHA-256 digest"
-          sha256sum "Northvane-${TAG}.apk" | tee SHA256SUMS.txt
+          # Northvane Mini (flip phones) only exists from 1.6.0 on.
+          if [ -f mini/build/outputs/apk/release/mini-release.apk ]; then
+            cp mini/build/outputs/apk/release/mini-release.apk "Northvane-Mini-${TAG}.apk"
+          fi
+          for apk in Northvane-*.apk; do
+            "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$apk" | grep -i "SHA-256 digest"
+          done
+          sha256sum Northvane-*.apk | tee SHA256SUMS.txt
 
       - name: Release notes
         run: |
@@ -116,11 +122,11 @@ jobs:
             # Replace the files; drop debug-signed APKs left from before signing was set up.
             gh release view "$TAG" --json assets --jq '.assets[].name' | grep -- '-debug\.apk$' \
               | while read -r old; do gh release delete-asset "$TAG" "$old" --yes; done
-            gh release upload "$TAG" "Northvane-${TAG}.apk" SHA256SUMS.txt --clobber
+            gh release upload "$TAG" Northvane-*.apk SHA256SUMS.txt --clobber
           else
             # Only the highest version is marked Latest, whatever order releases are made in.
             newest=$( (git tag -l 'v*'; echo "$TAG") | grep -v -- '-' | sort -V | tail -n 1)
-            gh release create "$TAG" "Northvane-${TAG}.apk" SHA256SUMS.txt --target "$COMMIT" \
+            gh release create "$TAG" Northvane-*.apk SHA256SUMS.txt --target "$COMMIT" \
               --title "Northvane ${TAG}" --notes-file release-notes.md \
               --latest=$([ "$TAG" = "$newest" ] && echo true || echo false) \
               $(echo "$TAG" | grep -q -- '-' && echo --prerelease)

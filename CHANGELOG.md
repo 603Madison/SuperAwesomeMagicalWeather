@@ -3,6 +3,14 @@
 All notable changes to Northvane. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.6.0] - 2026-11-03
+
+### Added
+- **Northvane Mini**, a separate app for Android flip phones (Northvane-Mini APK in each release). Every action works from the d-pad, OK, soft keys and number keys, with or without a touchscreen; compact screens for current conditions, hourly, 7-day, alerts (with notifications), places (search by town or ZIP, or GPS), settings and a lightweight radar (IEM NEXRAD map pictures, ◀▶ time, ▲▼ zoom, 2468 pan).
+
+### Fixed
+- **Future cast**: uses the model's composite reflectivity, which matches the radar far better than reflectivity 1 km above ground (it was dropping rain the radar sees aloft far from the radars), takes each frame from the newest run that has published it instead of waiting for one run to cover every frame, and draws at twice the resolution so frames no longer look blocky.
+
 ## [1.5.3] - 2026-11-03
 
 ### Changed

@@ -54,7 +54,7 @@ enum class SatelliteFeature(val title: String, val description: String, val appr
     HISTORY("Recent weather (NOAA)", "Past rain and temperatures for mud, foliage and seasonal outage estimates; at most every 6 hours", "~3 KB", true),
     POLLEN("Pollen forecast", "Google Pollen API, only if you've added a key; at most every 6 hours", "~6 KB", false),
     RADAR("Radar", "Past hour of radar images", "0.5–3 MB per view", false),
-    FUTURE_CAST("Radar future cast", "NOAA HRRR model radar, about 320 KB per 15 minutes ahead", "2.5–3.5 MB per view", false),
+    FUTURE_CAST("Radar future cast", "NOAA HRRR model radar, about 490 KB per 15 minutes ahead", "4–5 MB per view", false),
     SATELLITE_IMAGERY("Satellite imagery", "GOES cloud imagery under the radar", "0.3–2 MB per view", false),
     AIR_QUALITY("Air quality & UV", "AQI (EPA AirNow or Open-Meteo) and EPA UV index; at most every 30 minutes", "~3 KB", true),
     TRAFFIC("Traffic events", "Work zones, closures and incidents from state DOT feeds", "50–700 KB per view", false),

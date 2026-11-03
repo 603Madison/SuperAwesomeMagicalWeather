@@ -25,11 +25,15 @@ class HrrrTest {
 
     private fun client(fake: FakeNetwork) = HttpClients.create("test-agent", cacheDir = null).newBuilder().addInterceptor(fake).build()
 
-    /** An index whose REFD 1 km entry for 15 minutes spans the whole fixture (served for any range). */
+    /** An index whose composite reflectivity entry for 15 minutes spans the whole fixture (served for any range). */
     private val index = """
         1:0:d=2026110313:REFC:entire atmosphere:15 min fcst:
-        6:0:d=2026110313:REFD:1000 m above ground:15 min fcst:
-        7:${grib.size}:d=2026110313:REFD:4000 m above ground:15 min fcst:
+        2:${grib.size}:d=2026110313:RETOP:cloud top:15 min fcst:
+    """.trimIndent()
+
+    private fun indexFor(minutes: Int, next: Int = grib.size) = """
+        1:0:d=x:REFC:entire atmosphere:$minutes min fcst:
+        2:$next:d=x:RETOP:cloud top:$minutes min fcst:
     """.trimIndent()
 
     @Test
@@ -56,16 +60,25 @@ class HrrrTest {
     }
 
     @Test
-    fun picksTheNewestRunThatReachesFarEnough() = runTest {
+    fun eachFrameComesFromTheNewestRunThatHasIt() = runTest {
         val fake = FakeNetwork().apply {
-            // 14Z isn't out yet; 13Z has the files through hour 3.
-            on("hrrr.t14z", code = 404, body = "")
-            on("hrrr.t13z.wrfsubhf03.grib2.idx", body = index)
+            on("example.test", code = 404, body = "")
+            // 15Z has published its first hour only; 14Z has its second and third hours.
+            on("hrrr.t15z.wrfsubhf01.grib2.idx", body = indexFor(15) + "\n" + indexFor(30) + "\n" + indexFor(45) + "\n" + indexFor(60))
+            on("hrrr.t14z.wrfsubhf02.grib2.idx", body = indexFor(75) + "\n" + indexFor(90) + "\n" + indexFor(105) + "\n" + indexFor(120))
+            on("hrrr.t14z.wrfsubhf03.grib2.idx", body = indexFor(135) + "\n" + indexFor(150) + "\n" + indexFor(165) + "\n" + indexFor(180))
         }
         val hrrr = HrrrForecast(client(fake), base = "https://example.test")
-        assertEquals(init, hrrr.latestRun(Instant.parse("2026-11-03T14:40:00Z"), Instant.parse("2026-11-03T15:40:00Z")))
-        assertNull(HrrrForecast(client(FakeNetwork().apply { on("example.test", code = 404, body = "") }), "https://example.test")
-            .latestRun(Instant.parse("2026-11-03T14:40:00Z"), Instant.parse("2026-11-03T15:40:00Z")))
+        val now = Instant.parse("2026-11-03T15:58:00Z")
+        val times = listOf("16:00", "16:15", "16:30", "17:00", "17:15", "18:30").map { Instant.parse("2026-11-03T$it:00Z") }
+        val runs = hrrr.runsFor(now, times)
+        val t15 = Instant.parse("2026-11-03T15:00:00Z")
+        val t14 = Instant.parse("2026-11-03T14:00:00Z")
+        assertEquals(t15, runs[times[0]]) // 16:00 is in 15Z's first hour
+        assertEquals(t14, runs[times[1]]) // 16:15 isn't out from 15Z yet, so 14Z
+        assertEquals(t14, runs[times[3]]) // 17:00: 14Z's third hour
+        assertNull(runs[times[4]]) // 17:15 would need 14Z's fourth hour, not published
+        assertNull(runs[times[5]])
     }
 
     @Test
@@ -75,17 +88,18 @@ class HrrrTest {
             onBytes("wrfsubhf01.grib2", grib)
         }
         val area = TileArea.around(portland.first, portland.second, zoom = 6, cols = 3, rows = 3)
-        val frames = HrrrForecast(client(fake), base = "https://example.test").frames(init, listOf(init.plusSeconds(15 * 60)), area)
+        val frames = HrrrForecast(client(fake), base = "https://example.test").frames(init.plusSeconds(60), listOf(init.plusSeconds(15 * 60)), area)
         assertEquals(1, frames.size)
         val frame = frames.single()
         assertTrue(frame.isForecast)
         assertEquals(init, frame.run)
         val image = frame.image!!
         assertEquals(768, image.width)
-        val drawn = image.pixels.count { it != 0 }
-        assertTrue(drawn in 1000 until image.pixels.size / 2, "$drawn pixels")
+        val pixels = image.argb()
+        val drawn = pixels.count { it != 0 }
+        assertTrue(drawn in 1000 until pixels.size / 2, "$drawn pixels")
         // Only palette colors, fully opaque.
-        assertTrue(image.pixels.filter { it != 0 }.all { (it ushr 24) == 0xFF })
+        assertTrue(pixels.filter { it != 0 }.all { (it ushr 24) == 0xFF })
         // The byte range comes from the index.
         assertTrue(fake.requests.any { it.header("Range") == "bytes=0-${grib.size - 1}" })
     }
@@ -96,7 +110,7 @@ class HrrrTest {
         assumeTrue(System.getProperty("northvane.live") == "true")
         val http = HttpClients.create("Northvane-test", cacheDir = null)
         val now = Instant.now()
-        val area = TileArea.around(portland.first, portland.second, zoom = 6, cols = 3, rows = 3)
+        val area = TileArea.around(portland.first, portland.second, zoom = 7, cols = 4, rows = 4) // as the app does
         val service = RadarService(http)
         val latest = service.pastFrames(RadarSource.NOAA_MRMS, now).last()
         val started = System.nanoTime()
@@ -106,7 +120,7 @@ class HrrrTest {
         val out = java.io.File("build/hrrr").apply { mkdirs() }
         frames.forEachIndexed { k, f ->
             val img = BufferedImage(area.width, area.height, BufferedImage.TYPE_INT_ARGB)
-            img.setRGB(0, 0, area.width, area.height, f.image!!.pixels, 0, area.width)
+            img.setRGB(0, 0, area.width, area.height, f.image!!.argb(), 0, area.width)
             ImageIO.write(img, "png", java.io.File(out, "frame%02d.png".format(k)))
         }
     }

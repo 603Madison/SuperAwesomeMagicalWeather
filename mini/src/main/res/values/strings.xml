@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Northvane Mini</string>
+    <string name="channel_alerts">Weather alerts</string>
+    <string name="channel_alerts_desc">NWS and Environment Canada warnings, watches and advisories for your places.</string>
+</resources>

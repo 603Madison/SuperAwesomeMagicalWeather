@@ -23,17 +23,24 @@ import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.roundToInt
 
-/** A forecast radar image rendered on the device, drawn over [west, east] × [south, north] (Web Mercator). */
+/**
+ * A forecast radar image rendered on the device, drawn over [west, east] ×
+ * [south, north] (Web Mercator). Stored as one byte per pixel (an index into
+ * [ReflectivityPalette]) to keep several frames small in memory.
+ */
 class RadarImage(
     val width: Int,
     val height: Int,
-    /** ARGB pixels, row by row from the top-left. */
-    val pixels: IntArray,
+    /** Palette index per pixel, row by row from the top-left; 0 is transparent. */
+    val indices: ByteArray,
     val north: Double,
     val south: Double,
     val west: Double,
     val east: Double,
-)
+) {
+    /** ARGB pixels for drawing. */
+    fun argb(): IntArray = IntArray(indices.size) { ReflectivityPalette.color(indices[it].toInt() and 0xFF) }
+}
 
 /**
  * The radar colors of NOAA's MRMS reflectivity service, by dBZ, so forecast
@@ -51,13 +58,18 @@ object ReflectivityPalette {
         50.0 to 0xFF2300, 55.0 to 0xC80000, 60.0 to 0xBE008C, 65.0 to 0xE68CFF, 70.0 to 0xFFFFFF,
     )
 
-    // 0.25 dBZ steps from MIN_DBZ to 75 dBZ.
-    private val table = IntArray(((75.0 - MIN_DBZ) * 4).toInt() + 1) { k -> colorAt(MIN_DBZ + k / 4.0) }
+    // Index 0 is transparent; then 0.5 dBZ steps from MIN_DBZ to 75 dBZ (fits in a byte).
+    private val table = IntArray(((75.0 - MIN_DBZ) * 2).toInt() + 2) { k -> if (k == 0) 0 else colorAt(MIN_DBZ + (k - 1) / 2.0) }
 
-    fun argb(dbz: Float): Int {
+    /** Palette index for a reflectivity; 0 when too weak to draw. */
+    fun index(dbz: Float): Int {
         if (dbz.isNaN() || dbz < MIN_DBZ) return 0
-        return table[((dbz - MIN_DBZ) * 4).toInt().coerceAtMost(table.lastIndex)]
+        return (1 + ((dbz - MIN_DBZ) * 2).toInt()).coerceAtMost(table.lastIndex)
     }
+
+    fun color(index: Int): Int = table[index.coerceIn(0, table.lastIndex)]
+
+    fun argb(dbz: Float): Int = color(index(dbz))
 
     private fun colorAt(dbz: Double): Int {
         val upper = anchors.indexOfFirst { it.first >= dbz }
@@ -73,10 +85,13 @@ object ReflectivityPalette {
 
 /**
  * NOAA's HRRR (High-Resolution Rapid Refresh) model straight from NOAA's open
- * data on AWS: the newest hourly run's simulated radar reflectivity 1 km above
- * ground, every 15 minutes, 3 km resolution. Only the needed field is
- * downloaded (byte ranges from the run's index file, ~320 KB per frame), then
- * decoded, projected and colored like the past radar on the device.
+ * data on AWS: simulated composite radar reflectivity (the strongest echo in
+ * each column, which is what a radar mosaic shows far from the radars), every
+ * 15 minutes at 3 km. Each frame comes from the newest run that has published
+ * it, since runs appear an hour or so after they start and fill in over the
+ * next hour. Only the needed field is downloaded (byte ranges from the run's
+ * index file, ~490 KB per frame), then decoded, projected and colored like the
+ * past radar on the device.
  */
 class HrrrForecast(
     private val http: OkHttpClient,
@@ -87,26 +102,43 @@ class HrrrForecast(
     }
     private val indexCache = HashMap<String, List<IndexEntry>>()
 
-    internal data class IndexEntry(val offset: Long, val field: String, val level: String, val step: String)
-
-    /** The newest run whose files already reach [until]. */
-    suspend fun latestRun(now: Instant, until: Instant): Instant? {
-        val hour = now.truncatedTo(ChronoUnit.HOURS)
-        for (back in 0L..4L) {
-            val init = hour.minus(Duration.ofHours(back))
-            val minutes = Duration.between(init, until).toMinutes()
-            if (minutes > MAX_SUBHOURLY_MINUTES) return null
-            val lastFile = fileHour(minutes.coerceAtLeast(15))
-            if (index(init, lastFile) != null) return init
-        }
-        return null
+    internal data class IndexEntry(val offset: Long, val field: String, val level: String, val step: String) {
+        /** Composite reflectivity: what radar mosaics show, including rain aloft far from the radars. */
+        fun isReflectivity() = field == "REFC" && level == "entire atmosphere"
     }
 
-    /** Forecast frames for [times] from the run started at [init], drawn over [area]. */
-    suspend fun frames(init: Instant, times: List<Instant>, area: TileArea): List<RadarFrame> = coroutineScope {
+    /**
+     * The newest run that has published each of [times] (runs up to five hours
+     * old are considered), or nothing for times no run covers yet.
+     */
+    suspend fun runsFor(now: Instant, times: List<Instant>): Map<Instant, Instant> {
+        val hour = now.truncatedTo(ChronoUnit.HOURS)
+        val runs = (0L..5L).map { hour.minus(Duration.ofHours(it)) }
+        val missing = HashSet<String>() // files known not to be out yet, within this call
+        val chosen = LinkedHashMap<Instant, Instant>()
+        for (time in times) {
+            for (init in runs) {
+                val minutes = Duration.between(init, time).toMinutes()
+                if (minutes < 15 || minutes > MAX_SUBHOURLY_MINUTES || minutes % 15 != 0L) continue
+                val file = fileHour(minutes)
+                val key = "${STAMP.format(init)}/$file"
+                if (key in missing) continue
+                if (index(init, file)?.any { it.isReflectivity() && it.step == "$minutes min fcst" } == true) {
+                    chosen[time] = init
+                    break
+                }
+                missing += key
+            }
+        }
+        return chosen
+    }
+
+    /** Forecast frames for [times] from the newest runs that have them, drawn over [area]. */
+    suspend fun frames(now: Instant, times: List<Instant>, area: TileArea): List<RadarFrame> = coroutineScope {
+        val runs = runsFor(now, times)
         val mapping = withContext(Dispatchers.Default) { GridMapping(area) }
         val limit = Semaphore(3)
-        times.map { time ->
+        runs.map { (time, init) ->
             async {
                 limit.withPermit {
                     val minutes = Duration.between(init, time).toMinutes()
@@ -127,7 +159,7 @@ class HrrrForecast(
         val file = fileHour(minutes)
         val entries = index(init, file) ?: return null
         val step = "$minutes min fcst"
-        val i = entries.indexOfFirst { it.field == "REFD" && it.level == "1000 m above ground" && it.step == step }
+        val i = entries.indexOfFirst { it.isReflectivity() && it.step == step }
         if (i < 0) return null
         val start = entries[i].offset
         val end = entries.getOrNull(i + 1)?.offset?.minus(1) ?: return null
@@ -196,7 +228,7 @@ class HrrrForecast(
             val g = field.grid
             prepare(g)
             val w = area.width
-            val pixels = IntArray(w * area.height)
+            val pixels = ByteArray(w * area.height)
             for (k in pixels.indices) {
                 val i = gi[k]
                 val j = gj[k]
@@ -208,7 +240,7 @@ class HrrrForecast(
                 val fj = j - j0
                 val v = (field[i0, j0] * (1 - fi) + field[i0 + 1, j0] * fi) * (1 - fj) +
                     (field[i0, j0 + 1] * (1 - fi) + field[i0 + 1, j0 + 1] * fi) * fj
-                pixels[k] = ReflectivityPalette.argb(v)
+                pixels[k] = ReflectivityPalette.index(v).toByte()
             }
             return RadarImage(w, area.height, pixels, area.north, area.south, area.west, area.east)
         }

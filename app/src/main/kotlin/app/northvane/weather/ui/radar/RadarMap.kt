@@ -134,7 +134,7 @@ fun RadarMap(
             val image = frame.image
             if (image != null) {
                 // Drawn on the phone from model data: one image stretched over its tile area.
-                val bitmap = Bitmap.createBitmap(image.pixels, image.width, image.height, Bitmap.Config.ARGB_8888)
+                val bitmap = Bitmap.createBitmap(image.argb(), image.width, image.height, Bitmap.Config.ARGB_8888)
                 val quad = LatLngQuad(
                     LatLng(image.north, image.west), LatLng(image.north, image.east),
                     LatLng(image.south, image.east), LatLng(image.south, image.west),

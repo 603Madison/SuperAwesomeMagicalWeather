@@ -72,7 +72,8 @@ class RadarViewModel(private val container: AppContainer) : ViewModel() {
             val past = attempt { container.radar.pastFrames(settings.radarSource, now) }.getOrDefault(emptyList())
             val future = if (futureAllowed) {
                 // NOAA's HRRR model, starting right after the newest radar scan, drawn around the location.
-                val area = at?.let { TileArea.around(it.latitude, it.longitude, zoom = 6, cols = 3, rows = 3) }
+                // Zoom-7 pixels (under 1 km) so the map's usual zoom doesn't show blocks; about 11° by 8° around the place.
+                val area = at?.let { TileArea.around(it.latitude, it.longitude, zoom = 7, cols = 4, rows = 4) }
                 val after = past.lastOrNull()?.time ?: now
                 attempt { container.radar.futureFrames(now, settings.futureCastMinutes, after, area) }.getOrDefault(emptyList())
             } else {

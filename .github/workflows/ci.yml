@@ -36,7 +36,7 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0"
 
       - name: Unit tests, screenshot tests, lint, debug build
-        run: ./gradlew --no-daemon :core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+        run: ./gradlew --no-daemon :core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :mini:testDebugUnitTest :mini:lintDebug :mini:assembleDebug
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -44,15 +44,20 @@ jobs:
           name: reports-and-screenshots
           path: |
             app/build/outputs/screenshots/
+            mini/build/outputs/screenshots/
             app/build/reports/lint-results-debug.html
+            mini/build/reports/lint-results-debug.html
             core/build/reports/tests/
             app/build/reports/tests/
+            mini/build/reports/tests/
           if-no-files-found: ignore
 
       - uses: actions/upload-artifact@v4
         with:
           name: northvane-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            mini/build/outputs/apk/debug/mini-debug.apk
 
   live-services:
     # Weekly check that NWS / NOAA / IEM still behave the way the app expects.

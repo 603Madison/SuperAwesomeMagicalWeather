@@ -141,3 +141,15 @@ weather services described below.
 - Versions are pinned in `gradle/libs.versions.toml`.
 - Release builds are minified and resource-shrunk. Signing keys are never
   committed (`keystore.properties` and `*.jks` are git-ignored).
+
+## Northvane Mini
+
+The flip-phone app keeps the same rules with a smaller surface: HTTPS only
+(cleartext is off for every host, since Mini has no local-server features), no
+API keys, no accounts, and places and settings stored only on the device
+(excluded from cloud backup and device transfer). It talks only to
+api.weather.gov and Environment Canada (forecasts and alerts),
+mesonet.agron.iastate.edu (radar map pictures, which include the map area
+around the place being viewed) and geocoding-api.open-meteo.com (place search;
+only the typed town or ZIP code is sent). Location is used only when the user
+picks "Use my location", and only while the app is open.

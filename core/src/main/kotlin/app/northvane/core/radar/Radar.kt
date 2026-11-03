@@ -66,8 +66,7 @@ class RadarService(
         val until = now.plus(Duration.ofMinutes(horizonMinutes.toLong()))
         if (area != null) {
             val direct = runCatchingNonCancel {
-                val init = hrrr.latestRun(now, until) ?: return@runCatchingNonCancel emptyList()
-                hrrr.frames(init, HrrrForecast.frameTimes(after, now, until), area)
+                hrrr.frames(now, HrrrForecast.frameTimes(after, now, until), area)
             }.getOrNull().orEmpty()
             if (direct.isNotEmpty()) return direct
         }

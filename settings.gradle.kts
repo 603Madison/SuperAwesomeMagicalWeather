@@ -31,3 +31,4 @@ dependencyResolutionManagement {
 rootProject.name = "Northvane"
 include(":core")
 include(":app")
+include(":mini")

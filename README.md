@@ -66,6 +66,30 @@ check it against `SHA256SUMS.txt`, and open it on your phone (you'll be asked to
 allow installs from your browser or file manager). Northvane runs on Android 8.0+.
 The satellite features need Android 16+ and a carrier that supports satellite data.
 
+### Northvane Mini (flip phones)
+
+Each release also has **Northvane-Mini**, a separate small app for Android flip
+phones (Kyocera DuraXV, Sonim XP3plus, TCL Flip, CAT S22 Flip and similar). It
+installs alongside Northvane and is built for 2.4–2.8" screens and keypads:
+
+- **Everything works from the d-pad and keys**, with or without a
+  touchscreen: ▲▼ to move, OK to select, the right soft key (or Back) to go
+  back, and the left soft key for the action shown at bottom left (Refresh,
+  Add, Search…). Phones that send MENU for the left soft key work too.
+- **Number shortcuts** from the home screen: 1 Hourly, 2 7-day, 3 Alerts,
+  4 Radar, 5 Places, 6 Settings, 0 Keys & help.
+- Current conditions, 48 hours, 7 days with full NWS text, alerts with
+  background **notifications**, several places (search by town or ZIP with the
+  keypad, or use GPS), °F/°C and dark/light themes.
+- **Radar** as a single map picture per frame (IEM's NEXRAD maps with counties,
+  highways and towns), no map engine: ◀▶ steps through the past hour, ▲▼ or
+  `*` `#` zoom, 2 4 6 8 pan, OK plays.
+- Light on data (about 25 KB per forecast refresh, ~60 KB per radar frame) and
+  on memory, for Android Go phones. Same forecast engine and sources as
+  Northvane; no accounts, ads or tracking.
+
+<img src="docs/screenshots/mini_home.png" width="240" alt="Northvane Mini home screen at 480×640">
+
 ## Status
 
 Version 1.0.0. The data layer is tested against captured and live NWS, NOAA and
@@ -318,15 +342,19 @@ need a burn permit.
   scan times in NOAA's image catalog, and each frame draws the newest scan for
   every region (CONUS, Alaska, Hawaii, Puerto Rico, Guam).
 - **Future cast**: NOAA's HRRR model (3 km, updated hourly), read straight
-  from NOAA's open data on AWS rather than pre-rendered tiles. Northvane picks
-  the newest run that's out (about an hour after it starts, versus two to
-  three hours for third-party tiles), downloads only the simulated radar
-  reflectivity 1 km above ground for each 15-minute step (~320 KB each, by byte
-  range from the run's index), decodes the GRIB2 data on the phone, projects
-  it onto the map and colors it with the same scale as NOAA's radar, so past
-  and forecast frames look alike. Frames start right after the newest radar
-  scan and show which model run they come from. If NOAA's data can't be
-  reached, the Iowa Environmental Mesonet's HRRR tiles are used instead.
+  from NOAA's open data on AWS rather than pre-rendered tiles. Each 15-minute
+  frame comes from the newest run that has already published it (runs appear
+  about an hour after they start and fill in over the next hour), so the first
+  hour is usually from a run under two hours old. Northvane downloads only the
+  simulated **composite** reflectivity (the strongest echo in each column,
+  which is what a radar mosaic shows far from the radars; it matched NOAA's
+  radar over Maine noticeably better than reflectivity 1 km above ground),
+  about 490 KB per frame by byte range, decodes the GRIB2 data on the phone,
+  projects it onto sub-kilometer map pixels and colors it with the same scale
+  as NOAA's radar, so past and forecast frames look alike. Frames start right
+  after the newest radar scan, and the caption names the runs used. If NOAA's
+  data can't be reached, the Iowa Environmental Mesonet's HRRR tiles are used
+  instead.
 - **Satellite imagery** toggle on the map: GOES-East/West visible by day and
   infrared at night (or pick visible, infrared or water vapor) from NOAA
   nowCOAST, drawn under the radar.

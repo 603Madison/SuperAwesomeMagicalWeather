@@ -260,9 +260,13 @@ private fun Controls(
                 buildString {
                     append(state.source.attribution)
                     if (satellite) append(" · ${SatelliteImagery.ATTRIBUTION}")
-                    state.frames.firstOrNull { it.isForecast }?.let { f ->
-                        val run = f.run?.let { " (%02dZ run)".format(it.atOffset(java.time.ZoneOffset.UTC).hour) }.orEmpty()
-                        append(" · Forecast: NOAA HRRR model$run" + if (f.image != null) ", from NOAA open data" else " via Iowa Environmental Mesonet")
+                    val forecast = state.frames.filter { it.isForecast }
+                    if (forecast.isNotEmpty()) {
+                        // Newest run first; later frames may come from the run before while the newest is still publishing.
+                        val runs = forecast.mapNotNull { it.run }.distinct().sortedDescending()
+                            .joinToString(", ") { "%02dZ".format(it.atOffset(java.time.ZoneOffset.UTC).hour) }
+                        append(" · Forecast: NOAA HRRR model" + (if (runs.isNotEmpty()) " ($runs run)" else "") +
+                            if (forecast.first().image != null) ", from NOAA open data" else " via Iowa Environmental Mesonet")
                     }
                 },
                 style = MaterialTheme.typography.labelSmall,
