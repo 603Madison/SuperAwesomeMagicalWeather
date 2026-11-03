@@ -407,7 +407,7 @@ private fun MapsPage(state: MainUiState, container: AppContainer, onBack: () -> 
     SettingsScaffold("Radar & traffic", onBack) {
         SectionCard("Radar") {
             ChoiceDropdown("Past radar", RadarSource.entries, s.radarSource, { it.label }, { source -> update { setRadarSource(source) } })
-            LabeledSwitch("Future cast", s.futureCastEnabled, { on -> update { setFutureCast(on) } }, subtitle = "Next 90 minutes from the radar's own motion, then NOAA's HRRR model (continental US)")
+            LabeledSwitch("Future cast", s.futureCastEnabled, { on -> update { setFutureCast(on) } }, subtitle = "NOAA's HRRR model, newest run, in the same colors as the radar (continental US)")
             if (s.futureCastEnabled) {
                 ChoiceDropdown("Future cast range", listOf(60, 120, 180), s.futureCastMinutes, { "${it / 60} hour${if (it > 60) "s" else ""} ahead" }, { m -> update { setFutureCastMinutes(m) } })
             }

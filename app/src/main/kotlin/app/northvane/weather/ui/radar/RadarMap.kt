@@ -131,13 +131,13 @@ fun RadarMap(
         layerIds = frames.mapIndexed { i, frame ->
             val sourceId = "radar-src-$i"
             val layerId = "radar-layer-$i"
-            val nowcast = frame.nowcast
-            if (nowcast != null) {
-                // Computed on the phone: one image stretched over its tile area.
-                val bitmap = Bitmap.createBitmap(nowcast.pixels, nowcast.width, nowcast.height, Bitmap.Config.ARGB_8888)
+            val image = frame.image
+            if (image != null) {
+                // Drawn on the phone from model data: one image stretched over its tile area.
+                val bitmap = Bitmap.createBitmap(image.pixels, image.width, image.height, Bitmap.Config.ARGB_8888)
                 val quad = LatLngQuad(
-                    LatLng(nowcast.north, nowcast.west), LatLng(nowcast.north, nowcast.east),
-                    LatLng(nowcast.south, nowcast.east), LatLng(nowcast.south, nowcast.west),
+                    LatLng(image.north, image.west), LatLng(image.north, image.east),
+                    LatLng(image.south, image.east), LatLng(image.south, image.west),
                 )
                 s.addSource(ImageSource(sourceId, quad, bitmap))
             } else {

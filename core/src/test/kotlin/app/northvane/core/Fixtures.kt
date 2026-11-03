@@ -15,7 +15,7 @@ val NOW: Instant = Instant.parse("2026-10-29T15:00:00Z")
  * tests exercise real clients and interceptors without touching the network.
  */
 class FakeNetwork : Interceptor {
-    data class Canned(val code: Int, val body: String, val headers: Map<String, String> = emptyMap())
+    data class Canned(val code: Int, val body: String, val headers: Map<String, String> = emptyMap(), val bytes: ByteArray? = null)
 
     private val routes = mutableListOf<Pair<String, Canned>>()
     // OkHttp calls run in parallel, so recording must be thread-safe.
@@ -23,6 +23,11 @@ class FakeNetwork : Interceptor {
 
     fun on(urlContains: String, code: Int = 200, body: String, headers: Map<String, String> = emptyMap()) {
         routes += urlContains to Canned(code, body, headers)
+    }
+
+    /** A binary response, such as a GRIB2 field. */
+    fun onBytes(urlContains: String, bytes: ByteArray, code: Int = 200) {
+        routes += urlContains to Canned(code, "", bytes = bytes)
     }
 
     override fun intercept(chain: Interceptor.Chain): Response {
@@ -41,7 +46,7 @@ class FakeNetwork : Interceptor {
             .code(canned.code)
             .message("Canned")
             .apply { canned.headers.forEach { (k, v) -> header(k, v) } }
-            .body(canned.body.toResponseBody("application/json".toMediaType()))
+            .body(canned.bytes?.toResponseBody("application/octet-stream".toMediaType()) ?: canned.body.toResponseBody("application/json".toMediaType()))
             .build()
     }
 }

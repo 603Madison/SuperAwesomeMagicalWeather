@@ -93,8 +93,10 @@ weather services described below.
 - Over satellite links, each data type can be blocked individually, which also
   limits what leaves the device on that network.
 - Requests go only to: api.weather.gov (NWS), mapservices.weather.noaa.gov
-  (NOAA radar), mesonet.agron.iastate.edu (HRRR future cast / alternative
-  radar), nowcoast.noaa.gov (satellite imagery, only when the layer is on),
+  (NOAA radar), noaa-hrrr-bdp-pds.s3.amazonaws.com (NOAA HRRR future cast;
+  no location is sent, the same file serves everyone), mesonet.agron.iastate.edu
+  (fallback HRRR tiles / alternative radar), services.swpc.noaa.gov (aurora
+  forecast; no location sent), nowcoast.noaa.gov (satellite imagery, only when the layer is on),
   data.rcc-acis.org (NOAA ACIS recent observed weather, at most every 6 hours
   per place), tiles.openfreemap.org (basemap), the user's WeeWX server,
   pollen.googleapis.com (only with the user's key; coordinates rounded to

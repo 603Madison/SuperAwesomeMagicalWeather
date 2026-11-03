@@ -30,33 +30,49 @@ enum class RadarSource(val label: String, val attribution: String) {
 data class RadarFrame(
     val time: Instant,
     val isForecast: Boolean,
-    /** XYZ (or WMS-style `{bbox-epsg-3857}`) tile URL template for MapLibre; empty for a [nowcast] image. */
+    /** XYZ (or WMS-style `{bbox-epsg-3857}`) tile URL template for MapLibre; empty for an [image] frame. */
     val tileUrl: String,
-    /** A forecast image extrapolated from recent radar, instead of map tiles. */
-    val nowcast: NowcastImage? = null,
+    /** A forecast rendered on the device from model data, instead of map tiles. */
+    val image: RadarImage? = null,
+    /** For model frames: when the model run started. */
+    val run: Instant? = null,
 )
 
 /**
  * Builds radar animation frames.
  *
  * Past frames come from the NWS/NOAA MRMS time-enabled image service
- * (default) or IEM's NEXRAD composite tiles. The future cast uses the NOAA
- * HRRR model's simulated reflectivity, which IEM publishes as map tiles —
- * NOAA does not offer a tiled radar forecast itself.
+ * (default) or IEM's NEXRAD composite tiles. The future cast is NOAA's HRRR
+ * model, read from NOAA's open data and drawn on the device ([HrrrForecast]);
+ * IEM's pre-rendered HRRR tiles are the fallback.
  */
 class RadarService(
     private val http: OkHttpClient,
     private val noaaBase: String = NOAA_MRMS_BASE,
     private val iemBase: String = IEM_BASE,
+    private val hrrr: HrrrForecast = HrrrForecast(http),
 ) {
     suspend fun pastFrames(source: RadarSource, now: Instant, count: Int = 7): List<RadarFrame> = when (source) {
         RadarSource.NOAA_MRMS -> noaaFrames(now, count)
         RadarSource.IEM_NEXRAD -> iemNexradFrames(now, count)
     }
 
-    suspend fun futureFrames(now: Instant, horizonMinutes: Int = 120): List<RadarFrame> {
+    /**
+     * Model frames after [after] (the newest radar scan) out to [horizonMinutes]
+     * from now, over [area]: the newest HRRR run straight from NOAA, or IEM's
+     * tiles of an older run if NOAA's data can't be reached.
+     */
+    suspend fun futureFrames(now: Instant, horizonMinutes: Int = 120, after: Instant = now, area: TileArea? = null): List<RadarFrame> {
+        val until = now.plus(Duration.ofMinutes(horizonMinutes.toLong()))
+        if (area != null) {
+            val direct = runCatchingNonCancel {
+                val init = hrrr.latestRun(now, until) ?: return@runCatchingNonCancel emptyList()
+                hrrr.frames(init, HrrrForecast.frameTimes(after, now, until), area)
+            }.getOrNull().orEmpty()
+            if (direct.isNotEmpty()) return direct
+        }
         val init = latestHrrrRun(now)
-        return hrrrFrames(init, now, horizonMinutes, iemBase)
+        return hrrrFrames(init, now, horizonMinutes, iemBase).filter { it.time.isAfter(after) }
     }
 
     // --- NOAA MRMS (mapservices.weather.noaa.gov ArcGIS ImageServer) ---
@@ -197,7 +213,7 @@ class RadarService(
                 val forecastMinute = Duration.between(init, target).toMinutes()
                 if (forecastMinute in 0..1080 && forecastMinute % 15 == 0L) {
                     val layer = "hrrr::REFD-F%04d-%s".format(forecastMinute, IEM_STAMP.format(init))
-                    frames += RadarFrame(target, isForecast = true, tileUrl = "$iemBase/cache/tile.py/1.0.0/$layer/{z}/{x}/{y}.png")
+                    frames += RadarFrame(target, isForecast = true, tileUrl = "$iemBase/cache/tile.py/1.0.0/$layer/{z}/{x}/{y}.png", run = init)
                 }
                 target = target.plus(Duration.ofMinutes(15))
             }

@@ -3,6 +3,11 @@
 All notable changes to Northvane. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.5.3] - 2026-11-03
+
+### Changed
+- **Future cast from real model data.** The extrapolated "nowcast" from 1.5.2 is gone. Forecast frames now come from NOAA's HRRR model read directly from NOAA's open data: the newest run (about an hour old instead of two to three), the model's simulated radar 1 km above ground at 3 km resolution, decoded on the phone and drawn in the same colors as the past radar. Frames start right after the newest radar scan and show which run they're from. Iowa Environmental Mesonet tiles remain as a fallback.
+
 ## [1.5.2] - 2026-11-03
 
 ### Changed

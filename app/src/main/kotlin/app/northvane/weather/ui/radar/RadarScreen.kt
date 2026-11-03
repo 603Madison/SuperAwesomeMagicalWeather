@@ -260,8 +260,10 @@ private fun Controls(
                 buildString {
                     append(state.source.attribution)
                     if (satellite) append(" · ${SatelliteImagery.ATTRIBUTION}")
-                    if (state.frames.any { it.nowcast != null }) append(" · Nowcast: latest radar carried along its recent motion")
-                    if (state.frames.any { it.isForecast && it.nowcast == null }) append(" · Model: NOAA HRRR via Iowa Environmental Mesonet")
+                    state.frames.firstOrNull { it.isForecast }?.let { f ->
+                        val run = f.run?.let { " (%02dZ run)".format(it.atOffset(java.time.ZoneOffset.UTC).hour) }.orEmpty()
+                        append(" · Forecast: NOAA HRRR model$run" + if (f.image != null) ", from NOAA open data" else " via Iowa Environmental Mesonet")
+                    }
                 },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -302,8 +304,7 @@ private fun SatelliteToggle(on: Boolean, allowed: Boolean, label: String, onTogg
 @Composable
 private fun FrameBadge(frame: RadarFrame, latest: Boolean) {
     val (label, color) = when {
-        frame.nowcast != null -> "Nowcast" to MaterialTheme.colorScheme.tertiary
-        frame.isForecast -> "Model" to MaterialTheme.colorScheme.secondary
+        frame.isForecast -> "Forecast" to MaterialTheme.colorScheme.tertiary
         latest -> "Latest" to MaterialTheme.colorScheme.primary
         else -> "Past" to MaterialTheme.colorScheme.onSurfaceVariant
     }
