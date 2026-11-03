@@ -3,6 +3,11 @@
 All notable changes to Northvane. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.4.4] - 2026-11-03
+
+### Changed
+- In an opened day of the 10-day forecast, the power outage outlook now comes after the day and night forecast text.
+
 ## [1.4.3] - 2026-11-02
 
 ### Changed

@@ -297,15 +297,15 @@ internal fun DailySection(
                         if (isOpen) {
                             Spacer(Modifier.height(12.dp))
                             DayDetails(day, f)
-                            outage?.let {
-                                Spacer(Modifier.height(10.dp))
-                                OutagePanel(it, f, heatTypes)
-                            }
                             Spacer(Modifier.height(10.dp))
                             day.dayDetail?.let { DetailParagraph("Day", it) }
                             day.nightDetail?.let { DetailParagraph("Night", it) }
                             if (day.dayDetail == null && day.nightDetail == null) {
                                 day.shortForecast?.let { DetailParagraph(null, it) }
+                            }
+                            outage?.let {
+                                Spacer(Modifier.height(4.dp))
+                                OutagePanel(it, f, heatTypes)
                             }
                         }
                     }
