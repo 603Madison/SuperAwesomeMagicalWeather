@@ -169,7 +169,10 @@ class MiniKeysTest {
         press(KeyEvent.KEYCODE_6)
         compose.onNodeWithText("Units: °F, mph, in").assertExists()
         press(KeyEvent.KEYCODE_DPAD_CENTER)
-        compose.onNodeWithText("Units: °C, km/h, mm", useUnmergedTree = true).assertExists()
+        // The setting is saved in the background; wait for the screen to show it.
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodesWithText("Units: °C, km/h, mm", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        }
         save("mini_settings")
     }
 
