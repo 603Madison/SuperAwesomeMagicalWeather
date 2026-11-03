@@ -246,7 +246,52 @@ When the risk is High or Very high, tap the panel for preparation steps. They
 are tailored to what's driving the risk and to whether your heat sources need
 electricity.
 
-This is not a utility forecast. Turn it on or off in Settings › Forecast extras.
+This is not a utility forecast. Turn it on or off in Settings › Today screen.
+
+### Frozen pipe risk (optional, off by default)
+Shown in a day's details on nights at or below 20°F, the point where pipes in
+outside walls and unheated spaces start to freeze. The level rises with how
+cold it gets (10°F, 0°F), how many hours stay below 20°F, a day that never
+thaws, wind, and a high power outage risk the same day (no power usually means
+no heat). Tap the panel for steps: hoses and outdoor faucets, open sink
+cabinets, dripping faucets, thermostat settings, heat tape, and what to do if
+the power is out for long. A water-drop mark on the day's row flags High and
+Very high risk.
+
+### Black ice and frost (optional, off by default)
+For each morning, from the hourly forecast where it reaches and the day
+summaries beyond it:
+
+- **Frost** on windshields after clear, calm nights near or below freezing in damp air.
+- **Black ice** from freezing rain, from rain or drizzle followed by a drop
+  below freezing, or from daytime snowmelt that refreezes overnight.
+
+An ice-crystal mark flags mornings with black ice; tap the panel for driving
+and walkway tips. Turn both on in Settings › Today screen.
+
+### Aurora forecast (on by default)
+NOAA's Space Weather Prediction Center publishes the planetary K-index for the
+past three days and the next three, free and the same for everyone (no
+location is sent). Northvane works out your geomagnetic latitude and how far
+south the auroral oval reaches at each Kp, then checks when it's dark and how
+cloudy the hourly forecast is. The card appears on the Today screen only when
+the aurora may be visible from where you are: through a phone camera, low on
+the northern horizon, or overhead. During a strong storm (Kp 7 and up) it also
+warns that GPS and satellite texting can be less reliable. In Backwoods mode
+the forecast (~7 KB) is off unless you allow it.
+
+### Maple sap runs (optional, off by default)
+On the Outlook tab from mid-January through April. Each day is rated from the
+night before's low and the day's high: sap runs best after a night in the 20s
+°F and a sunny day in the 40s, and stops when nights stay above freezing. A
+run of warm nights late in the season is flagged, since buds end it.
+
+### Burn days (optional, off by default)
+On the Outlook tab: a week of Good / Use caution / Don't burn days for brush
+and yard waste, from wind and gusts, the day's lowest humidity, how long since
+meaningful rain (NOAA observed data plus the forecast), snow cover, and NWS
+Red Flag Warnings and Fire Weather Watches. Rules vary by town and state: many
+need a burn permit.
 
 ### Alerts
 - Background checks every 15/30/60 minutes (WorkManager) for the saved
@@ -380,18 +425,20 @@ docs/   Security and privacy notes.
     encrypted and never shown again.
 - **Settings › Severe weather alerts**: categories, check frequency, channels.
 - **Settings › Backwoods mode**: when it turns on, show stale data, and what it may download (grouped).
-- **Settings › Forecast extras**: power outage outlook, outdoor activities
-  (and which ones), trail mud, fall foliage, pollen. Each is a separate switch.
+- **Settings › Today screen**: hourly details, air quality, UV, power outage
+  outlook, frozen pipe risk, black ice and frost, aurora forecast, pollen and
+  allergies, AI summary. Each is a separate switch.
+- **Settings › Outlook**: outdoor activities (and which ones), trail mud, fall
+  foliage, clothes drying, garden, burn days, maple sap runs and heating.
 - **Settings › Radar**: past-radar source, future cast on/off and range,
   satellite imagery and type.
 - **Locations**: rename a place (nickname), choose whether it sends alert
   notifications, remove it.
 - **Settings › Appearance**: theme (static, weather or custom), System / Light / Dark, wallpaper colors, units.
-- **Settings › Forecast extras › My allergies**: your allergens and sensitivity.
+- **Settings › Today screen › My allergies**: your allergens and sensitivity.
 - **Settings › Traffic**: tab on/off, radius, live speed layer.
-- **Settings › Home & garden**: clothes drying, garden (with *My garden*: crops,
-  methods, planted dates, and garden extras) and heating (with *My heating*:
-  sources and temperature ranges).
+- **Settings › Outlook › My garden / My heating**: crops, methods, planted
+  dates and garden extras; heat sources and temperature ranges.
 
 ## Data sources and attribution
 
@@ -400,13 +447,14 @@ docs/   Security and privacy notes.
 - HRRR future-cast tiles and the alternative NEXRAD composite: Iowa
   Environmental Mesonet, Iowa State University.
 - Recent observed weather: NOAA Regional Climate Centers, ACIS (public domain).
+- Aurora: NOAA Space Weather Prediction Center planetary K-index (public domain).
 - UV index and AirNow air quality: US EPA. Air quality model: Open-Meteo (CC BY 4.0, CAMS).
 - Work zones: state DOT WZDx feeds via the USDOT ITS DataHub registry. Incidents: New England 511.
 - Optional traffic speeds: TomTom (your own key).
 - Satellite imagery: NOAA nowCOAST (GOES-East/West).
 - Basemap: OpenFreeMap; © OpenMapTiles; © OpenStreetMap contributors.
 - Optional: Google Pollen API, OpenWeatherMap (your own accounts and keys).
-- Activity, mud, foliage and outage outlooks are Northvane's own estimates.
+- Activity, mud, foliage, outage, frozen pipe, ice, aurora, sap and burn outlooks are Northvane's own estimates.
 
 See [`docs/SECURITY.md`](docs/SECURITY.md) for the security and privacy design, [`SECURITY.md`](SECURITY.md) for reporting vulnerabilities, [`CHANGELOG.md`](CHANGELOG.md) for release notes and [`docs/RELEASING.md`](docs/RELEASING.md) for how releases are made.
 

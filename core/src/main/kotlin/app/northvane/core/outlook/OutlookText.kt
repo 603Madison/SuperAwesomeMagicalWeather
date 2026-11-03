@@ -176,6 +176,42 @@ object OutlookText {
         }
     }
 
+    /** Steps to keep pipes from freezing, most useful first; more as the risk rises. */
+    fun pipePrep(risk: app.northvane.core.model.PipeRisk, heating: List<HeatType>, f: UnitFormatter): List<String> {
+        val kinds = risk.factors.map { it.kind }.toSet()
+        val high = risk.level >= app.northvane.core.model.OutageLevel.HIGH
+        return buildList {
+            add("Disconnect garden hoses and shut off and drain outdoor faucets")
+            add("Open cabinet doors under sinks on outside walls so warm air reaches the pipes")
+            if (high) add("Let faucets on outside walls drip slowly overnight, hot and cold")
+            add("Keep the heat at ${f.temperatureWithUnit(12.8)} or warmer day and night, even if you're away")
+            if (high) add("Check unheated spaces: crawl spaces, garages, basements, and well or pump lines. Plug in heat tape where you have it")
+            if (app.northvane.core.model.PipeFactor.Kind.WIND in kinds) add("Close garage doors and foundation vents; wind drives cold into walls and crawl spaces")
+            add("Know where your main water shutoff is")
+            if (app.northvane.core.model.PipeFactor.Kind.OUTAGE in kinds) {
+                val backup = heating.filterNot { it.needsPower }.map { it.label.substringBefore(" (").lowercase() }
+                if (backup.isNotEmpty()) add("If the power goes out, keep the ${backup.joinToString(" and ")} going to protect the pipes")
+                add("If the power is out for long and the house drops below ${f.temperatureWithUnit(4.4)}, shut off the main and drain the lines")
+            }
+            if (risk.level == app.northvane.core.model.OutageLevel.VERY_HIGH) {
+                add("If a pipe freezes, open the faucet and warm the pipe with a hair dryer or space heater, never an open flame")
+            }
+        }
+    }
+
+    /** Tips for a frosty or icy morning. */
+    fun iceTips(ice: app.northvane.core.model.MorningIce): List<String> = buildList {
+        if (ice.blackIce != null) {
+            add("Bridges, overpasses, shaded curves and the end of driveways ice over first")
+            add("Drive slowly, leave extra room, and brake and steer gently")
+            add("Put salt or sand on steps and walkways before you head out")
+        }
+        if (ice.frost != null) {
+            add("Leave 10 minutes to clear the windshield, or cover it overnight")
+            if (ice.blackIce == null) add("Frost can make bridges and shaded spots slick early in the morning")
+        }
+    }
+
     fun heatingTask(t: HeatingTask, f: UnitFormatter): String {
         val fuel = t.source?.fuel ?: "fuel"
         return when (t.kind) {

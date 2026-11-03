@@ -106,6 +106,7 @@ import app.northvane.weather.ui.theme.skyGradient
 import app.northvane.weather.ui.theme.warningGradient
 import app.northvane.core.model.AlertCategory
 import app.northvane.core.outlook.AllergyEstimator
+import app.northvane.core.aurora.AuroraAdvisor
 import app.northvane.core.outlook.DryingAdvisor
 import app.northvane.core.outlook.HeatingAdvisor
 import app.northvane.core.garden.GardenAdvisor
@@ -295,10 +296,22 @@ private fun HomeContent(
                                     snapshot.daily, formatter, time,
                                     showOutage = settings.outageRiskEnabled,
                                     heatTypes = if (settings.heatingEnabled) settings.heatSources.map { it.type }.distinct() else emptyList(),
+                                    showPipes = settings.pipeRiskEnabled,
+                                    showIce = settings.morningIceEnabled,
                                 )
                             }
                         } else if (snapshot.daily.isNotEmpty()) {
                             hidden += "daily forecast"
+                        }
+                        val aurora = snapshot.aurora
+                        if (settings.auroraEnabled && aurora != null && state.shows(Section.AURORA)) {
+                            val lat = snapshot.latitude ?: state.selected?.latitude
+                            val lon = state.selected?.longitude
+                            if (lat != null && lon != null) {
+                                // Cheap: a few nights of sun positions against at most 3 days of Kp values.
+                                val report = AuroraAdvisor.report(aurora, lat, lon, snapshot.hourly, zone, Instant.now())
+                                if (report.worthShowing(state.liteMode)) item { AuroraSection(report, time) }
+                            }
                         }
                         val air = snapshot.airQuality
                         val airFresh = state.shows(Section.AIR_QUALITY)

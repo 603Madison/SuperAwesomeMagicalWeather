@@ -16,6 +16,7 @@ enum class DataSource(val displayName: String) {
     OWM("OpenWeatherMap"),
     NWS_FORECAST_ESTIMATE("NWS hourly forecast"),
     NOAA_ACIS("NOAA climate data (ACIS)"),
+    NOAA_SWPC("NOAA Space Weather Prediction Center"),
     GOOGLE_POLLEN("Google Pollen API"),
     AIRNOW("EPA AirNow"),
     EPA_UV("EPA UV Index"),
@@ -157,6 +158,10 @@ data class DailyForecast(
     val overnight: PeriodStats? = null,
     val mud: MudOutlook? = null,
     val activities: List<ActivityScore> = emptyList(),
+    /** Frozen pipe risk for the day and the night after it. */
+    val pipeRisk: PipeRisk? = null,
+    /** Frost and black ice on the morning of this day. */
+    val morningIce: MorningIce? = null,
 )
 
 /** Parts of a refresh that can be switched on or off individually (e.g. over satellite). */
@@ -168,6 +173,8 @@ enum class Section {
     POLLEN,
     /** Air quality index and UV index. */
     AIR_QUALITY,
+    /** Geomagnetic activity forecast (NOAA SWPC), for the aurora. */
+    AURORA,
 }
 
 @Serializable
@@ -258,6 +265,7 @@ data class WeatherSnapshot(
     val elevationM: Double? = null,
     val airQuality: AirQuality? = null,
     val uv: UvForecast? = null,
+    val aurora: KpForecast? = null,
     /** When each section's data was last downloaded (for hiding stale data on satellite). */
     val sectionTimes: Map<Section, @Serializable(InstantSerializer::class) Instant> = emptyMap(),
 ) {

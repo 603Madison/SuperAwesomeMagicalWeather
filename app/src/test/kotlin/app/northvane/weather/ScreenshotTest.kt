@@ -47,6 +47,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import app.northvane.core.model.AlertCategory
@@ -426,6 +428,85 @@ class ScreenshotTest {
         page = SettingsPage.SATELLITE
         compose.onAllNodesWithText("Forecast & alerts")[0].performClick()
         save("settings_satellite_expanded")
+    }
+
+    /** Demo only: a cold snap on the second day with black ice that morning and a hard freeze that night. */
+    private fun withColdSnap(s: WeatherSnapshot): WeatherSnapshot {
+        val days = s.daily.toMutableList()
+        val zone = java.time.ZoneId.of(s.timeZoneId)
+        days[1] = days[1].copy(
+            highC = Units.fToC(17.0), lowC = Units.fToC(-2.0),
+            pipeRisk = app.northvane.core.model.PipeRisk(
+                app.northvane.core.model.OutageLevel.VERY_HIGH, Units.fToC(-2.0), 15,
+                listOf(
+                    app.northvane.core.model.PipeFactor(app.northvane.core.model.PipeFactor.Kind.LOW, Units.fToC(-2.0)),
+                    app.northvane.core.model.PipeFactor(app.northvane.core.model.PipeFactor.Kind.NO_THAW, Units.fToC(17.0)),
+                    app.northvane.core.model.PipeFactor(app.northvane.core.model.PipeFactor.Kind.LONG_COLD, 15.0),
+                ),
+            ),
+            morningIce = app.northvane.core.model.MorningIce(
+                frost = null, blackIce = app.northvane.core.model.Likelihood.LIKELY,
+                reasons = listOf(app.northvane.core.model.MorningIce.Reason.RAIN_THEN_FREEZE),
+                lowC = Units.fToC(24.0), coldestAt = days[1].date.atTime(6, 0).atZone(zone).toInstant(),
+            ),
+        )
+        return s.copy(daily = days)
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h2400dp-xxhdpi")
+    fun coldSnapPipesAndIceDark() {
+        val snap = withColdSnap(snapshot())
+        val st = state(snap)
+        render(dark = true) { HomeScreen(st.copy(settings = st.settings.copy(pipeRiskEnabled = true, morningIceEnabled = true)), noActions, {}, {}, {}) }
+        val name = java.time.format.TextStyle.SHORT.let { snap.daily[1].date.dayOfWeek.getDisplayName(it, java.util.Locale.getDefault()) }
+        compose.onAllNodesWithText(name)[0].performClick()
+        compose.onAllNodesWithText("Tap for how to prepare").let { it[it.fetchSemanticsNodes().size - 1] }.performClick()
+        save("today_cold_snap_dark")
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h900dp-xxhdpi")
+    fun auroraCard() {
+        val snap = snapshot()
+        val zone = java.time.ZoneId.of(snap.timeZoneId)
+        val now = Instant.now()
+        // A G3 storm peaking after dark tonight.
+        val start = java.time.LocalDate.now(zone).atStartOfDay(java.time.ZoneOffset.UTC).toInstant()
+        val kps = listOf(2.0, 2.33, 3.0, 4.0, 4.67, 5.33, 6.67, 7.33, 6.0, 5.0, 4.0, 3.33, 3.0, 2.67, 2.33, 2.0, 4.33, 5.0, 3.0, 2.0, 2.0, 2.0, 2.0, 2.0)
+        val kp = app.northvane.core.model.KpForecast(
+            kps.mapIndexed { i, k -> app.northvane.core.model.KpPoint(start.plus(java.time.Duration.ofHours(3L * i)), k, app.northvane.core.model.KpPoint.Kind.PREDICTED) },
+            now,
+        )
+        val evening = java.time.LocalDate.now(zone).atTime(15, 0).atZone(zone).toInstant()
+        val report = app.northvane.core.aurora.AuroraAdvisor.report(kp, location.latitude, location.longitude, snap.hourly, zone, evening)
+        val time = app.northvane.weather.ui.TimeFormat(zone, false)
+        render(dark = true) { androidx.compose.foundation.layout.Column(Modifier.padding(16.dp)) { app.northvane.weather.ui.home.AuroraSection(report, time) } }
+        save("aurora_card")
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1400dp-xxhdpi")
+    fun sapAndBurnCards() {
+        val snap = snapshot()
+        val zone = java.time.ZoneId.of(snap.timeZoneId)
+        val time = app.northvane.weather.ui.TimeFormat(zone, false)
+        val today = java.time.LocalDate.now(zone)
+        // A late-winter week for the sap card; the real forecast for burn days.
+        val march = listOf(24.0 to 43.0, 27.0 to 46.0, 33.0 to 41.0, 18.0 to 30.0, 22.0 to 40.0, 35.0 to 52.0, 38.0 to 55.0)
+        val sap = app.northvane.core.model.SapReport(march.mapIndexed { i, (low, high) ->
+            val (rating, score) = app.northvane.core.outlook.SapAdvisor.rate(Units.fToC(low), Units.fToC(high), skyCover = 30)
+            app.northvane.core.model.SapDay(today.plusDays(i.toLong()), rating, score, Units.fToC(low), Units.fToC(high))
+        })
+        val burn = app.northvane.core.outlook.BurnAdvisor.report(snap.daily, snap.history, snap.alerts, today, zone)
+        val f = app.northvane.core.util.UnitFormatter(UnitSystem.IMPERIAL)
+        render(dark = false) {
+            androidx.compose.foundation.layout.Column(Modifier.padding(16.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)) {
+                app.northvane.weather.ui.home.SapSection(sap, f, time)
+                app.northvane.weather.ui.home.BurnSection(burn, f, time)
+            }
+        }
+        save("sap_burn_cards")
     }
 
     @Test

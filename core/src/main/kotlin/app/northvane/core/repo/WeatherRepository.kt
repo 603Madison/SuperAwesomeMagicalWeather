@@ -12,6 +12,7 @@ import app.northvane.core.model.WeatherAlert
 import app.northvane.core.model.WeatherCondition
 import app.northvane.core.model.WeatherSnapshot
 import app.northvane.core.air.AirNowClient
+import app.northvane.core.aurora.AuroraClient
 import app.northvane.core.eccc.EcccClient
 import app.northvane.core.eccc.EcccForecast
 import app.northvane.core.eccc.OutsideEcccCoverageException
@@ -80,6 +81,8 @@ data class SourceConfig(
     val pollenRestriction: AndroidKeyRestriction? = null,
     /** Optional free EPA AirNow key; without it AQI comes from Open-Meteo's model. */
     val airNowApiKey: String? = null,
+    /** Download NOAA's geomagnetic forecast for the aurora card. */
+    val aurora: Boolean = false,
 )
 
 @Serializable
@@ -106,6 +109,7 @@ class WeatherRepository(
     private val epaUv: EpaUvClient? = null,
     private val openMeteoAir: OpenMeteoAirClient? = null,
     private val eccc: EcccClient? = null,
+    private val aurora: AuroraClient? = null,
 ) {
     /** Nearest Environment Canada city page per place; these never move. */
     private val ecccSites = java.util.concurrent.ConcurrentHashMap<String, String>()
@@ -169,6 +173,7 @@ class WeatherRepository(
         } else {
             null
         }
+        val auroraJob = aurora?.takeIf { config.aurora && wants(Section.AURORA) }?.let { client -> async { attempt { client.forecast(now) } } }
         val pollenJob = config.pollenApiKey?.takeIf { wants(Section.POLLEN) }?.let { key ->
             pollen?.let { client -> async { attempt { client.forecast(point, key, now, config.pollenRestriction) } } }
         }
@@ -193,6 +198,8 @@ class WeatherRepository(
         historyResult?.exceptionOrNull()?.takeUnless { it is HistoryUnavailableException }
             ?.let { issues += SourceIssue(DataSource.NOAA_ACIS, "Recent weather: ${it.toUserMessage()}") }
         pollenResult?.exceptionOrNull()?.let { issues += SourceIssue(DataSource.GOOGLE_POLLEN, "Pollen: ${it.toUserMessage()}") }
+        val auroraResult = auroraJob?.await()
+        auroraResult?.exceptionOrNull()?.let { issues += SourceIssue(DataSource.NOAA_SWPC, "Aurora: ${it.toUserMessage()}") }
 
         val grid = gridResult?.getOrNull()
         var daily: List<DailyForecast> = dailyResult?.getOrNull().orEmpty()
@@ -268,7 +275,7 @@ class WeatherRepository(
         val alerts = alertsResult?.getOrNull() ?: ecccAlerts.orEmpty()
         val skipped = Section.entries.filterNot(wants).toSet()
 
-        val attemptedSomething = (Section.entries.toSet() - skipped - Section.OWM_FALLBACK - Section.HISTORY - Section.POLLEN - Section.AIR_QUALITY).isNotEmpty()
+        val attemptedSomething = (Section.entries.toSet() - skipped - Section.OWM_FALLBACK - Section.HISTORY - Section.POLLEN - Section.AIR_QUALITY - Section.AURORA).isNotEmpty()
         val gotExtras = historyResult?.isSuccess == true || pollenResult?.isSuccess == true || airResult?.air != null
         if (attemptedSomething && current == null && daily.isEmpty() && upcomingHourly.isEmpty() && alertsResult?.isSuccess != true && ecccAlerts == null && !gotExtras) {
             throw WeatherUnavailableException(issues.ifEmpty { listOf(SourceIssue(DataSource.NWS, "No data available")) })
@@ -295,6 +302,7 @@ class WeatherRepository(
             pollen = pollenResult?.getOrNull(),
             airQuality = airResult?.air,
             uv = airResult?.uv,
+            aurora = auroraResult?.getOrNull(),
             sectionTimes = buildMap {
                 if (current != null && current.source != DataSource.NWS_FORECAST_ESTIMATE) put(Section.CURRENT_CONDITIONS, now)
                 if (weewxCurrent != null) put(Section.LOCAL_STATION, now)
@@ -305,6 +313,7 @@ class WeatherRepository(
                 historyResult?.getOrNull()?.let { put(Section.HISTORY, it.fetchedAt) }
                 pollenResult?.getOrNull()?.let { put(Section.POLLEN, it.fetchedAt) }
                 airResult?.air?.let { put(Section.AIR_QUALITY, it.fetchedAt) }
+                auroraResult?.getOrNull()?.let { put(Section.AURORA, it.fetchedAt) }
             },
         )
         Outlooks.annotate(snapshot, location.latitude, location.longitude, now)

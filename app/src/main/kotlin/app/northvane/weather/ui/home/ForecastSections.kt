@@ -234,6 +234,8 @@ internal fun DailySection(
     activities: Set<Activity> = emptySet(),
     showMud: Boolean = false,
     heatTypes: List<HeatType> = emptyList(),
+    showPipes: Boolean = false,
+    showIce: Boolean = false,
 ) {
     var expanded by rememberSaveable { mutableStateOf<String?>(null) }
     val temps = days.flatMap { listOfNotNull(it.lowC, it.highC) }
@@ -250,6 +252,8 @@ internal fun DailySection(
                     val key = day.date.toString()
                     val isOpen = expanded == key
                     val outage = day.outageRisk?.takeIf { showOutage }
+                    val pipes = day.pipeRisk?.takeIf { showPipes }
+                    val ice = day.morningIce?.takeIf { showIce }
                     Column(
                         Modifier
                             .fillMaxWidth()
@@ -268,6 +272,14 @@ internal fun DailySection(
                                 if (outage != null && outage.level >= OutageLevel.ELEVATED) {
                                     Spacer(Modifier.width(4.dp))
                                     PowerGlyph(outageColor(outage.level), Modifier.size(14.dp))
+                                }
+                                // One cold-weather mark: black ice first, then serious pipe risk.
+                                if (ice?.blackIce != null) {
+                                    Spacer(Modifier.width(3.dp))
+                                    IceGlyph(iceColor(ice), Modifier.size(12.dp))
+                                } else if (pipes != null && pipes.level >= OutageLevel.HIGH) {
+                                    Spacer(Modifier.width(3.dp))
+                                    DropGlyph(outageColor(pipes.level), Modifier.size(12.dp))
                                 }
                             }
                             WeatherIcon(day.condition, day.isDaytimeCondition, size = 30.dp)
@@ -306,6 +318,14 @@ internal fun DailySection(
                             outage?.let {
                                 Spacer(Modifier.height(4.dp))
                                 OutagePanel(it, f, heatTypes)
+                            }
+                            ice?.let {
+                                Spacer(Modifier.height(8.dp))
+                                IcePanel(it, f, time)
+                            }
+                            pipes?.let {
+                                Spacer(Modifier.height(8.dp))
+                                PipePanel(it, f, heatTypes)
                             }
                         }
                     }

@@ -58,6 +58,7 @@ enum class SatelliteFeature(val title: String, val description: String, val appr
     AIR_QUALITY("Air quality & UV", "AQI (EPA AirNow or Open-Meteo) and EPA UV index; at most every 30 minutes", "~3 KB", true),
     TRAFFIC("Traffic events", "Work zones, closures and incidents from state DOT feeds", "50–700 KB per view", false),
     GARDEN_CLIMATE("Garden & heating frost dates", "30 years of NOAA lows, downloaded once per place", "~40 KB once", true),
+    AURORA("Aurora forecast", "NOAA's geomagnetic forecast for the aurora card; at most every 3 hours", "~7 KB", false),
     AI_SUMMARY("AI weather summary", "Sends the forecast to your AI server and gets a short summary back", "~2–4 KB", false),
     TRAFFIC_FLOW("Traffic speed map", "TomTom flow tiles on the traffic map, if you've added a key", "0.3–1 MB per view", false),
     OWM_FALLBACK("OpenWeatherMap fallback", "Only if enabled in Data sources", "~5 KB", false);
@@ -84,6 +85,11 @@ data class AppSettings(
     val notificationPromptShown: Boolean = false,
     val satelliteFeatures: Set<SatelliteFeature> = SatelliteFeature.DEFAULTS,
     val outageRiskEnabled: Boolean = false,
+    val pipeRiskEnabled: Boolean = false,
+    val morningIceEnabled: Boolean = false,
+    val auroraEnabled: Boolean = true,
+    val sapEnabled: Boolean = false,
+    val burnEnabled: Boolean = false,
     val pollenEnabled: Boolean = false,
     val activitiesEnabled: Boolean = true,
     val activities: Set<Activity> = Activity.entries.toSet(),
@@ -155,6 +161,11 @@ class SettingsRepository(context: Context) {
         val notificationPrompt = booleanPreferencesKey("notification_prompt_shown")
         val satelliteFeatures = stringSetPreferencesKey("satellite_features")
         val outageRisk = booleanPreferencesKey("outage_risk")
+        val pipeRisk = booleanPreferencesKey("pipe_risk")
+        val morningIce = booleanPreferencesKey("morning_ice")
+        val aurora = booleanPreferencesKey("aurora")
+        val sap = booleanPreferencesKey("sap_run")
+        val burn = booleanPreferencesKey("burn_day")
         val pollen = booleanPreferencesKey("pollen")
         val activitiesEnabled = booleanPreferencesKey("activities_enabled")
         val activities = stringSetPreferencesKey("activities") // 1.1–1.2: enabled set (only the original six existed)
@@ -228,6 +239,11 @@ class SettingsRepository(context: Context) {
                     ?.mapNotNull { name -> SatelliteFeature.entries.firstOrNull { it.name == name } }
                     ?.toSet() ?: d.satelliteFeatures,
                 outageRiskEnabled = p[Keys.outageRisk] ?: d.outageRiskEnabled,
+                pipeRiskEnabled = p[Keys.pipeRisk] ?: d.pipeRiskEnabled,
+                morningIceEnabled = p[Keys.morningIce] ?: d.morningIceEnabled,
+                auroraEnabled = p[Keys.aurora] ?: d.auroraEnabled,
+                sapEnabled = p[Keys.sap] ?: d.sapEnabled,
+                burnEnabled = p[Keys.burn] ?: d.burnEnabled,
                 pollenEnabled = p[Keys.pollen] ?: d.pollenEnabled,
                 activitiesEnabled = p[Keys.activitiesEnabled] ?: d.activitiesEnabled,
                 activities = Activity.entries.toSet() - disabledActivities(p),
@@ -301,6 +317,11 @@ class SettingsRepository(context: Context) {
         p[Keys.satelliteFeatures] = if (enabled) current + feature.name else current - feature.name
     }
     suspend fun setOutageRisk(enabled: Boolean) = store.edit { it[Keys.outageRisk] = enabled }
+    suspend fun setPipeRisk(enabled: Boolean) = store.edit { it[Keys.pipeRisk] = enabled }
+    suspend fun setMorningIce(enabled: Boolean) = store.edit { it[Keys.morningIce] = enabled }
+    suspend fun setAurora(enabled: Boolean) = store.edit { it[Keys.aurora] = enabled }
+    suspend fun setSap(enabled: Boolean) = store.edit { it[Keys.sap] = enabled }
+    suspend fun setBurn(enabled: Boolean) = store.edit { it[Keys.burn] = enabled }
     suspend fun setPollen(enabled: Boolean) = store.edit { it[Keys.pollen] = enabled }
     suspend fun setActivitiesEnabled(enabled: Boolean) = store.edit { it[Keys.activitiesEnabled] = enabled }
     /**
@@ -391,9 +412,9 @@ enum class SatelliteGroup(val title: String, val description: String, val featur
             SatelliteFeature.HOURLY_FORECAST, SatelliteFeature.FORECAST_DETAILS, SatelliteFeature.LOCAL_STATION),
     ),
     EXTRAS(
-        "Extras", "Air quality, pollen, recent weather and frost dates for the outlooks, AI summary, OpenWeatherMap.",
+        "Extras", "Air quality, pollen, recent weather and frost dates for the outlooks, aurora, AI summary, OpenWeatherMap.",
         listOf(SatelliteFeature.AIR_QUALITY, SatelliteFeature.POLLEN, SatelliteFeature.HISTORY, SatelliteFeature.GARDEN_CLIMATE,
-            SatelliteFeature.AI_SUMMARY, SatelliteFeature.OWM_FALLBACK),
+            SatelliteFeature.AURORA, SatelliteFeature.AI_SUMMARY, SatelliteFeature.OWM_FALLBACK),
     ),
     MAPS(
         "Maps", "Radar, future cast, satellite imagery and traffic. These download the most.",

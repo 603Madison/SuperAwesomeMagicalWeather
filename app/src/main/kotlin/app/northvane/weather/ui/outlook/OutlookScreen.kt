@@ -26,13 +26,17 @@ import androidx.compose.ui.unit.dp
 import app.northvane.core.garden.Crop
 import app.northvane.core.garden.GardenAdvisor
 import app.northvane.core.model.Section
+import app.northvane.core.outlook.BurnAdvisor
 import app.northvane.core.outlook.DryingAdvisor
 import app.northvane.core.outlook.HeatingAdvisor
+import app.northvane.core.outlook.SapAdvisor
 import app.northvane.core.util.UnitFormatter
 import app.northvane.weather.data.AppSettings
 import app.northvane.weather.ui.MainUiState
 import app.northvane.weather.ui.TimeFormat
 import app.northvane.weather.ui.home.ActivitiesSection
+import app.northvane.weather.ui.home.BurnSection
+import app.northvane.weather.ui.home.SapSection
 import app.northvane.weather.ui.home.DryingSection
 import app.northvane.weather.ui.home.FoliageSection
 import app.northvane.weather.ui.home.GardenCard
@@ -43,11 +47,13 @@ import java.time.ZoneId
 
 /** Whether the Outlook tab has anything turned on. */
 fun AppSettings.hasOutlookFeatures(): Boolean =
-    (activitiesEnabled && activities.isNotEmpty()) || mudEnabled || foliageEnabled || dryingEnabled || gardenEnabled || heatingEnabled
+    (activitiesEnabled && activities.isNotEmpty()) || mudEnabled || foliageEnabled || dryingEnabled || gardenEnabled || heatingEnabled ||
+        sapEnabled || burnEnabled
 
 /**
  * Planning cards that used to crowd the Today screen: outdoor activities,
- * trail mud, garden, clothes drying, heating season and fall foliage. Each
+ * trail mud, garden, clothes drying, heating season, maple sap, burn days and
+ * fall foliage. Each
  * appears only when turned on, in season, and (on satellite) with fresh data.
  */
 @Composable
@@ -122,6 +128,21 @@ fun OutlookScreen(
                         HeatingSection(heating, settings.heatSources.isNotEmpty(), settings.heatingAggressive, f, time, onOpenHeating)
                     }
                 }
+                val latitude = snapshot.latitude ?: state.selected?.latitude
+                if (settings.sapEnabled && dailyFresh && latitude != null && SapAdvisor.inSeason(time.today(), latitude)) {
+                    shown++
+                    item {
+                        val sap = remember(snapshot) { SapAdvisor.report(snapshot.daily, snapshot.hourly, snapshot.history, time.today(), zone) }
+                        SapSection(sap, f, time)
+                    }
+                }
+                if (settings.burnEnabled && dailyFresh && snapshot.daily.isNotEmpty()) {
+                    shown++
+                    item {
+                        val burn = remember(snapshot) { BurnAdvisor.report(snapshot.daily, snapshot.history, snapshot.alerts, time.today(), zone) }
+                        BurnSection(burn, f, time)
+                    }
+                }
                 val foliage = snapshot.foliage
                 if (settings.foliageEnabled && foliage != null && foliage.inSeason && dailyFresh) {
                     shown++
@@ -133,7 +154,7 @@ fun OutlookScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 24.dp)) {
                         Text("Nothing to plan right now", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "Cards appear here in season: outdoor activities, trail mud, your garden, clothes drying, heating and fall foliage. " +
+                            "Cards appear here in season: outdoor activities, trail mud, your garden, clothes drying, heating, maple sap, burn days and fall foliage. " +
                                 "Turn them on in Settings › Outlook." + if (state.liteMode && !settings.showStaleData) " In Backwoods mode, cards with data over 12 hours old are hidden." else "",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,

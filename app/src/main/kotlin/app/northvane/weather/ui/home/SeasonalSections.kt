@@ -59,7 +59,7 @@ import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
 
 @Composable
-private fun SeasonCard(content: @Composable () -> Unit) {
+internal fun SeasonCard(content: @Composable () -> Unit) {
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
@@ -68,16 +68,16 @@ private fun SeasonCard(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun Note(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) =
+internal fun Note(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) =
     Text(text, style = MaterialTheme.typography.bodySmall, color = color, modifier = modifier)
 
 @Composable
-private fun StatusDot(color: Color) = Canvas(Modifier.padding(top = 5.dp).size(10.dp)) { drawCircle(color) }
+internal fun StatusDot(color: Color) = Canvas(Modifier.padding(top = 5.dp).size(10.dp)) { drawCircle(color) }
 
-private val Good = Color(0xFF2E9E5B)
-private val Caution = Color(0xFFEF7D1A)
-private val Stop = Color(0xFFD32F2F)
-private val Neutral = Color(0xFF7A8794)
+internal val Good = Color(0xFF2E9E5B)
+internal val Caution = Color(0xFFEF7D1A)
+internal val Stop = Color(0xFFD32F2F)
+internal val Neutral = Color(0xFF7A8794)
 
 // --- Garden ---
 

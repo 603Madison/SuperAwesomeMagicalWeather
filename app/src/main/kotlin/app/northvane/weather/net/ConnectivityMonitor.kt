@@ -152,6 +152,7 @@ fun fetchPlanFor(settings: AppSettings, status: NetworkStatus): FetchPlan {
         if (SatelliteFeature.HISTORY in features) add(Section.HISTORY)
         if (SatelliteFeature.POLLEN in features) add(Section.POLLEN)
         if (SatelliteFeature.AIR_QUALITY in features) add(Section.AIR_QUALITY)
+        if (SatelliteFeature.AURORA in features) add(Section.AURORA)
     }
     return FetchPlan(sections = sections, observationStations = 1, limited = true)
 }

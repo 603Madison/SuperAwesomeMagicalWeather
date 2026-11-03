@@ -7,8 +7,8 @@ import java.time.Instant
 import java.time.ZoneId
 
 /**
- * Derived outlooks for a snapshot: mud, fall foliage, activity scores and
- * the season-aware power outage estimate. Pure functions of the snapshot, so
+ * Derived outlooks for a snapshot: mud, fall foliage, activity scores, the
+ * season-aware power outage estimate, frozen pipe risk and morning ice. Pure functions of the snapshot, so
  * they're recomputed whenever cached sections are merged into a fresh one.
  */
 object Outlooks {
@@ -28,9 +28,16 @@ object Outlooks {
             leafCover = { date -> FoliageEstimator.leafCover(date, latitude, elevation, foliage) },
             mud = mud,
         )
-        val annotated = OutageEstimator.annotate(days, s.alerts, zone, outage).map { d ->
+        val snowOnGround = (s.history?.snowDepthMm ?: 0.0) >= 25.0
+        val withOutage = OutageEstimator.annotate(days, s.alerts, zone, outage)
+        val annotated = withOutage.mapIndexed { i, d ->
             val dayMud = mud[d.date]
-            d.copy(mud = dayMud, activities = ActivityScorer.score(d, dayMud, ctx))
+            d.copy(
+                mud = dayMud,
+                activities = ActivityScorer.score(d, dayMud, ctx),
+                pipeRisk = PipeFreeze.estimate(d, s.hourly, zone),
+                morningIce = MorningIceEstimator.estimate(d, withOutage.getOrNull(i - 1)?.takeIf { it.date == d.date.minusDays(1) }, s.hourly, zone, snowOnGround, now),
+            )
         }
         return s.copy(daily = annotated, foliage = foliage, latitude = latitude, elevationM = elevation)
     }

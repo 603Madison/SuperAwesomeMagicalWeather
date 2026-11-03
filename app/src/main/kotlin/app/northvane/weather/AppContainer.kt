@@ -1,5 +1,6 @@
 package app.northvane.weather
 
+import app.northvane.core.aurora.AuroraClient
 import android.app.Application
 import app.northvane.core.net.HttpClients
 import app.northvane.core.history.AcisClient
@@ -77,7 +78,7 @@ class AppContainer(val app: Application) {
     val repository: WeatherRepository by lazy {
         WeatherRepository(nws, owm, weewx, weatherCache.pointCache, acis = acis, pollen = pollen,
             airNow = airNow, epaUv = EpaUvClient(http), openMeteoAir = OpenMeteoAirClient(http),
-            eccc = EcccClient(http),
+            eccc = EcccClient(http), aurora = AuroraClient(http),
         )
     }
 

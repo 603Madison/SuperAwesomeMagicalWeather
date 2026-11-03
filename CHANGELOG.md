@@ -3,6 +3,16 @@
 All notable changes to Northvane. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] - 2026-11-03
+
+### Added
+- **Aurora forecast** (on by default): a Today card that appears only when the northern lights may be visible from your location, from NOAA's Space Weather Prediction Center K-index forecast, darkness and cloud cover. It warns when a strong geomagnetic storm may affect GPS and satellite texting.
+- **Frozen pipe risk** (off by default): in each day's details on nights near 20°F or colder, with steps to protect your pipes, including what to do if the power goes out.
+- **Black ice and frost** (off by default): each morning's chance of frosty windshields and icy roads, from freezing rain, wet roads freezing, and snowmelt refreezing.
+- **Maple sap runs** (off by default): an Outlook card rating freeze-thaw days for tapping, mid-January through April.
+- **Burn days** (off by default): an Outlook card with good, caution and no-burn days from wind, humidity, dry spells, snow cover and NWS fire weather alerts.
+- Backwoods mode can allow or block the aurora forecast (blocked by default).
+
 ## [1.4.4] - 2026-11-03
 
 ### Changed

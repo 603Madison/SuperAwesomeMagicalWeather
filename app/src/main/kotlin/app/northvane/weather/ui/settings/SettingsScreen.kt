@@ -213,6 +213,12 @@ private fun TodayPage(state: MainUiState, container: AppContainer, onBack: () ->
             LabeledSwitch("UV index", s.uvEnabled, { on -> update { setUv(on) } }, subtitle = "EPA's hourly UV forecast by ZIP code")
             LabeledSwitch("Power outage outlook", s.outageRiskEnabled, { on -> update { setOutageRisk(on) } },
                 subtitle = "In each day's details; tap High risk for preparation steps")
+            LabeledSwitch("Frozen pipe risk", s.pipeRiskEnabled, { on -> update { setPipeRisk(on) } },
+                subtitle = "In each day's details on nights near 20°F or colder, with steps to protect your pipes")
+            LabeledSwitch("Black ice & frost", s.morningIceEnabled, { on -> update { setMorningIce(on) } },
+                subtitle = "In each day's details: icy roads and frosty windshields that morning")
+            LabeledSwitch("Aurora forecast", s.auroraEnabled, { on -> update { setAurora(on) } },
+                subtitle = "Shows up only when the northern lights may be visible from here (NOAA, free)")
         }
         SectionCard("Pollen & allergies") {
             LabeledSwitch("Pollen forecast", s.pollenEnabled, { on -> update { setPollen(on) } },
@@ -270,6 +276,10 @@ private fun OutlookPage(state: MainUiState, container: AppContainer, onBack: () 
             if (s.gardenEnabled) {
                 NavRow("My garden", if (s.gardenPlan.isEmpty()) "Choose what you're planting" else s.gardenPlan.joinToString(", ") { it.crop.label.substringBefore(" (").lowercase() }, nav.openGarden)
             }
+            LabeledSwitch("Burn days", s.burnEnabled, { on -> update { setBurn(on) } },
+                subtitle = "Good days to burn brush, from wind, humidity, dry spells and fire weather alerts")
+            LabeledSwitch("Maple sap runs", s.sapEnabled, { on -> update { setSap(on) } },
+                subtitle = "Freeze-thaw days for tapping, mid-January through April")
             LabeledSwitch("Heating season", s.heatingEnabled, { on -> update { setHeating(on) } },
                 subtitle = "Which system to run, and when to buy fuel or stack wood")
             if (s.heatingEnabled) {
@@ -473,13 +483,14 @@ private fun AboutPage(onBack: () -> Unit) {
                     "Open-Meteo (air quality model), state DOT traffic feeds, your WeeWX server and, if enabled, OpenWeatherMap, " +
                     "New England 511 and TomTom. Pollen requests send coordinates rounded to about 1 km to Google. If you turn on the " +
                     "AI summary, the place name and forecast numbers go to the AI server you configure, and nothing else. Map tiles " +
-                    "come from OpenFreeMap; radar and satellite imagery from NOAA and the Iowa Environmental Mesonet. Place search uses " +
+                    "come from OpenFreeMap; radar and satellite imagery from NOAA and the Iowa Environmental Mesonet. The aurora forecast " +
+                    "is downloaded from NOAA's Space Weather Prediction Center without sending your location. Place search uses " +
                     "your device's built-in geocoder.",
             )
             Text(
                 "Map data © OpenStreetMap contributors, © OpenMapTiles. Weather data: NOAA / National Weather Service; Environment and " +
-                    "Climate Change Canada; NOAA Regional Climate Centers (ACIS). Pollen: Google Pollen API. Activity, mud, foliage, garden, " +
-                    "heating and outage outlooks are Northvane estimates. AI summaries are written by your own AI server.",
+                    "Climate Change Canada; NOAA Regional Climate Centers (ACIS); NOAA Space Weather Prediction Center. Pollen: Google Pollen " +
+                    "API. Activity, mud, foliage, garden, heating, outage, frozen pipe, ice, aurora, sap and burn outlooks are Northvane estimates. AI summaries are written by your own AI server.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
