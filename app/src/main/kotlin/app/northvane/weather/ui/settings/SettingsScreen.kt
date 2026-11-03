@@ -55,6 +55,8 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import app.northvane.core.model.Activity
+import app.northvane.core.model.AuroraView
+import app.northvane.weather.work.AuroraWatchWorker
 import app.northvane.core.model.AlertCategory
 import app.northvane.core.model.UnitSystem
 import app.northvane.core.radar.RadarSource
@@ -71,6 +73,7 @@ import app.northvane.weather.ui.components.ChoiceDropdown
 import app.northvane.weather.ui.components.LabeledSwitch
 import app.northvane.weather.ui.components.SectionCard
 import app.northvane.weather.ui.components.SegmentedChoice
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -204,6 +207,23 @@ private fun AppearancePage(state: MainUiState, container: AppContainer, onBack: 
 private fun TodayPage(state: MainUiState, container: AppContainer, onBack: () -> Unit, nav: SettingsNav) {
     val s = state.settings
     val update = rememberUpdater(container)
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    // Aurora notifications run in the background, so the schedule follows these switches.
+    fun syncAurora(block: suspend SettingsRepository.() -> Unit) {
+        scope.launch {
+            container.settings.block()
+            AuroraWatchWorker.sync(context, container.settings.settings.first())
+        }
+    }
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    fun askForNotifications() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermission.launch(POST_NOTIFICATIONS)
+        }
+    }
     SettingsScaffold("Today screen", onBack) {
         SectionCard("Cards") {
             LabeledSwitch("Hourly details open by default", s.hourlyExpanded, { on -> update { setHourlyExpanded(on) } },
@@ -217,8 +237,23 @@ private fun TodayPage(state: MainUiState, container: AppContainer, onBack: () ->
                 subtitle = "In each day's details on nights near 20°F or colder, with steps to protect your pipes")
             LabeledSwitch("Black ice & frost", s.morningIceEnabled, { on -> update { setMorningIce(on) } },
                 subtitle = "In each day's details: icy roads and frosty windshields that morning")
-            LabeledSwitch("Aurora forecast", s.auroraEnabled, { on -> update { setAurora(on) } },
+            LabeledSwitch("Aurora forecast", s.auroraEnabled, { on -> syncAurora { setAurora(on) } },
                 subtitle = "Shows up only when the northern lights may be visible from here (NOAA, free)")
+            if (s.auroraEnabled) {
+                LabeledSwitch("Aurora notifications", s.auroraNotify, { on ->
+                    if (on) askForNotifications()
+                    syncAurora { setAuroraNotify(on) }
+                }, subtitle = "For places with notifications on: a heads-up the day before, and when it may be visible now")
+                if (s.auroraNotify) {
+                    ChoiceDropdown("Notify when it may be", listOf(AuroraView.CAMERA, AuroraView.HORIZON, AuroraView.OVERHEAD), s.auroraNotifyView, {
+                        when (it) {
+                            AuroraView.CAMERA -> "Visible to a phone camera"
+                            AuroraView.HORIZON -> "Visible to the eye, low on the horizon"
+                            else -> "Overhead (rare, big storms)"
+                        }
+                    }, { view -> update { setAuroraNotifyView(view) } })
+                }
+            }
         }
         SectionCard("Pollen & allergies") {
             LabeledSwitch("Pollen forecast", s.pollenEnabled, { on -> update { setPollen(on) } },

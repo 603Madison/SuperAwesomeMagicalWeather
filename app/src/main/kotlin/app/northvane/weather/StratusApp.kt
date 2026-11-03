@@ -2,6 +2,8 @@ package app.northvane.weather
 
 import android.app.Application
 import app.northvane.weather.notify.AlertNotifier
+import app.northvane.weather.work.AuroraWatchWorker
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class NorthvaneApp : Application() {
@@ -14,6 +16,10 @@ class NorthvaneApp : Application() {
         container.connectivity.start()
         AlertNotifier.createChannels(this)
         app.northvane.weather.work.LaundryWatchWorker.createChannel(this)
-        container.applicationScope.launch { container.alertScheduler.sync() }
+        AuroraWatchWorker.createChannel(this)
+        container.applicationScope.launch {
+            container.alertScheduler.sync()
+            AuroraWatchWorker.sync(this@NorthvaneApp, container.settings.settings.first())
+        }
     }
 }

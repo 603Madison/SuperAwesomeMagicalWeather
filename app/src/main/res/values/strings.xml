@@ -10,5 +10,7 @@
     <string name="channel_statements">Statements &amp; other</string>
     <string name="channel_statements_desc">Special weather statements, outlooks and other NWS messages.</string>
     <string name="channel_laundry">Laundry</string>
+    <string name="channel_aurora">Aurora</string>
+    <string name="channel_aurora_desc">When the northern lights may be visible from your saved places, tonight or right now.</string>
     <string name="channel_laundry_desc">Warnings to bring laundry in before rain, while you have clothes on the line.</string>
 </resources>

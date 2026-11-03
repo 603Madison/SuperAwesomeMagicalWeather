@@ -78,7 +78,7 @@ class AppContainer(val app: Application) {
     val repository: WeatherRepository by lazy {
         WeatherRepository(nws, owm, weewx, weatherCache.pointCache, acis = acis, pollen = pollen,
             airNow = airNow, epaUv = EpaUvClient(http), openMeteoAir = OpenMeteoAirClient(http),
-            eccc = EcccClient(http), aurora = AuroraClient(http),
+            eccc = EcccClient(http), aurora = aurora,
         )
     }
 
@@ -89,6 +89,7 @@ class AppContainer(val app: Application) {
     val placeSearch: PlaceSearch by lazy { PlaceSearch(app, owm, secrets, settings) }
 
     val alertScheduler: AlertScheduler by lazy { AlertScheduler(app, settings) }
+    val aurora: AuroraClient by lazy { AuroraClient(http) }
 
     init {
         applicationScope.launch {

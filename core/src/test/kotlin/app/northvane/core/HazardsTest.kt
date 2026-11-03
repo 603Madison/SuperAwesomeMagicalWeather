@@ -1,9 +1,12 @@
 package app.northvane.core
 
 import app.northvane.core.aurora.AuroraAdvisor
+import app.northvane.core.aurora.AuroraAlerts
 import app.northvane.core.aurora.AuroraClient
 import app.northvane.core.model.AlertCategory
 import app.northvane.core.model.AlertSeverity
+import app.northvane.core.model.AuroraNight
+import app.northvane.core.model.AuroraReport
 import app.northvane.core.model.AuroraView
 import app.northvane.core.model.BurnRating
 import app.northvane.core.model.BurnReason
@@ -333,5 +336,41 @@ class HazardsTest {
         val report = AuroraAdvisor.report(forecast, portland.first, portland.second, emptyList(), zone, now)
         assertNotNull(report.nights.firstOrNull())
         assertFalse(report.gpsImpact)
+    }
+
+    @Test
+    fun auroraNotificationsPickTheRightNight() {
+        val now = Instant.parse("2026-11-10T19:00:00Z") // 2 PM in Maine
+        fun night(date: String, view: AuroraView, kp: Double, clouds: Int? = null, peakHourUtc: Long = 27) = AuroraNight(
+            LocalDate.parse(date), kp, view, Instant.parse("${date}T00:00:00Z").plus(Duration.ofHours(peakHourUtc)), clouds,
+        )
+        fun report(vararg nights: AuroraNight, nowView: AuroraView = AuroraView.NONE, nowKp: Double? = 2.0) =
+            AuroraReport(nights.toList(), 53.0, nowKp, nowView, gpsImpact = false)
+
+        val tonight = AuroraAlerts.pick(report(night("2026-11-10", AuroraView.HORIZON, 5.7)), AuroraView.HORIZON, now, zone)!!
+        assertEquals("night-2026-11-10", tonight.key)
+        assertFalse(tonight.now)
+        // Camera-only doesn't reach a horizon threshold; overcast nights and nights too far out are skipped.
+        assertNull(AuroraAlerts.pick(report(night("2026-11-10", AuroraView.CAMERA, 4.7)), AuroraView.HORIZON, now, zone))
+        assertNull(AuroraAlerts.pick(report(night("2026-11-10", AuroraView.OVERHEAD, 7.3, clouds = 95)), AuroraView.HORIZON, now, zone))
+        assertNull(AuroraAlerts.pick(report(night("2026-11-12", AuroraView.OVERHEAD, 7.3)), AuroraView.HORIZON, now, zone))
+        // Happening now wins, and belongs to last night in the small hours.
+        val early = Instant.parse("2026-11-11T07:00:00Z") // 2 AM
+        val live = AuroraAlerts.pick(report(nowView = AuroraView.OVERHEAD, nowKp = 7.0), AuroraView.HORIZON, early, zone)!!
+        assertTrue(live.now)
+        assertEquals("now-2026-11-10", live.key)
+        // Once per night, again only if it gets better.
+        assertTrue(AuroraAlerts.isNew(tonight, null))
+        assertFalse(AuroraAlerts.isNew(tonight, AuroraView.HORIZON))
+        assertTrue(AuroraAlerts.isNew(tonight.copy(view = AuroraView.OVERHEAD), AuroraView.HORIZON))
+    }
+
+    @Test
+    fun outageRiskOnlyCountsRealDrivers() {
+        val calm = OutageRisk(OutageLevel.LOW, 0, listOf(app.northvane.core.model.OutageFactor(app.northvane.core.model.OutageFactor.Kind.LEAVES_OFF)))
+        assertFalse(calm.hasRisk)
+        assertFalse(OutageRisk(OutageLevel.LOW, 0, emptyList()).hasRisk)
+        val storms = OutageRisk(OutageLevel.LOW, 6, listOf(app.northvane.core.model.OutageFactor(app.northvane.core.model.OutageFactor.Kind.THUNDER, 22.0)))
+        assertTrue(storms.hasRisk)
     }
 }

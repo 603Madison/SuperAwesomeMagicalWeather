@@ -1,5 +1,6 @@
 package app.northvane.weather.data
 
+import app.northvane.core.model.AuroraView
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -88,6 +89,9 @@ data class AppSettings(
     val pipeRiskEnabled: Boolean = false,
     val morningIceEnabled: Boolean = false,
     val auroraEnabled: Boolean = true,
+    val auroraNotify: Boolean = true,
+    /** The least you'd want a notification for. */
+    val auroraNotifyView: AuroraView = AuroraView.HORIZON,
     val sapEnabled: Boolean = false,
     val burnEnabled: Boolean = false,
     val pollenEnabled: Boolean = false,
@@ -164,6 +168,8 @@ class SettingsRepository(context: Context) {
         val pipeRisk = booleanPreferencesKey("pipe_risk")
         val morningIce = booleanPreferencesKey("morning_ice")
         val aurora = booleanPreferencesKey("aurora")
+        val auroraNotify = booleanPreferencesKey("aurora_notify")
+        val auroraNotifyView = stringPreferencesKey("aurora_notify_view")
         val sap = booleanPreferencesKey("sap_run")
         val burn = booleanPreferencesKey("burn_day")
         val pollen = booleanPreferencesKey("pollen")
@@ -242,6 +248,8 @@ class SettingsRepository(context: Context) {
                 pipeRiskEnabled = p[Keys.pipeRisk] ?: d.pipeRiskEnabled,
                 morningIceEnabled = p[Keys.morningIce] ?: d.morningIceEnabled,
                 auroraEnabled = p[Keys.aurora] ?: d.auroraEnabled,
+                auroraNotify = p[Keys.auroraNotify] ?: d.auroraNotify,
+                auroraNotifyView = p[Keys.auroraNotifyView].toEnum(d.auroraNotifyView),
                 sapEnabled = p[Keys.sap] ?: d.sapEnabled,
                 burnEnabled = p[Keys.burn] ?: d.burnEnabled,
                 pollenEnabled = p[Keys.pollen] ?: d.pollenEnabled,
@@ -320,6 +328,8 @@ class SettingsRepository(context: Context) {
     suspend fun setPipeRisk(enabled: Boolean) = store.edit { it[Keys.pipeRisk] = enabled }
     suspend fun setMorningIce(enabled: Boolean) = store.edit { it[Keys.morningIce] = enabled }
     suspend fun setAurora(enabled: Boolean) = store.edit { it[Keys.aurora] = enabled }
+    suspend fun setAuroraNotify(enabled: Boolean) = store.edit { it[Keys.auroraNotify] = enabled }
+    suspend fun setAuroraNotifyView(view: AuroraView) = store.edit { it[Keys.auroraNotifyView] = view.name }
     suspend fun setSap(enabled: Boolean) = store.edit { it[Keys.sap] = enabled }
     suspend fun setBurn(enabled: Boolean) = store.edit { it[Keys.burn] = enabled }
     suspend fun setPollen(enabled: Boolean) = store.edit { it[Keys.pollen] = enabled }

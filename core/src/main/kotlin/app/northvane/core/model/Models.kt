@@ -199,7 +199,13 @@ data class OutageFactor(val kind: Kind, val value: Double? = null, val detail: S
 }
 
 @Serializable
-data class OutageRisk(val level: OutageLevel, val score: Int, val factors: List<OutageFactor>, val leafCover: Double? = null)
+data class OutageRisk(val level: OutageLevel, val score: Int, val factors: List<OutageFactor>, val leafCover: Double? = null) {
+    /** True when something actually raises the risk; background notes like bare trees or frozen ground don't count. */
+    val hasRisk: Boolean get() = factors.any { it.kind !in EXPLANATORY_OUTAGE_FACTORS }
+}
+
+private val EXPLANATORY_OUTAGE_FACTORS =
+    setOf(OutageFactor.Kind.LEAVES_ON, OutageFactor.Kind.LEAVES_OFF, OutageFactor.Kind.FROZEN_GROUND, OutageFactor.Kind.SOFT_GROUND)
 
 @Serializable
 enum class AlertSeverity { EXTREME, SEVERE, MODERATE, MINOR, UNKNOWN }

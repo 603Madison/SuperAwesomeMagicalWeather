@@ -3,6 +3,14 @@
 All notable changes to Northvane. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.5.1] - 2026-11-03
+
+### Added
+- **Aurora notifications**: a heads-up up to a day before the northern lights may be visible from your saved places, and another when they may be visible right now. At most once per night unless the outlook improves; overcast nights are skipped. Choose camera, horizon (default) or overhead in Settings › Today screen. Checks NOAA every 3 hours; Backwoods mode can allow or block it with the aurora forecast.
+
+### Changed
+- The power outage outlook only appears in a day's details when something raises the risk (wind, ice, snow, thunderstorms, soaked ground, heat or an NWS alert), not on quiet days.
+
 ## [1.5.0] - 2026-11-03
 
 ### Added

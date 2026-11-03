@@ -169,3 +169,38 @@ object AuroraAdvisor {
         return AuroraNight(date, peak.kp, view(peak.kp, magLat), peakAt, clouds)
     }
 }
+
+/** Something worth a notification: aurora visible now, or expected on a coming night. */
+data class AuroraHeadsUp(
+    /** Identifies the night (and whether it's happening now), to notify once per night and level. */
+    val key: String,
+    val now: Boolean,
+    val night: AuroraNight?,
+    val view: AuroraView,
+    val kp: Double,
+)
+
+object AuroraAlerts {
+    /** Nights whose best viewing is within this far ahead get a heads-up. */
+    val LEAD: Duration = Duration.ofHours(30)
+    /** Skip nights the hourly forecast says will be overcast. */
+    private const val OVERCAST = 85
+
+    /** The one event to notify about, if any reaches [threshold]. Happening now beats later nights. */
+    fun pick(report: AuroraReport, threshold: AuroraView, now: Instant, zone: ZoneId): AuroraHeadsUp? {
+        if (report.nowView >= threshold && report.nowKp != null) {
+            // Evenings belong to today's night; small hours to the night before.
+            val night = now.atZone(zone).let { if (it.hour < 12) it.toLocalDate().minusDays(1) else it.toLocalDate() }
+            return AuroraHeadsUp("now-$night", true, report.nights.firstOrNull { it.date == night }, report.nowView, report.nowKp)
+        }
+        val night = report.nights.firstOrNull { n ->
+            n.view >= threshold && (n.cloudPercent ?: 0) < OVERCAST &&
+                (n.peakAt ?: n.date.atTime(21, 0).atZone(zone).toInstant()).isBefore(now.plus(LEAD))
+        } ?: return null
+        return AuroraHeadsUp("night-${night.date}", false, night, night.view, night.maxKp)
+    }
+
+    /** Notify for a key the first time, and again only if the expected view improves. */
+    fun isNew(headsUp: AuroraHeadsUp, alreadyNotified: AuroraView?): Boolean =
+        alreadyNotified == null || headsUp.view > alreadyNotified
+}

@@ -251,7 +251,8 @@ internal fun DailySection(
                 days.forEachIndexed { index, day ->
                     val key = day.date.toString()
                     val isOpen = expanded == key
-                    val outage = day.outageRisk?.takeIf { showOutage }
+                    // No panel on days with nothing that could knock the power out.
+                    val outage = day.outageRisk?.takeIf { showOutage && it.hasRisk }
                     val pipes = day.pipeRisk?.takeIf { showPipes }
                     val ice = day.morningIce?.takeIf { showIce }
                     Column(

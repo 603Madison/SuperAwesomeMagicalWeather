@@ -246,7 +246,8 @@ When the risk is High or Very high, tap the panel for preparation steps. They
 are tailored to what's driving the risk and to whether your heat sources need
 electricity.
 
-This is not a utility forecast. Turn it on or off in Settings › Today screen.
+Quiet days with nothing that raises the risk show no panel at all. This is not
+a utility forecast. Turn it on or off in Settings › Today screen.
 
 ### Frozen pipe risk (optional, off by default)
 Shown in a day's details on nights at or below 20°F, the point where pipes in
@@ -279,6 +280,13 @@ the aurora may be visible from where you are: through a phone camera, low on
 the northern horizon, or overhead. During a strong storm (Kp 7 and up) it also
 warns that GPS and satellite texting can be less reliable. In Backwoods mode
 the forecast (~7 KB) is off unless you allow it.
+
+**Aurora notifications** (on with the forecast) check NOAA's forecast every
+three hours for places that have notifications on. You get a heads-up up to a
+day ahead and another if it may be visible right now, at most once per night
+unless the outlook improves. Overcast nights are skipped. Choose the threshold
+in Settings › Today screen: visible to a phone camera, to the eye low on the
+horizon (the default), or overhead.
 
 ### Maple sap runs (optional, off by default)
 On the Outlook tab from mid-January through April. Each day is rated from the
