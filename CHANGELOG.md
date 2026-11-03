@@ -3,6 +3,11 @@
 All notable changes to Northvane. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.6.2] - 2026-11-03
+
+### Fixed
+- **Future cast haze.** Calibration was lifting the model's weakest values (below 0 dBZ: cloud, virga and the soft fringe between grid points) into pale "rain", which spread a grey-lavender haze and flattened the forecast. Those values now never become rain, and the correction is capped at ±10 dBZ. The forecast keeps the radar's rain area and colors without the haze.
+
 ## [1.6.1] - 2026-11-03
 
 ### Changed

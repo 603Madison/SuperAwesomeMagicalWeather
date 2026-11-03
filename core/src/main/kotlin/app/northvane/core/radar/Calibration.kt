@@ -20,6 +20,9 @@ class Calibration private constructor(private val model: FloatArray, private val
 
     fun apply(dbz: Float): Float {
         if (dbz.isNaN()) return dbz
+        // The model's weakest values (cloud, virga, and the soft fringe from blending grid points) never become
+        // rain: lifting them is what paints a pale haze around everything.
+        if (dbz < NEW_RAIN_FLOOR) return dbz
         val pos = (dbz - LUT_MIN) / LUT_STEP
         if (pos < 0 || pos >= LUT_SIZE - 1) return exact(dbz)
         val i = pos.toInt()
@@ -44,7 +47,8 @@ class Calibration private constructor(private val model: FloatArray, private val
     }
 
     companion object {
-        private const val MAX_SHIFT = 15f
+        private const val MAX_SHIFT = 10f
+        private const val NEW_RAIN_FLOOR = 0f
         private const val LUT_MIN = -20f
         private const val LUT_STEP = 0.25f
         private const val LUT_SIZE = 401 // -20 to 80 dBZ

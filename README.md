@@ -354,9 +354,11 @@ need a burn permit.
   as NOAA's radar, so past and forecast frames look alike. Each run is then
   **calibrated to the newest radar** by quantile mapping: at the radar's time,
   the model's reflectivity at each percentile is matched to the radar's, and
-  that correction is applied to the run's later frames (capped at ±15 dBZ).
-  This fixes a model that draws too little or too much rain on a given day
-  without moving anything; where the rain is still comes from the model. On a
+  that correction is applied to the run's later frames (capped at ±10 dBZ).
+  Model values below 0 dBZ (cloud, virga, the soft fringe between grid
+  points) are never turned into rain, which would paint a pale haze. This
+  fixes a model that draws too little or too much rain on a given day without
+  moving anything; where the rain is still comes from the model. On a
   day of light rain in Maine it brought the model's rain area in line with the
   radar and raised the critical success index for light rain by 0.02–0.07 over
   the next 90 minutes. Frames start right after the newest radar scan, and the

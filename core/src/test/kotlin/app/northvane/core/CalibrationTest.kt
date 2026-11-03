@@ -47,6 +47,8 @@ class CalibrationTest {
         // The order of values is kept: stronger stays stronger.
         assertTrue(cal.apply(25f) >= cal.apply(20f))
         assertTrue(cal.apply(-10f) < ReflectivityPalette.MIN_DBZ)
+        // Below 0 dBZ nothing turns into rain, however much more rain the radar has.
+        assertEquals(-3f, cal.apply(-3f))
     }
 
     @Test
@@ -66,7 +68,7 @@ class CalibrationTest {
         val m = FloatArray(10_000) { k -> if (k < 3000) 10f + (k % 5) else -10f }
         val r = FloatArray(10_000) { k -> if (k < 3000) 55f + (k % 5) else -10f } // radar 45 dBZ stronger
         val cal = Calibration.build(m, r)!!
-        assertEquals(27f, cal.apply(12f), 0.01f) // 12 + at most 15
+        assertEquals(22f, cal.apply(12f), 0.01f) // 12 + at most 10
     }
 
     @Test
