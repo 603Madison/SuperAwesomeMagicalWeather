@@ -1,0 +1,1 @@
+Fixed: the AI features now know your town (they were told "Current location"), and the forecasters' notes are shorter and about your part of the area.

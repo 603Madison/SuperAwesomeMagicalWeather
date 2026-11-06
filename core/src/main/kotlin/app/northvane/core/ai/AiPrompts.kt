@@ -27,14 +27,16 @@ object AiPrompts {
     fun discussion(d: ForecastDiscussion, place: String, zone: ZoneId): AiRequest = AiRequest(
         system = "You explain National Weather Service forecast discussions to people without a meteorology background. " +
             "A discussion is the forecasters' own reasoning behind the forecast for a large area. " +
-            "Tell the reader what the forecasters expect for their place over the next few days, how confident they are, " +
-            "and what could still change the forecast. Translate jargon (QPF, PTYPE, shortwave, upslope and so on) into everyday words. " +
-            "Leave out marine and fire-weather detail unless it changes things on land for the reader. " +
-            "Use 3 to 5 short sentences, then one line that starts with \"Confidence:\" and says high, medium or low with a few words why. " +
-            PLAIN,
+            "Tell the reader what the forecasters expect at their place over the next few days, how confident they are, " +
+            "and what could still change. Where the discussion treats parts of the area differently (coast, foothills, " +
+            "mountains, north and south), use what applies to the reader's place and leave out the rest; never comment on " +
+            "what you know or don't know about their location. Translate jargon (QPF, PTYPE, shortwave, upslope and so on) " +
+            "into everyday words, and skip marine and fire-weather detail unless it changes things on land. " +
+            "Keep it short: at most 4 sentences and 70 words, then one line that starts with \"Confidence:\" giving high, " +
+            "medium or low and the reason in under 15 words. " + PLAIN,
         user = "The reader is in $place. Discussion from NWS ${d.office}, issued ${stamp(d.issued, zone)} local time:\n\n" +
             "<discussion>\n${d.text}\n</discussion>",
-        replyTokens = 450,
+        replyTokens = 300,
         effort = AiEffort.LOW,
     )
 
@@ -44,7 +46,7 @@ object AiPrompts {
             "Say what is expected, when it matters (in the reader's local time), and the one or two things worth doing about it. " +
             "If the alert says it applies only to part of its area (the coast, higher elevations, a county) and the reader's place " +
             "may be outside that part, say so. Keep every number and time from the alert; add none of your own. " +
-            "Use 2 to 4 short sentences. " + PLAIN,
+            "Use at most 3 short sentences and 60 words. " + PLAIN,
         user = buildString {
             appendLine("The reader is in $place. It is now ${stamp(now, zone)} local time.")
             appendLine("<alert>")
@@ -68,7 +70,7 @@ object AiPrompts {
             "support it, and suggest a better time if the one asked about looks poor. If the forecast doesn't cover what was asked " +
             "(too far ahead, or something it doesn't measure), say so plainly. If the question isn't about the weather or " +
             "planning around it, say that you can only help with the forecast. " +
-            "Use at most 5 short sentences. " + PLAIN,
+            "Use at most 4 short sentences and 80 words. " + PLAIN,
         user = "<forecast>\n${forecastData(s, place, units, now)}\n</forecast>\n\nQuestion: ${question.trim().take(MAX_QUESTION)}",
         replyTokens = 450,
         effort = AiEffort.MEDIUM,

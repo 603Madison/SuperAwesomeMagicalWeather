@@ -61,6 +61,16 @@ class AiController(private val container: AppContainer, private val scope: Corou
         return AiConfig(settings.aiProvider, settings.aiBaseUrl, settings.aiModel, key).takeIf { it.isComplete }
     }
 
+    /**
+     * The town to tell the AI about: the National Weather Service's place name
+     * for the forecast point, else the saved name. Never a nickname ("Mom's")
+     * or "Current location", which mean nothing to the model.
+     */
+    private fun placeFor(location: SavedLocation, snapshot: WeatherSnapshot?): String =
+        snapshot?.placeName?.takeIf { it.isNotBlank() }
+            ?: location.name.takeUnless { location.isDeviceLocation && it.equals("Current location", ignoreCase = true) }
+            ?: "the forecast area"
+
     /** Why a request can't go out right now, or null if it can. */
     private suspend fun blocked(config: AiConfig, settings: AppSettings, liteMode: Boolean): String? = when {
         liteMode && SatelliteFeature.AI_SUMMARY !in settings.satelliteFeatures -> "AI is paused in Backwoods mode"
@@ -81,7 +91,11 @@ class AiController(private val container: AppContainer, private val scope: Corou
             val config = config(settings) ?: return@launch
             val office = container.weatherCache.pointCache.get(location.point.nwsKey())?.point?.gridId?.let(Discussions::office)
                 ?: return@launch // Outside the US: no discussion.
-            val stored = container.aiReplies.discussion(office)?.takeIf { it.model == config.model }
+            val snapshot = container.weatherCache.read(location.id)
+            val place = placeFor(location, snapshot)
+            // Stored per office and place: two places in one office's area get their own notes.
+            val storeKey = "$office|$place"
+            val stored = container.aiReplies.discussion(storeKey)?.takeIf { it.model == config.model }
             update(location.id) { it.copy(office = office, discussion = it.discussion.copy(reply = it.discussion.reply ?: stored)) }
             val now = Instant.now()
             val recent = checkedAt[office]?.let { Duration.between(it, now) < RECHECK } == true
@@ -96,9 +110,9 @@ class AiController(private val container: AppContainer, private val scope: Corou
                 checkedAt[office] = now
                 if (stored != null && stored.sourceId == id) return@attempt stored
                 val discussion = container.nws.discussion(office, id)
-                val zone = container.weatherCache.read(location.id)?.timeZoneId?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: ZoneId.systemDefault()
-                val text = container.ai.complete(config, AiPrompts.discussion(discussion, location.displayName, zone))
-                AiReply(text, config.model, Instant.now(), id, discussion.issued).also { container.aiReplies.putDiscussion(office, it) }
+                val zone = snapshot?.timeZoneId?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: ZoneId.systemDefault()
+                val text = container.ai.complete(config, AiPrompts.discussion(discussion, place, zone))
+                AiReply(text, config.model, Instant.now(), id, discussion.issued).also { container.aiReplies.putDiscussion(storeKey, it) }
             }
             result.onSuccess { reply -> update(location.id) { it.copy(discussion = AiTask(reply)) } }
                 .onFailure { e -> update(location.id) { it.copy(discussion = it.discussion.copy(loading = false, error = e.toUserMessage())) } }
@@ -111,7 +125,9 @@ class AiController(private val container: AppContainer, private val scope: Corou
         if (states.value[location.id]?.alerts?.get(alert.id)?.loading == true) return
         scope.launch {
             val config = config(settings) ?: return@launch
-            container.aiReplies.alert(alert.id)?.takeIf { it.model == config.model }?.let { stored ->
+            val place = placeFor(location, snapshot)
+            val storeKey = "${alert.id}|$place"
+            container.aiReplies.alert(storeKey)?.takeIf { it.model == config.model }?.let { stored ->
                 update(location.id) { it.copy(alerts = it.alerts + (alert.id to AiTask(stored))) }
                 return@launch
             }
@@ -121,10 +137,10 @@ class AiController(private val container: AppContainer, private val scope: Corou
             }
             update(location.id) { it.copy(alerts = it.alerts + (alert.id to AiTask(loading = true))) }
             val zone = runCatching { ZoneId.of(snapshot.timeZoneId) }.getOrDefault(ZoneId.systemDefault())
-            val result = attempt { container.ai.complete(config, AiPrompts.alert(alert, location.displayName, zone, Instant.now())) }
+            val result = attempt { container.ai.complete(config, AiPrompts.alert(alert, place, zone, Instant.now())) }
             result.onSuccess { text ->
                 val reply = AiReply(text, config.model, Instant.now(), alert.id, alert.sent)
-                container.aiReplies.putAlert(alert.id, reply)
+                container.aiReplies.putAlert(storeKey, reply)
                 update(location.id) { it.copy(alerts = it.alerts + (alert.id to AiTask(reply))) }
             }.onFailure { e ->
                 update(location.id) { it.copy(alerts = it.alerts + (alert.id to AiTask(error = e.toUserMessage()))) }
@@ -145,7 +161,7 @@ class AiController(private val container: AppContainer, private val scope: Corou
                 return@launch
             }
             update(location.id) { it.copy(answer = AiTask(loading = true)) }
-            val result = attempt { container.ai.complete(config, AiPrompts.question(q, snapshot, location.displayName, settings.units, Instant.now())) }
+            val result = attempt { container.ai.complete(config, AiPrompts.question(q, snapshot, placeFor(location, snapshot), settings.units, Instant.now())) }
             result.onSuccess { text -> update(location.id) { it.copy(answer = AiTask(AiReply(text, config.model, Instant.now(), "question"))) } }
                 .onFailure { e -> update(location.id) { it.copy(answer = AiTask(error = e.toUserMessage())) } }
         }

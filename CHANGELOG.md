@@ -5,6 +5,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-11-06
+
+### Fixed
+- **Forecasters' notes, alert explanations and questions now use your town.** For the "Current location" place, the AI was told the place was literally "Current location", so it described the whole forecast area and said it didn't know where you are. It now gets the National Weather Service's name for the spot (for example "Gray, ME"), never a nickname.
+- **Shorter forecasters' notes:** at most four sentences plus a one-line confidence, keeping only what applies to your part of the area (coast, foothills or mountains). Alert explanations and answers are shorter too.
+- Notes and alert explanations are now kept per place, so two places covered by the same weather office no longer share one write-up.
+
 ## [1.9.0] - 2026-11-06
 
 AI where it's useful, and Claude as a provider.
