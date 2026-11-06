@@ -1,4 +1,4 @@
-package app.northvane.weather.ui.components
+package app.northvane.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size

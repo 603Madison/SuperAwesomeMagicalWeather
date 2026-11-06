@@ -79,6 +79,15 @@ import app.northvane.mini.data.RadarImages
 import kotlinx.coroutines.delay
 import java.time.Duration
 import java.time.Instant
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.text.style.TextAlign
+import app.northvane.core.model.WeatherCondition
+import app.northvane.ui.TemperatureRange
+import app.northvane.ui.WeatherIcon
+import app.northvane.ui.skyGradient
+import app.northvane.ui.warningGradient
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -149,7 +158,11 @@ fun MiniRoot(vm: MiniViewModel, openAlerts: Boolean, onExit: () -> Unit, hub: Ke
     MiniTheme(dark) {
         androidx.compose.runtime.CompositionLocalProvider(LocalKeyHub provides hub, LocalFocusMemory provides memory) {
             // Surface sets the default text color for the theme.
-            androidx.compose.material3.Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            androidx.compose.material3.Surface(
+                Modifier.fillMaxSize().background(pageBrush(dark)),
+                color = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.onBackground,
+            ) {
             Column(Modifier.fillMaxSize()) {
                 val route = stack.last()
                 // The app's name is long for a 2.4" screen: at home the place itself is the title.
@@ -210,7 +223,7 @@ private fun HomeScreen(state: MiniState, fmt: Fmt, go: (String) -> Unit, refresh
     val menu = listOf(
         MenuItem(1, "Hourly", Route.HOURLY),
         MenuItem(2, "7-day", Route.DAYS),
-        MenuItem(3, "Alerts", Route.ALERTS, if (alerts.isEmpty()) "None" else "${alerts.size} active", if (warning) Warn else if (alerts.isNotEmpty()) Caution else null),
+        MenuItem(3, "Alerts", Route.ALERTS, if (alerts.isEmpty()) "None" else "${alerts.size} active", if (warning) MaterialTheme.colorScheme.error else if (alerts.isNotEmpty()) MaterialTheme.colorScheme.tertiary else null),
         MenuItem(4, "Radar", Route.RADAR),
         MenuItem(5, "Places", Route.PLACES),
         MenuItem(6, "Settings", Route.SETTINGS),
@@ -225,44 +238,67 @@ private fun HomeScreen(state: MiniState, fmt: Fmt, go: (String) -> Unit, refresh
     MiniList(screen = Route.HOME, count = menu.size, header = { NowHeader(state, snapshot, fmt) }) { i, focus, onFocused ->
         val item = menu[i]
         MiniRow({ go(item.route) }, focusRequester = focus, onFocused = onFocused) {
-            Text("${item.key}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(18.dp))
-            Text(item.label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            KeyBadge("${item.key}")
+            Spacer(Modifier.width(10.dp))
+            Text(item.label, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium), modifier = Modifier.weight(1f))
             item.detail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = item.color ?: MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
 }
 
+/** Current conditions on the main app's hero card: sky colors for the weather, red during a warning. */
 @Composable
 private fun NowHeader(state: MiniState, snapshot: WeatherSnapshot?, fmt: Fmt) {
     val f = fmt.units
     val current = snapshot?.current
+    val hour = snapshot?.hourly?.firstOrNull()
     val today = snapshot?.daily?.firstOrNull { it.highC != null || it.lowC != null }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)) {
-        if (snapshot == null) {
-            Text(if (state.loading) "Loading the forecast…" else "No forecast yet", style = MaterialTheme.typography.titleMedium)
-        } else {
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(f.temperature(current?.temperatureC ?: snapshot.hourly.firstOrNull()?.temperatureC), style = MaterialTheme.typography.headlineLarge)
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.padding(bottom = 4.dp)) {
-                    Text(current?.description ?: current?.condition?.label ?: snapshot.hourly.firstOrNull()?.shortForecast ?: "", style = MaterialTheme.typography.titleSmall, maxLines = 2)
-                    if (today != null) Text("H ${f.temperature(today.highC)}  L ${f.temperature(today.lowC)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val warning = snapshot?.alerts.orEmpty().firstOrNull { it.category == AlertCategory.WARNING }
+    val condition = current?.condition?.takeIf { it != WeatherCondition.UNKNOWN } ?: hour?.condition ?: WeatherCondition.UNKNOWN
+    val isDay = current?.isDaytime ?: hour?.isDaytime ?: true
+    val sky = if (warning != null) warningGradient(dark) else skyGradient(condition, isDay, dark)
+    val soft = Color.White.copy(alpha = 0.82f)
+    Column(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp)) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Brush.verticalGradient(sky))
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            if (snapshot == null) {
+                Text(if (state.loading) "Loading the forecast…" else "No forecast yet", style = MaterialTheme.typography.titleMedium, color = Color.White)
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(f.temperature(current?.temperatureC ?: hour?.temperatureC), style = MaterialTheme.typography.headlineLarge, color = Color.White)
+                        Text(
+                            current?.description ?: current?.condition?.label ?: hour?.shortForecast ?: "",
+                            style = MaterialTheme.typography.titleSmall, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    WeatherIcon(condition, isDay, size = 48.dp, onDark = true)
                 }
+                val line1 = listOfNotNull(
+                    current?.feelsLikeC?.let { "Feels ${f.temperature(it)}" },
+                    today?.let { "H ${f.temperature(it.highC)}  L ${f.temperature(it.lowC)}" },
+                )
+                if (line1.isNotEmpty()) Text(line1.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = soft)
+                val line2 = listOfNotNull(
+                    current?.windSpeedKph?.let { "Wind ${f.windSpeed(it)}" },
+                    current?.humidityPercent?.let { "Humidity ${f.percent(it)}" },
+                )
+                if (line2.isNotEmpty()) Text(line2.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = soft)
+                if (warning != null) {
+                    Text("⚠ ${warning.event}", style = MaterialTheme.typography.titleSmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                } else {
+                    today?.shortForecast?.let { Text("Today: $it", style = MaterialTheme.typography.bodySmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                }
+                Text(if (state.loading) "Updating…" else "Updated ${fmt.time(snapshot.fetchedAt)}", style = MaterialTheme.typography.labelMedium, color = soft)
             }
-            val bits = listOfNotNull(
-                current?.feelsLikeC?.let { "Feels ${f.temperature(it)}" },
-                current?.windSpeedKph?.let { "Wind ${f.windSpeed(it)}" },
-                current?.humidityPercent?.let { "Humidity ${f.percent(it)}" },
-            )
-            if (bits.isNotEmpty()) Text(bits.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            today?.shortForecast?.let { Text("Today: $it", style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis) }
-            Text(
-                if (state.loading) "Updating…" else "Updated ${fmt.time(snapshot.fetchedAt)}",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
-        state.message?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Warn) }
+        state.message?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp)) }
     }
 }
 
@@ -283,11 +319,13 @@ private fun HourRow(h: HourlyForecast, fmt: Fmt, focus: FocusRequester, onFocuse
     val f = fmt.units
     MiniRow(null, focusRequester = focus, onFocused = onFocused) {
         Column(Modifier.weight(1f)) {
-            Row {
-                Text(fmt.hour(h.time), style = MaterialTheme.typography.titleSmall, modifier = Modifier.width(64.dp))
-                Text(f.temperature(h.temperatureC), style = MaterialTheme.typography.titleSmall, modifier = Modifier.width(44.dp))
-                Text(h.precipitationChance?.let { "$it%" } ?: "", style = MaterialTheme.typography.bodySmall, color = Accent, modifier = Modifier.width(40.dp))
-                Text(f.windSpeed(h.windSpeedKph), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(fmt.hour(h.time), style = MaterialTheme.typography.titleSmall, modifier = Modifier.width(54.dp))
+                WeatherIcon(h.condition, h.isDaytime, size = 22.dp)
+                Spacer(Modifier.width(8.dp))
+                Text(f.temperature(h.temperatureC), style = MaterialTheme.typography.titleSmall, modifier = Modifier.width(40.dp))
+                Text(h.precipitationChance?.let { "$it%" } ?: "", style = MaterialTheme.typography.bodySmall, color = Accent, modifier = Modifier.width(38.dp))
+                Text(f.windSpeed(h.windSpeedKph), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
             Text(h.shortForecast ?: h.condition.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
@@ -300,17 +338,30 @@ private fun DaysScreen(state: MiniState, fmt: Fmt, go: (String) -> Unit, refresh
     val days = state.snapshot?.daily.orEmpty().filter { !it.date.isBefore(today) }
     ScreenKeysEffect(ScreenKeys(left = refreshKey(state, refresh), center = "Details"))
     if (days.isEmpty()) return Hint(if (state.loading) "Loading…" else "No daily forecast for this place.")
+    // The week's range, so each day's bar sits where it belongs, as in the main app.
+    val lows = days.mapNotNull { it.lowC ?: it.highC }
+    val highs = days.mapNotNull { it.highC ?: it.lowC }
+    val min = lows.minOrNull() ?: 0.0
+    val max = highs.maxOrNull() ?: 0.0
     MiniList(screen = Route.DAYS, count = days.size) { i, focus, onFocused ->
         val d = days[i]
         val f = fmt.units
         MiniRow({ go(Route.day(d.date)) }, focusRequester = focus, onFocused = onFocused) {
             Column(Modifier.weight(1f)) {
-                Row {
-                    Text(fmt.weekday(d.date), style = MaterialTheme.typography.titleSmall, modifier = Modifier.width(56.dp))
-                    Text("${f.temperature(d.highC)} / ${f.temperature(d.lowC)}", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                    d.precipitationChance?.takeIf { it >= 10 }?.let { Text("$it%", style = MaterialTheme.typography.bodySmall, color = Accent) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(fmt.weekday(d.date), style = MaterialTheme.typography.titleSmall, modifier = Modifier.width(46.dp))
+                    WeatherIcon(d.condition, d.isDaytimeCondition, size = 22.dp)
+                    Text(
+                        f.temperature(d.lowC), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.End, modifier = Modifier.width(34.dp),
+                    )
+                    TemperatureRange(d.lowC, d.highC, min, max, Modifier.weight(1f).padding(horizontal = 6.dp))
+                    Text(f.temperature(d.highC), style = MaterialTheme.typography.titleSmall, modifier = Modifier.width(32.dp))
                 }
-                Text(d.shortForecast ?: d.condition.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row {
+                    d.precipitationChance?.takeIf { it >= 10 }?.let { Text("$it%  ", style = MaterialTheme.typography.bodySmall, color = Accent) }
+                    Text(d.shortForecast ?: d.condition.label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
     }
@@ -322,8 +373,14 @@ private fun DayScreen(day: DailyForecast?, fmt: Fmt) {
     if (day == null) return Hint("This day is no longer in the forecast.")
     val f = fmt.units
     ScrollText {
-        Text("${day.name} · ${fmt.date(day.date)}", style = MaterialTheme.typography.titleMedium)
-        Text("High ${f.temperature(day.highC)}   Low ${f.temperature(day.lowC)}", style = MaterialTheme.typography.bodyMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            WeatherIcon(day.condition, day.isDaytimeCondition, size = 36.dp)
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text("${day.name} · ${fmt.date(day.date)}", style = MaterialTheme.typography.titleMedium)
+                Text("High ${f.temperature(day.highC)}   Low ${f.temperature(day.lowC)}", style = MaterialTheme.typography.bodyMedium)
+            }
+        }
         val facts = buildList {
             day.precipitationChance?.let { add("Precipitation $it%" + (day.precipitationMm?.takeIf { mm -> mm > 0 }?.let { mm -> " · ${f.precipitation(mm)}" } ?: "")) }
             day.snowMm?.takeIf { it >= 2.5 }?.let { add("Snow ${f.snow(it)}") }
@@ -357,18 +414,26 @@ private fun AlertsScreen(state: MiniState, fmt: Fmt, go: (String) -> Unit, refre
     MiniList(screen = Route.ALERTS, count = alerts.size) { i, focus, onFocused ->
         val a = alerts[i]
         MiniRow({ go(Route.alert(a.id)) }, focusRequester = focus, onFocused = onFocused) {
+            Box(Modifier.width(4.dp).height(30.dp).background(app.northvane.ui.alertColor(a.category), RoundedCornerShape(2.dp)))
+            Spacer(Modifier.width(8.dp))
             Column(Modifier.weight(1f)) {
-                Text(a.event, style = MaterialTheme.typography.titleSmall, color = alertColor(a))
+                Text(a.event, style = MaterialTheme.typography.titleSmall)
                 (a.ends ?: a.expires)?.let { Text("Until ${fmt.dayTime(it)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         }
     }
 }
 
-private fun alertColor(a: WeatherAlert): Color = when (a.category) {
-    AlertCategory.WARNING -> Warn
-    AlertCategory.WATCH -> Caution
-    else -> Accent
+/** The alert's kind as a small colored label, in the main app's alert colors. */
+@Composable
+private fun CategoryLabel(category: AlertCategory) {
+    if (category == AlertCategory.OTHER) return
+    Text(
+        category.name.lowercase().replaceFirstChar { it.uppercase() },
+        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+        color = Color.White,
+        modifier = Modifier.background(app.northvane.ui.alertColor(category), RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 1.dp),
+    )
 }
 
 @Composable
@@ -376,7 +441,8 @@ private fun AlertScreen(alert: WeatherAlert?, fmt: Fmt) {
     ScreenKeysEffect(ScreenKeys(center = "▲▼ Scroll"))
     if (alert == null) return Hint("This alert has ended.")
     ScrollText {
-        Text(alert.event, style = MaterialTheme.typography.titleMedium, color = alertColor(alert))
+        CategoryLabel(alert.category)
+        Text(alert.event, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 2.dp))
         val from = alert.onset ?: alert.effective
         val until = alert.ends ?: alert.expires
         Text(listOfNotNull(from?.let { "From ${fmt.dayTime(it)}" }, until?.let { "until ${fmt.dayTime(it)}" }).joinToString(" "), style = MaterialTheme.typography.bodySmall)
@@ -535,7 +601,7 @@ private fun PlaceScreen(state: MiniState, id: String, vm: MiniViewModel, back: (
     )
     MiniList(screen = "place", count = rows.size, header = { Hint(place.displayName, color = MaterialTheme.colorScheme.onSurface) }) { i, focus, onFocused ->
         MiniRow(rows[i].second, focusRequester = focus, onFocused = onFocused) {
-            Text(rows[i].first, style = MaterialTheme.typography.bodyMedium, color = if (i == rows.lastIndex) Warn else MaterialTheme.colorScheme.onSurface)
+            Text(rows[i].first, style = MaterialTheme.typography.bodyMedium, color = if (i == rows.lastIndex) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
         }
     }
 }
@@ -587,7 +653,7 @@ private fun AddPlaceScreen(state: MiniState, vm: MiniViewModel, onAdded: () -> U
         }
         if (state.searching) Hint("Searching…")
         if (state.results != null && results.isEmpty() && !state.searching) Hint("No places found. Try a town name or ZIP code.")
-        state.message?.let { Hint(it, color = Warn) }
+        state.message?.let { Hint(it, color = MaterialTheme.colorScheme.error) }
         Box(Modifier.weight(1f)) {
             androidx.compose.foundation.lazy.LazyColumn {
                 items(rows.size) { i ->

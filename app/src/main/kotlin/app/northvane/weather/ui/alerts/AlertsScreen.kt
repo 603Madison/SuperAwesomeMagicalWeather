@@ -2,6 +2,7 @@
 
 package app.northvane.weather.ui.alerts
 
+import app.northvane.ui.alertColor
 import app.northvane.weather.ui.theme.LocalIsDark
 import android.text.format.DateFormat
 import androidx.compose.animation.animateContentSize
@@ -60,7 +61,6 @@ import app.northvane.core.model.WeatherAlert
 import app.northvane.weather.notify.AlertNotifier
 import app.northvane.weather.ui.MainUiState
 import app.northvane.weather.ui.TimeFormat
-import app.northvane.weather.ui.theme.alertColor
 import java.time.ZoneId
 
 @Composable

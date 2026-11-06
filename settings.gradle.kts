@@ -30,5 +30,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "SuperAwesomeMagicalWeather"
 include(":core")
+include(":ui")
 include(":app")
 include(":mini")

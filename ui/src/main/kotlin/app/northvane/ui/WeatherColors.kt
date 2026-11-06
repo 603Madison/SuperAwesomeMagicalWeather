@@ -1,4 +1,4 @@
-package app.northvane.weather.ui.theme
+package app.northvane.ui
 
 import androidx.compose.ui.graphics.Color
 import app.northvane.core.model.AlertCategory

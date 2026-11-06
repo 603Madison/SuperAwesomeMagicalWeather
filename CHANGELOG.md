@@ -3,7 +3,11 @@
 All notable changes to SuperAwesomeMagicalWeather (called Northvane before 1.7.0). The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.7.2] - 2026-11-06
+
+### Changed
+- **Mini looks like the main app.** It uses the main app's blue theme in light and dark, and the same soft background behind rounded cards. Current conditions sit on the main app's sky-colored card, with its weather icon, and the card turns red during a warning. Hourly and 7-day rows have weather icons, and 7-day has the same temperature range bars. Menu shortcuts are blue key badges, and alerts are marked in the main app's alert colors. Keypad navigation is unchanged.
+- The weather icons, sky colors and brand colors now live in a module shared by both apps (`ui/`), so they stay in step.
 
 ### Added
 - **Own F-Droid repository** on GitHub Pages, updated after every release with the same signed APKs as the GitHub releases. Add it in F-Droid with the address and fingerprint in the README (`docs/FDROID.md`).

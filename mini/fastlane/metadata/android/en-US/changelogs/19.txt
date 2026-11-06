@@ -1,0 +1,1 @@
+Mini now looks like the main app: its blue theme in light and dark, a sky-colored card for current conditions (red during a warning), weather icons, temperature range bars on the 7-day forecast, and alert colors. Keypad navigation is unchanged.

@@ -2,6 +2,7 @@
 
 package app.northvane.weather.ui.radar
 
+import app.northvane.ui.RadarLegend
 import androidx.compose.ui.graphics.Color
 import app.northvane.weather.ui.theme.LocalIsDark
 import android.text.format.DateFormat
@@ -69,7 +70,6 @@ import app.northvane.weather.data.SatelliteFeature
 import app.northvane.weather.ui.MainUiState
 import app.northvane.weather.ui.TimeFormat
 import app.northvane.weather.ui.components.NorthvaneIcons
-import app.northvane.weather.ui.theme.RadarLegend
 import java.time.ZoneId
 import kotlin.math.roundToInt
 

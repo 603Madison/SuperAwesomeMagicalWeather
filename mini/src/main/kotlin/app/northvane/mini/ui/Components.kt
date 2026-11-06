@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -25,8 +27,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -42,7 +42,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import app.northvane.ui.BrandDarkColors
+import app.northvane.ui.BrandLightColors
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -62,8 +65,6 @@ import kotlinx.coroutines.launch
 // --- Theme: compact type and strong contrast for 2.4–2.8" screens ---
 
 val Accent = Color(0xFF3B82F6)
-val Warn = Color(0xFFFF6B5E)
-val Caution = Color(0xFFF2B53A)
 
 private val MiniType = Typography(
     headlineLarge = TextStyle(fontSize = 40.sp, fontWeight = FontWeight.Light, lineHeight = 44.sp),
@@ -74,22 +75,25 @@ private val MiniType = Typography(
     labelMedium = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium, lineHeight = 14.sp),
 )
 
+/** The main app's default theme (shared through :ui), with type sized for flip phones. */
 @Composable
 fun MiniTheme(dark: Boolean, content: @Composable () -> Unit) {
-    val colors = if (dark) {
-        darkColorScheme(
-            primary = Accent, background = Color(0xFF0E1420), surface = Color(0xFF0E1420),
-            surfaceVariant = Color(0xFF1B2433), onSurface = Color(0xFFF1F4F9), onSurfaceVariant = Color(0xFFAAB4C3),
-            primaryContainer = Color(0xFF1E3A6B), onPrimaryContainer = Color.White, error = Warn,
-        )
-    } else {
-        lightColorScheme(
-            primary = Color(0xFF1D5FD1), background = Color.White, surface = Color.White,
-            surfaceVariant = Color(0xFFE9EDF3), onSurface = Color(0xFF0E1420), onSurfaceVariant = Color(0xFF465166),
-            primaryContainer = Color(0xFFD3E2FB), onPrimaryContainer = Color(0xFF0E1420), error = Color(0xFFC62828),
-        )
+    MaterialTheme(colorScheme = if (dark) BrandDarkColors else BrandLightColors, typography = MiniType, content = content)
+}
+
+/** The soft page background the main app uses behind its cards. */
+fun pageBrush(dark: Boolean): Brush =
+    Brush.verticalGradient(if (dark) listOf(Color(0xFF0F1A2E), Color(0xFF0B1220)) else listOf(Color(0xFFEAF1FD), Color(0xFFF5F7FB)))
+
+private val RowShape = RoundedCornerShape(12.dp)
+
+/** A key-number badge, like the keys on the phone. */
+@Composable
+fun KeyBadge(label: String) {
+    val colors = MaterialTheme.colorScheme
+    Box(Modifier.size(20.dp).background(colors.primary, CircleShape), contentAlignment = Alignment.Center) {
+        Text(label, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = colors.onPrimary)
     }
-    MaterialTheme(colorScheme = colors, typography = MiniType, content = content)
 }
 
 // --- Soft keys and hardware keys ---
@@ -153,7 +157,7 @@ fun MiniRow(
     Row(
         modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 1.dp)
+            .padding(horizontal = 6.dp, vertical = 2.dp)
             .semantics(mergeDescendants = true) {}
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged {
@@ -171,9 +175,10 @@ fun MiniRow(
             }
             .focusable()
             .pointerInput(onClick) { detectTapGestures { onClick?.invoke() } }
-            .background(if (focused) colors.primaryContainer else Color.Transparent, RoundedCornerShape(8.dp))
-            .border(2.dp, if (focused) colors.primary else Color.Transparent, RoundedCornerShape(8.dp))
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            // Rows are cards, as in the main app; the focused one is filled and outlined in the accent color.
+            .background(if (focused) colors.primaryContainer else colors.surfaceContainer, RowShape)
+            .border(2.dp, if (focused) colors.primary else Color.Transparent, RowShape)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         content = content,
     )
@@ -247,12 +252,12 @@ fun ScrollText(modifier: Modifier = Modifier, content: @Composable ColumnScope.(
 fun TopBar(title: String, subtitle: String?) {
     val colors = MaterialTheme.colorScheme
     Row(
-        Modifier.fillMaxWidth().background(colors.surfaceVariant).padding(horizontal = 10.dp, vertical = 4.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             title,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.titleMedium,
             color = colors.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -275,23 +280,26 @@ fun TopBar(title: String, subtitle: String?) {
 @Composable
 fun SoftKeyBar(keys: ScreenKeys, onBack: () -> Unit) {
     val colors = MaterialTheme.colorScheme
-    Row(
-        Modifier.fillMaxWidth().height(28.dp).background(colors.surfaceVariant).padding(horizontal = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        SoftLabel(keys.left?.label.orEmpty(), TextAlign.Start, Modifier.weight(1f)) { keys.left?.run?.invoke() }
-        SoftLabel(keys.center.orEmpty(), TextAlign.Center, Modifier.weight(1f), bold = true) {}
-        SoftLabel(keys.right, TextAlign.End, Modifier.weight(1f)) { onBack() }
+    Column(Modifier.fillMaxWidth().background(colors.surfaceContainer)) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(colors.outlineVariant))
+        Row(
+            Modifier.fillMaxWidth().height(28.dp).padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SoftLabel(keys.left?.label.orEmpty(), TextAlign.Start, Modifier.weight(1f)) { keys.left?.run?.invoke() }
+            SoftLabel(keys.center.orEmpty(), TextAlign.Center, Modifier.weight(1f), bold = true, color = colors.primary) {}
+            SoftLabel(keys.right, TextAlign.End, Modifier.weight(1f)) { onBack() }
+        }
     }
 }
 
 @Composable
-private fun SoftLabel(text: String, align: TextAlign, modifier: Modifier, bold: Boolean = false, onTap: () -> Unit) {
+private fun SoftLabel(text: String, align: TextAlign, modifier: Modifier, bold: Boolean = false, color: Color = Color.Unspecified, onTap: () -> Unit) {
     Box(modifier.fillMaxSize().pointerInput(text) { detectTapGestures { onTap() } }, contentAlignment = Alignment.Center) {
         Text(
             text,
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = if (bold) FontWeight.Bold else FontWeight.Medium),
-            color = MaterialTheme.colorScheme.onSurface,
+            color = if (color == Color.Unspecified) MaterialTheme.colorScheme.onSurface else color,
             textAlign = align,
             maxLines = 1,
             modifier = Modifier.fillMaxWidth(),

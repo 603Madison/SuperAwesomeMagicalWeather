@@ -194,7 +194,7 @@ platform 37.
 ./gradlew :core:test                    # data layer and security tests
 ./gradlew :app:testDebugUnitTest        # app tests; renders screenshots to app/build/outputs/screenshots
 ./gradlew :mini:testDebugUnitTest       # Mini tests, driven by keys only
-./gradlew :app:lintDebug :mini:lintDebug
+./gradlew :app:lintDebug :ui:lintDebug :mini:lintDebug
 ./gradlew :app:assembleDebug :mini:assembleDebug   # installable debug APKs
 ./gradlew :core:test -Pnorthvane.live=true          # also hit the real NWS, NOAA and IEM services
 ```
@@ -214,6 +214,7 @@ keyPassword=…
 |---|---|
 | `core/` | Plain Kotlin, no Android: API clients, parsers, forecast merging, estimates, radar decoding, network security policy |
 | `app/` | The Android app: Compose UI, MapLibre radar, background alert checks, encrypted key storage |
+| `ui/` | Look and feel shared by both apps: weather icons, sky colors, brand colors |
 | `mini/` | The flip-phone app |
 | `weewx/` | WeeWX skin and setup guide |
 | `docs/` | How it works, security notes, release process, screenshots |

@@ -1,0 +1,1 @@
+Behind the scenes: the weather icons and colors are now shared with SuperAwesomeMagicalWeather Mini, which now looks like this app.

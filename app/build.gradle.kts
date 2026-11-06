@@ -27,8 +27,8 @@ android {
         applicationId = "app.northvane.weather"
         minSdk = 26
         targetSdk = 37
-        versionCode = 18
-        versionName = "1.7.1"
+        versionCode = 19
+        versionName = "1.7.2"
     }
 
     signingConfigs {
@@ -98,6 +98,7 @@ android {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":ui"))
 
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)

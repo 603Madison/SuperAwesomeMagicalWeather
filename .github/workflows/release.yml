@@ -86,7 +86,7 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0"
 
       - name: Run tests
-        run: ./gradlew --no-daemon :core:test :app:testDebugUnitTest :app:lintDebug :mini:testDebugUnitTest :mini:lintDebug
+        run: ./gradlew --no-daemon :core:test :app:testDebugUnitTest :app:lintDebug :ui:lintDebug :mini:testDebugUnitTest :mini:lintDebug
 
       - name: Restore signing key
         env:

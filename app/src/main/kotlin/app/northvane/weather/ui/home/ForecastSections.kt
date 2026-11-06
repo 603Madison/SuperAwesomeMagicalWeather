@@ -1,5 +1,7 @@
 package app.northvane.weather.ui.home
 
+import app.northvane.ui.WeatherIcon
+import app.northvane.ui.TemperatureRange
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
@@ -63,7 +65,6 @@ import app.northvane.core.model.Units
 import app.northvane.core.util.Solar
 import app.northvane.core.util.UnitFormatter
 import app.northvane.weather.ui.TimeFormat
-import app.northvane.weather.ui.components.WeatherIcon
 import kotlinx.coroutines.delay
 import java.time.Duration
 import java.time.Instant
@@ -475,27 +476,6 @@ private fun DetailParagraph(label: String?, text: String) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(bottom = 6.dp),
     )
-}
-
-/** A bar spanning the week's temperature range, filled between this day's low and high. */
-@Composable
-private fun TemperatureRange(low: Double?, high: Double?, min: Double, max: Double, modifier: Modifier = Modifier) {
-    val track = MaterialTheme.colorScheme.surfaceVariant
-    Canvas(modifier.height(6.dp)) {
-        val r = size.height / 2
-        drawRoundRect(track, cornerRadius = CornerRadius(r, r))
-        val span = (max - min).takeIf { it > 0.1 } ?: return@Canvas
-        val lo = ((low ?: high ?: return@Canvas) - min) / span
-        val hi = ((high ?: low ?: return@Canvas) - min) / span
-        val start = (lo * size.width).toFloat()
-        val end = (hi * size.width).toFloat().coerceAtLeast(start + size.height)
-        drawRoundRect(
-            brush = Brush.horizontalGradient(listOf(Color(0xFF5AA9F7), Color(0xFFF7B955), Color(0xFFF2784B)), startX = 0f, endX = size.width),
-            topLeft = Offset(start, 0f),
-            size = Size(end - start, size.height),
-            cornerRadius = CornerRadius(r, r),
-        )
-    }
 }
 
 /**

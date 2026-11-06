@@ -2,6 +2,10 @@
 
 package app.northvane.weather.ui.home
 
+import app.northvane.ui.WeatherIcon
+import app.northvane.ui.skyGradient
+import app.northvane.ui.warningGradient
+import app.northvane.ui.alertColor
 import app.northvane.weather.ui.theme.LocalIsDark
 import app.northvane.weather.ui.theme.LocalBackdrop
 import android.Manifest
@@ -99,11 +103,7 @@ import app.northvane.core.model.Section
 import app.northvane.weather.ui.MainUiState
 import app.northvane.weather.ui.TimeFormat
 import app.northvane.weather.ui.components.NorthvaneIcons
-import app.northvane.weather.ui.components.WeatherIcon
-import app.northvane.weather.ui.theme.alertColor
 import app.northvane.weather.ui.theme.WarningTheme
-import app.northvane.weather.ui.theme.skyGradient
-import app.northvane.weather.ui.theme.warningGradient
 import app.northvane.core.model.AlertCategory
 import app.northvane.core.outlook.AllergyEstimator
 import app.northvane.core.aurora.AuroraAdvisor

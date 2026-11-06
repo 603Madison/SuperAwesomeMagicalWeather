@@ -176,6 +176,24 @@ class MiniKeysTest {
         save("mini_settings")
     }
 
+    /** The light theme, as on the main app: hero card, key badges and range bars. */
+    @Test
+    fun lightTheme() {
+        // 6 opens Settings; ▼ to Theme and OK switches Dark to Light.
+        press(KeyEvent.KEYCODE_6)
+        press(KeyEvent.KEYCODE_DPAD_DOWN)
+        press(KeyEvent.KEYCODE_DPAD_CENTER)
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodesWithText("Theme: Light", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        press(KeyEvent.KEYCODE_BACK)
+        compose.onNodeWithText("Light rain").assertExists()
+        save("mini_home_light")
+        press(KeyEvent.KEYCODE_2)
+        compose.onAllNodesWithText("Rain Likely", substring = true)[0].assertExists()
+        save("mini_days_light")
+    }
+
     @Test
     fun leftSoftKeyCanBeTheMenuKey() {
         // Many Android flip phones send MENU for the left soft key.
