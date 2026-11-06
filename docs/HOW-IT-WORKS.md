@@ -81,6 +81,15 @@ read straight from NOAA's open data on AWS instead of pre-drawn tiles.
    model's rain area in line with the radar and raised the critical success
    index for light rain by 0.02–0.07 over the next 90 minutes.
 
+5. **Handed over from the radar.** Even a fresh run often has rain in the wrong
+   place at the moment of the last scan, so going straight from radar to model
+   made rain jump or vanish. The app measures how the rain is moving by
+   comparing the newest scan with one about 20 minutes earlier, carries the
+   newest scan along that motion, and fades it out over two hours while the
+   model fades in (mixed as rain rates, so rain the model lacks fades rather
+   than ghosting). The first frames follow what is actually falling; from two
+   hours on, the frames are the model's alone.
+
 Frames start right after the newest radar scan, and the caption names the runs
 used. If NOAA's data can't be reached, the Iowa Environmental Mesonet's HRRR
 tiles are used instead.

@@ -23,6 +23,9 @@ object Outlooks {
         val ctx = ActivityScorer.Context(
             latitude, longitude, zone, s.alerts, WaterIce.forecast(s.history, days, today),
             snowConfirmed = (s.history?.snowDepthMm ?: 0.0) >= 25.0,
+            // Readings only describe today's water, but they change slowly; give up on them after a day.
+            waterTempC = s.water?.takeIf { java.time.Duration.between(it.fetchedAt, now) < java.time.Duration.ofDays(1) }?.waterTempC,
+            riverRising = s.water?.river?.rising == true,
         )
         val outage = OutageContext(
             leafCover = { date -> FoliageEstimator.leafCover(date, latitude, elevation, foliage) },

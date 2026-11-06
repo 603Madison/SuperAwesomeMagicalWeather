@@ -267,7 +267,7 @@ private fun Controls(
                             .joinToString(", ") { "%02dZ".format(it.atOffset(java.time.ZoneOffset.UTC).hour) }
                         append(" · Forecast: NOAA HRRR model" + (if (runs.isNotEmpty()) " ($runs run)" else "") +
                             (if (forecast.first().image != null) ", from NOAA open data" else " via Iowa Environmental Mesonet") +
-                            if (forecast.any { it.calibrated }) ", calibrated to the latest radar" else "")
+                            if (forecast.any { it.calibrated }) ", calibrated to the latest radar, which leads the first two hours" else "")
                     }
                 },
                 style = MaterialTheme.typography.labelSmall,

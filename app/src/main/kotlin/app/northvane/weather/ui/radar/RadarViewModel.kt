@@ -75,7 +75,11 @@ class RadarViewModel(private val container: AppContainer) : ViewModel() {
                 // Zoom-7 pixels (under 1 km) so the map's usual zoom doesn't show blocks; about 11° by 8° around the place.
                 val area = at?.let { TileArea.around(it.latitude, it.longitude, zoom = 7, cols = 4, rows = 4) }
                 val after = past.lastOrNull()?.time ?: now
-                attempt { container.radar.futureFrames(now, settings.futureCastMinutes, after, area, ::decodePng) }.getOrDefault(emptyList())
+                // A scan about 20 minutes before the newest shows how the rain is moving.
+                val earlier = past.lastOrNull()?.time?.let { last ->
+                    past.dropLast(1).minByOrNull { kotlin.math.abs(java.time.Duration.between(it.time, last).toMinutes() - 20) }?.time
+                }
+                attempt { container.radar.futureFrames(now, settings.futureCastMinutes, after, area, ::decodePng, earlier) }.getOrDefault(emptyList())
             } else {
                 emptyList()
             }

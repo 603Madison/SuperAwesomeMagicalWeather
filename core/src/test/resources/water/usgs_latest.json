@@ -1,0 +1,257 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "time_series_id": "3b79c7bce7d34efc9a37e101f31755bf",
+        "monitoring_location_id": "USGS-01060000",
+        "parameter_code": "00060",
+        "statistic_id": "00011",
+        "time": "2026-11-06T19:30:00+00:00",
+        "value": "29.3",
+        "unit_of_measure": "ft^3/s",
+        "approval_status": "Provisional",
+        "qualifier": null,
+        "last_modified": "2026-11-06T19:43:11.174820+00:00",
+        "method_category": null
+      },
+      "id": "025c94d8-1229-477d-9a2d-b34efb518076",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.1782694444445,
+          43.79915
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "time_series_id": "349307773b0647c8b2ea274496498855",
+        "monitoring_location_id": "USGS-01067853",
+        "parameter_code": "00060",
+        "statistic_id": "00011",
+        "time": "1994-07-16T03:45:00+00:00",
+        "value": "0.48",
+        "unit_of_measure": "ft^3/s",
+        "approval_status": "Approved",
+        "qualifier": null,
+        "last_modified": "2025-08-23T15:31:56.538639+00:00",
+        "method_category": null
+      },
+      "id": "37b407cd-ff14-4d4d-bcc1-2553532cd040",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.4786916666667,
+          43.5256138888889
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "time_series_id": "cc1eb8d7e9dd47daad081b029ad718e3",
+        "monitoring_location_id": "USGS-01064118",
+        "parameter_code": "00060",
+        "statistic_id": "00011",
+        "time": "2020-10-01T04:00:00+00:00",
+        "value": "246",
+        "unit_of_measure": "ft^3/s",
+        "approval_status": "Approved",
+        "qualifier": [
+          "ESTIMATED"
+        ],
+        "last_modified": "2025-08-23T16:25:49.548460+00:00",
+        "method_category": null
+      },
+      "id": "77c5c6d5-b260-4d22-9476-561a1aca5ebb",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.3472222222222,
+          43.6869444444444
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "time_series_id": "63dcbcffbcbb4fa898498d3d0a971528",
+        "monitoring_location_id": "USGS-01064118",
+        "parameter_code": "00065",
+        "statistic_id": "00011",
+        "time": "2022-08-01T05:00:00+00:00",
+        "value": "3.07",
+        "unit_of_measure": "ft",
+        "approval_status": "Approved",
+        "qualifier": null,
+        "last_modified": "2025-08-23T14:03:23.962046+00:00",
+        "method_category": null
+      },
+      "id": "86eae065-0ac1-4d36-92e1-299bebbb7a40",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.3472222222222,
+          43.6869444444444
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "time_series_id": "ae0d7543db6a4a09870cbb6fd2f59183",
+        "monitoring_location_id": "USGS-01060000",
+        "parameter_code": "00065",
+        "statistic_id": "00011",
+        "time": "2026-11-06T19:30:00+00:00",
+        "value": "0.97",
+        "unit_of_measure": "ft",
+        "approval_status": "Provisional",
+        "qualifier": null,
+        "last_modified": "2026-11-06T19:43:10.504808+00:00",
+        "method_category": "UNKWN"
+      },
+      "id": "8889d1a0-4f06-40f6-9f9e-3605f1cb2db1",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.1782694444445,
+          43.79915
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "time_series_id": "087414e3c3a3452087f89b7e8b4ee9e3",
+        "monitoring_location_id": "USGS-01067851",
+        "parameter_code": "00060",
+        "statistic_id": "00011",
+        "time": "1994-06-15T03:45:00+00:00",
+        "value": "0.36",
+        "unit_of_measure": "ft^3/s",
+        "approval_status": "Approved",
+        "qualifier": null,
+        "last_modified": "2025-08-23T14:55:27.289694+00:00",
+        "method_category": null
+      },
+      "id": "8ae9b942-e4cb-4e8e-8cac-340433f1f114",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.4839416666667,
+          43.5334138888889
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "time_series_id": "e52bf197948d44a78bfe7ac073ee11a9",
+        "monitoring_location_id": "USGS-01063452",
+        "parameter_code": "00060",
+        "statistic_id": "00011",
+        "time": "2000-09-07T03:45:00+00:00",
+        "value": "0.01",
+        "unit_of_measure": "ft^3/s",
+        "approval_status": "Approved",
+        "qualifier": null,
+        "last_modified": "2025-08-23T16:24:38.471173+00:00",
+        "method_category": null
+      },
+      "id": "910d8d38-d7ca-4437-8175-da988417eaac",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.524825,
+          43.7631611111111
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "time_series_id": "922c98a420b546829b78b218b940dc53",
+        "monitoring_location_id": "USGS-01064140",
+        "parameter_code": "00065",
+        "statistic_id": "00011",
+        "time": "2026-11-06T19:45:00+00:00",
+        "value": "2.75",
+        "unit_of_measure": "ft",
+        "approval_status": "Provisional",
+        "qualifier": null,
+        "last_modified": "2026-11-06T19:58:25.938319+00:00",
+        "method_category": "UNKWN"
+      },
+      "id": "d6abe239-5b7c-4f74-adcc-9776f4fce7e9",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.3029333333333,
+          43.7245972222222
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "time_series_id": "0deec8b03f5d44fc9addee581cd0960c",
+        "monitoring_location_id": "USGS-01064140",
+        "parameter_code": "00060",
+        "statistic_id": "00011",
+        "time": "2026-11-06T19:45:00+00:00",
+        "value": "448",
+        "unit_of_measure": "ft^3/s",
+        "approval_status": "Provisional",
+        "qualifier": null,
+        "last_modified": "2026-11-06T19:58:28.347707+00:00",
+        "method_category": null
+      },
+      "id": "dc8f723b-bca4-4244-a6d2-200d62a6bb2a",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -70.3029333333333,
+          43.7245972222222
+        ]
+      }
+    }
+  ],
+  "numberReturned": 9,
+  "links": [
+    {
+      "type": "application/geo+json",
+      "rel": "self",
+      "title": "This document as GeoJSON",
+      "href": "https://api.waterdata.usgs.gov/ogcapi/v1/collections/latest-continuous/items?f=json&bbox=-70.6,43.5,-70.1,43.9&parameter_code=00060,00065,00010&limit=50"
+    },
+    {
+      "rel": "alternate",
+      "type": "application/ld+json",
+      "title": "This document as RDF (JSON-LD)",
+      "href": "https://api.waterdata.usgs.gov/ogcapi/v1/collections/latest-continuous/items?f=jsonld&bbox=-70.6,43.5,-70.1,43.9&parameter_code=00060,00065,00010&limit=50"
+    },
+    {
+      "type": "text/html",
+      "rel": "alternate",
+      "title": "This document as HTML",
+      "href": "https://api.waterdata.usgs.gov/ogcapi/v1/collections/latest-continuous/items?f=html&bbox=-70.6,43.5,-70.1,43.9&parameter_code=00060,00065,00010&limit=50"
+    },
+    {
+      "type": "text/csv; charset=utf-8",
+      "rel": "alternate",
+      "title": "This document as CSV",
+      "href": "https://api.waterdata.usgs.gov/ogcapi/v1/collections/latest-continuous/items?f=csv&bbox=-70.6,43.5,-70.1,43.9&parameter_code=00060,00065,00010&limit=50"
+    },
+    {
+      "type": "application/json",
+      "title": "Latest continuous",
+      "rel": "collection",
+      "href": "https://api.waterdata.usgs.gov/ogcapi/v1/collections/latest-continuous"
+    }
+  ],
+  "timeStamp": "2026-11-06T20:02:06.549149Z"
+}

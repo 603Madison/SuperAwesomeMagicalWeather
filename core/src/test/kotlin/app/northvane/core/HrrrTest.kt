@@ -117,7 +117,9 @@ class HrrrTest {
         val decode = { bytes: ByteArray ->
             ImageIO.read(bytes.inputStream())?.let { img -> img.getRGB(0, 0, img.width, img.height, null, 0, img.width) }
         }
-        val frames = service.futureFrames(now, 120, after = latest.time, area = area, decodePng = decode)
+        val past = service.pastFrames(RadarSource.NOAA_MRMS, now)
+        val earlier = past.dropLast(1).minByOrNull { kotlin.math.abs(Duration.between(it.time, latest.time).toMinutes() - 20) }?.time
+        val frames = service.futureFrames(now, 120, after = latest.time, area = area, decodePng = decode, earlier = earlier)
         println("Latest radar ${latest.time}; ${frames.size} model frames from runs ${frames.mapNotNull { it.run }.distinct()} " +
             "calibrated=${frames.count { it.calibrated }} in ${(System.nanoTime() - started) / 1_000_000} ms")
         assertTrue(frames.isNotEmpty() && frames.all { it.image != null })

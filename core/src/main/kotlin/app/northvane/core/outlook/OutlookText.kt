@@ -32,7 +32,9 @@ object OutlookText {
             Kind.MUDDY -> "Trails will be muddy"
             Kind.MUD_SEASON -> "Mud season: skip high-elevation trails until they dry, and walk through mud, not around it"
             Kind.ROUGH_WATER -> "Choppy water: wind around ${f.windSpeed(v)}"
-            Kind.COLD_WATER -> "Cold water: wear your PFD and dress for immersion, not the air temperature"
+            Kind.COLD_WATER -> v?.let { "Water about ${f.temperature(it)}: wear your PFD and dress for immersion, not the air temperature" }
+                ?: "Cold water: wear your PFD and dress for immersion, not the air temperature"
+            Kind.RIVER_RISING -> "The nearest river gauge is rising fast: expect stronger current and debris"
             Kind.BRIGHT_MOON -> "Bright moon (${pct()} lit) washes out faint stars"
             Kind.SLEEPING_BAG_0F -> "Low near ${temp()}: bring a 0°F (-18°C) bag, an insulated pad (R5+) and keep your water filter and batteries in your bag"
             Kind.SLEEPING_BAG_20F -> "Low near ${temp()}: bring a 20°F (-7°C) bag and an insulated pad (R4+). Don't let your water filter freeze"

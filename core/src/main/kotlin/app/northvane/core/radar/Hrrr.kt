@@ -147,7 +147,14 @@ class HrrrForecast(
      * over [area]. With [observed] (the newest radar over the same area),
      * each run is first calibrated against it ([Calibration]).
      */
-    suspend fun frames(now: Instant, times: List<Instant>, area: TileArea, observed: ObservedRadar? = null): List<RadarFrame> = coroutineScope {
+    suspend fun frames(
+        now: Instant,
+        times: List<Instant>,
+        area: TileArea,
+        observed: ObservedRadar? = null,
+        /** Carries the newest radar into the first frames; see [RadarBlend]. */
+        blend: RadarBlend? = null,
+    ): List<RadarFrame> = coroutineScope {
         val runs = runsFor(now, times)
         val mapping = withContext(Dispatchers.Default) { GridMapping(area) }
         val calibrations = if (observed == null) {
@@ -173,7 +180,7 @@ class HrrrForecast(
                     val bytes = field(init, minutes) ?: return@withPermit null
                     val calibration = calibrations[init]
                     withContext(Dispatchers.Default) {
-                        val image = mapping.render(Grib2.decode(bytes), calibration)
+                        val image = mapping.render(Grib2.decode(bytes), calibration, blend, blend?.minutesTo(time))
                         RadarFrame(time, isForecast = true, tileUrl = "", image = image, run = init, calibrated = calibration != null)
                     }
                 }
@@ -293,11 +300,16 @@ class HrrrForecast(
             }
         }
 
-        fun render(field: GribField, calibration: Calibration? = null): RadarImage {
+        fun render(field: GribField, calibration: Calibration? = null, blend: RadarBlend? = null, minutes: Double? = null): RadarImage {
             val values = sample(field)
+            val weight = if (blend != null && minutes != null) blend.weight(minutes) else 0f
+            val w = area.width
+            val h = area.height
             val pixels = ByteArray(values.size) { k ->
                 val v = values[k]
-                if (v.isNaN()) 0 else ReflectivityPalette.index(calibration?.apply(v) ?: v).toByte()
+                val model = if (v.isNaN()) v else calibration?.apply(v) ?: v
+                val value = if (weight > 0f) RadarBlend.mix(model, blend!!.valueAt(k % w, k / w, w, h, minutes!!), weight) else model
+                if (value.isNaN()) 0 else ReflectivityPalette.index(value).toByte()
             }
             return RadarImage(area.width, area.height, pixels, area.north, area.south, area.west, area.east)
         }

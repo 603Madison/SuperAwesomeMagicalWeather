@@ -83,6 +83,10 @@ data class SourceConfig(
     val airNowApiKey: String? = null,
     /** Download NOAA's geomagnetic forecast for the aurora card. */
     val aurora: Boolean = false,
+    /** Download NOAA HRRR's wildfire smoke forecast (about 2 MB). */
+    val smoke: Boolean = false,
+    /** Download the nearest river gauge and tide predictions. */
+    val water: Boolean = false,
 )
 
 @Serializable
@@ -110,6 +114,8 @@ class WeatherRepository(
     private val openMeteoAir: OpenMeteoAirClient? = null,
     private val eccc: EcccClient? = null,
     private val aurora: AuroraClient? = null,
+    private val smoke: app.northvane.core.radar.HrrrSmoke? = null,
+    private val water: app.northvane.core.water.WaterClient? = null,
 ) {
     /** Nearest Environment Canada city page per place; these never move. */
     private val ecccSites = java.util.concurrent.ConcurrentHashMap<String, String>()
@@ -177,6 +183,13 @@ class WeatherRepository(
             null
         }
         val auroraJob = aurora?.takeIf { config.aurora && wants(Section.AURORA) }?.let { client -> async { attempt { client.forecast(now) } } }
+        // HRRR covers the contiguous US only.
+        val smokeJob = smoke?.takeIf { config.smoke && wants(Section.SMOKE) && inContiguousUs(point) }?.let { client ->
+            async { attempt { client.outlook(point, now) } }
+        }
+        val waterJob = water?.takeIf { config.water && wants(Section.WATER) && !outsideNws }?.let { client ->
+            async { attempt { client.report(point, now) } }
+        }
         val pollenJob = config.pollenApiKey?.takeIf { wants(Section.POLLEN) }?.let { key ->
             pollen?.let { client -> async { attempt { client.forecast(point, key, now, config.pollenRestriction) } } }
         }
@@ -203,6 +216,10 @@ class WeatherRepository(
         pollenResult?.exceptionOrNull()?.let { issues += SourceIssue(DataSource.GOOGLE_POLLEN, "Pollen: ${it.toUserMessage()}") }
         val auroraResult = auroraJob?.await()
         auroraResult?.exceptionOrNull()?.let { issues += SourceIssue(DataSource.NOAA_SWPC, "Aurora: ${it.toUserMessage()}") }
+        val smokeResult = smokeJob?.await()
+        smokeResult?.exceptionOrNull()?.let { issues += SourceIssue(DataSource.NOAA_HRRR, "Smoke: ${it.toUserMessage()}") }
+        val waterResult = waterJob?.await()
+        waterResult?.exceptionOrNull()?.let { issues += SourceIssue(DataSource.USGS, "Rivers and tides: ${it.toUserMessage()}") }
 
         val grid = gridResult?.getOrNull()
         var daily: List<DailyForecast> = dailyResult?.getOrNull().orEmpty()
@@ -280,7 +297,7 @@ class WeatherRepository(
         val alerts = alertsResult?.getOrNull() ?: ecccAlerts.orEmpty()
         val skipped = Section.entries.filterNot(wants).toSet()
 
-        val attemptedSomething = (Section.entries.toSet() - skipped - Section.OWM_FALLBACK - Section.HISTORY - Section.POLLEN - Section.AIR_QUALITY - Section.AURORA).isNotEmpty()
+        val attemptedSomething = (Section.entries.toSet() - skipped - Section.OWM_FALLBACK - Section.HISTORY - Section.POLLEN - Section.AIR_QUALITY - Section.AURORA - Section.SMOKE - Section.WATER).isNotEmpty()
         val gotExtras = historyResult?.isSuccess == true || pollenResult?.isSuccess == true || airResult?.air != null
         if (attemptedSomething && current == null && daily.isEmpty() && upcomingHourly.isEmpty() && alertsResult?.isSuccess != true && ecccAlerts == null && !gotExtras) {
             throw WeatherUnavailableException(issues.ifEmpty { listOf(SourceIssue(DataSource.NWS, "No data available")) })
@@ -308,6 +325,8 @@ class WeatherRepository(
             airQuality = airResult?.air,
             uv = airResult?.uv,
             aurora = auroraResult?.getOrNull(),
+            smoke = smokeResult?.getOrNull(),
+            water = waterResult?.getOrNull(),
             sectionTimes = buildMap {
                 // Stamped with when it was measured, so an old reading shows (and ages) as old.
                 if (current != null && current.source != DataSource.NWS_FORECAST_ESTIMATE) {
@@ -322,6 +341,8 @@ class WeatherRepository(
                 pollenResult?.getOrNull()?.let { put(Section.POLLEN, it.fetchedAt) }
                 airResult?.air?.let { put(Section.AIR_QUALITY, it.fetchedAt) }
                 auroraResult?.getOrNull()?.let { put(Section.AURORA, it.fetchedAt) }
+                smokeResult?.getOrNull()?.let { put(Section.SMOKE, it.fetchedAt) }
+                waterResult?.getOrNull()?.let { put(Section.WATER, it.fetchedAt) }
             },
         )
         Outlooks.annotate(snapshot, location.latitude, location.longitude, now)

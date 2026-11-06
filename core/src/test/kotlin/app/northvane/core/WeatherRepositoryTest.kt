@@ -244,7 +244,7 @@ class WeatherRepositoryTest {
         assertTrue(fake.requests.none { it.url.encodedPath.endsWith("/forecast/hourly") })
         assertTrue(fake.requests.none { it.url.encodedPath == "/gridpoints/TOP/32,81" })
         assertEquals(
-            setOf(Section.HOURLY_FORECAST, Section.FORECAST_DETAILS, Section.LOCAL_STATION, Section.OWM_FALLBACK, Section.HISTORY, Section.POLLEN, Section.AIR_QUALITY, Section.AURORA),
+            setOf(Section.HOURLY_FORECAST, Section.FORECAST_DETAILS, Section.LOCAL_STATION, Section.OWM_FALLBACK, Section.HISTORY, Section.POLLEN, Section.AIR_QUALITY, Section.AURORA, Section.SMOKE, Section.WATER),
             snapshot.skippedSections,
         )
         // Without grid data, numbers come from the forecast text (the fixture states winds).

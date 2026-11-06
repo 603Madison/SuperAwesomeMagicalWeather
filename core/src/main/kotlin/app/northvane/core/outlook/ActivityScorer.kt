@@ -41,6 +41,10 @@ object ActivityScorer {
         val waterIce: Map<LocalDate, Double> = emptyMap(),
         /** A nearby station actually reported snow on the ground (not just the model). */
         val snowConfirmed: Boolean = false,
+        /** Measured water temperature nearby (river gauge or tide station), when the water card is on. */
+        val waterTempC: Double? = null,
+        /** The nearest river gauge is rising fast. */
+        val riverRising: Boolean = false,
     )
 
     /** Seasonal conditions that decide which activities make sense on a day. */
@@ -304,8 +308,15 @@ object ActivityScorer {
         heat(c, hot, comfortableTo = 88.0, perDegree = 2.0)
         val cool = f(p.feelsMinC ?: p.tempMinC)
         if (cool != null) c.lose((55 - cool) * 1.2, Tip(Kind.COLD, p.feelsMinC ?: p.tempMinC))
-        // New England lakes and the Gulf of Maine stay cold well into summer.
-        if (date.monthValue !in 7..9 || (f(p.tempMaxC) ?: 70.0) < 60) c.lose(5.0, Tip(Kind.COLD_WATER))
+        val water = f(ctx.waterTempC)
+        if (water != null) {
+            // Measured nearby: under 60 °F, a capsize brings cold shock whatever the air temperature.
+            if (water < 60) c.lose((60 - water) * 0.6, Tip(Kind.COLD_WATER, ctx.waterTempC))
+        } else if (date.monthValue !in 7..9 || (f(p.tempMaxC) ?: 70.0) < 60) {
+            // New England lakes and the Gulf of Maine stay cold well into summer.
+            c.lose(5.0, Tip(Kind.COLD_WATER))
+        }
+        if (ctx.riverRising) c.lose(15.0, Tip(Kind.RIVER_RISING))
         snowAndIce(c, p)
         if ((p.skyCoverMean ?: 100) < 40 && date.monthValue in 5..9) c.advise(Tip(Kind.SUNSCREEN))
     }

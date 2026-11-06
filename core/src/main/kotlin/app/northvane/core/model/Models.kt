@@ -22,6 +22,9 @@ enum class DataSource(val displayName: String) {
     EPA_UV("EPA UV Index"),
     OPEN_METEO("Open-Meteo"),
     ECCC("Environment and Climate Change Canada"),
+    NOAA_HRRR("NOAA HRRR smoke model"),
+    USGS("USGS water data"),
+    NOAA_TIDES("NOAA Tides & Currents"),
 }
 
 @Serializable
@@ -175,6 +178,10 @@ enum class Section {
     AIR_QUALITY,
     /** Geomagnetic activity forecast (NOAA SWPC), for the aurora. */
     AURORA,
+    /** Wildfire smoke forecast (NOAA HRRR). */
+    SMOKE,
+    /** River gauges (USGS) and tides (NOAA), for paddling. */
+    WATER,
 }
 
 @Serializable
@@ -272,6 +279,8 @@ data class WeatherSnapshot(
     val airQuality: AirQuality? = null,
     val uv: UvForecast? = null,
     val aurora: KpForecast? = null,
+    val smoke: app.northvane.core.radar.SmokeOutlook? = null,
+    val water: app.northvane.core.water.WaterReport? = null,
     /** When each section's data was last downloaded (for hiding stale data on satellite). */
     val sectionTimes: Map<Section, @Serializable(InstantSerializer::class) Instant> = emptyMap(),
 ) {

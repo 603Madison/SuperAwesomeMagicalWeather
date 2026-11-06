@@ -8,6 +8,8 @@ import app.northvane.core.json.obj
 import app.northvane.core.json.str
 import app.northvane.core.net.fetch
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runInterruptible
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
@@ -72,12 +74,21 @@ class RadarService(
         area: TileArea? = null,
         /** Decodes a PNG to ARGB pixels (platform code); enables calibration against the radar. */
         decodePng: ((ByteArray) -> IntArray?)? = null,
+        /** An earlier scan (about 20 minutes before [after]), to measure how the rain is moving. */
+        earlier: Instant? = null,
     ): List<RadarFrame> {
         val until = now.plus(Duration.ofMinutes(horizonMinutes.toLong()))
         if (area != null) {
-            val observed = if (decodePng != null) runCatchingNonCancel { observedRadar(area, after, decodePng) }.getOrNull() else null
+            val (observed, previous) = if (decodePng != null) coroutineScope {
+                val latest = async { runCatchingNonCancel { observedRadar(area, after, decodePng) }.getOrNull() }
+                val before = earlier?.let { t -> async { runCatchingNonCancel { observedRadar(area, t, decodePng) }.getOrNull() } }
+                latest.await() to before?.await()
+            } else {
+                null to null
+            }
+            val blend = observed?.let { RadarBlend.build(it, previous) }
             val direct = runCatchingNonCancel {
-                hrrr.frames(now, HrrrForecast.frameTimes(after, now, until), area, observed)
+                hrrr.frames(now, HrrrForecast.frameTimes(after, now, until), area, observed, blend)
             }.getOrNull().orEmpty()
             if (direct.isNotEmpty()) return direct
         }
