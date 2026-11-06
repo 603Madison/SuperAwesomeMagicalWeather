@@ -6,12 +6,20 @@ name: F-Droid repository
 # One-time setup: Settings > Pages > Source: GitHub Actions. See docs/FDROID.md.
 on:
   workflow_call:
+    secrets:
+      RELEASE_KEYSTORE_BASE64:
+        required: true
+      RELEASE_KEYSTORE_PASSWORD:
+        required: true
+      RELEASE_KEY_ALIAS:
+        required: false
+      RELEASE_KEY_PASSWORD:
+        required: false
   workflow_dispatch:
 
+# Only the deploy job gets Pages permissions; the build job, which holds the signing key, can only read.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: fdroid-pages
@@ -23,14 +31,18 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: "3.12"
+          python-version: "3.13"
 
       - name: Install fdroidserver and Android build tools
         run: |
-          pip install --quiet fdroidserver==2.4.5
+          # Every package pinned with its hash (fdroid/requirements.txt, made with pip-compile
+          # --generate-hashes): this job holds the signing key, so nothing unreviewed gets installed.
+          pip install --quiet --require-hashes --no-deps -r fdroid/requirements.txt
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "build-tools;37.0.0" > /dev/null
           echo "$ANDROID_HOME/build-tools/37.0.0" >> "$GITHUB_PATH"
 
@@ -73,7 +85,13 @@ jobs:
             exit 1
           fi
           echo "$KEYSTORE_BASE64" | tr -d ' \n\r' | base64 -d > "$RUNNER_TEMP/release.jks"
-          FP=$(keytool -exportcert -keystore "$RUNNER_TEMP/release.jks" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" | sha256sum | cut -d' ' -f1)
+          FP=$(keytool -exportcert -keystore "$RUNNER_TEMP/release.jks" -storepass:env KEYSTORE_PASSWORD -alias "$KEY_ALIAS" | sha256sum | cut -d' ' -f1)
+          # The repository's fingerprint is fixed: users entered it when adding the repository.
+          EXPECTED=$(tr -d ' \n' < .github/release-certificate.sha256)
+          if [ "$FP" != "$EXPECTED" ]; then
+            echo "::error::The signing key isn't the release key ($EXPECTED)"
+            exit 1
+          fi
           echo "Repository fingerprint: ${FP^^}"
           for apk in fdroid/repo/*.apk; do
             if ! apksigner verify --print-certs "$apk" | grep -q "SHA-256 digest: $FP"; then
@@ -108,6 +126,9 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}repo/

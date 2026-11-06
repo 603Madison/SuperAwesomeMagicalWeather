@@ -106,7 +106,10 @@ class HrrrForecast(
     private val gribCache = object : LinkedHashMap<String, ByteArray>(16, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ByteArray>?) = size > 16
     }
-    private val indexCache = HashMap<String, List<IndexEntry>>()
+    /** Recent runs' indexes; old runs drop out instead of piling up while the app runs. */
+    private val indexCache = object : LinkedHashMap<String, List<IndexEntry>>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<IndexEntry>>?) = size > 48
+    }
 
     internal data class IndexEntry(val offset: Long, val field: String, val level: String, val step: String) {
         /** Composite reflectivity: what radar mosaics show, including rain aloft far from the radars. */
@@ -150,7 +153,17 @@ class HrrrForecast(
         val calibrations = if (observed == null) {
             emptyMap()
         } else {
-            runs.values.distinct().associateWith { init -> runCatching { calibrate(init, observed, mapping) }.getOrNull() }
+            runs.values.distinct().associateWith { init ->
+                // Calibration is optional: any failure (even running out of memory) just skips it, but
+                // cancellation still stops the work.
+                try {
+                    calibrate(init, observed, mapping)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    null
+                }
+            }
         }
         val limit = Semaphore(3)
         runs.map { (time, init) ->

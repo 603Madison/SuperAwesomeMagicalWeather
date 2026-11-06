@@ -27,7 +27,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        handleIntent(intent)
+        // Only on a fresh start: after rotation or a theme change the launching intent was already handled.
+        if (savedInstanceState == null) handleIntent(intent)
         val container = (application as NorthvaneApp).container
 
         setContent {
@@ -79,15 +80,18 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleIntent(intent)
     }
 
     private fun handleIntent(intent: Intent?) {
-        if (intent?.getBooleanExtra(EXTRA_OPEN_ALERTS, false) == true) {
-            // Only accept a plain location id (letters, digits, dashes) from the intent.
-            val locationId = intent.getStringExtra(EXTRA_LOCATION_ID)
-                ?.takeIf { id -> id.length <= 64 && id.all { it.isLetterOrDigit() || it == '-' } }
-            navRequests.value = NavRequest.OpenAlerts(locationId)
+        // Only accept a plain location id (letters, digits, dashes) from the intent.
+        val locationId = intent?.getStringExtra(EXTRA_LOCATION_ID)
+            ?.takeIf { id -> id.length <= 64 && id.all { it.isLetterOrDigit() || it == '-' } }
+        when {
+            intent?.getBooleanExtra(EXTRA_OPEN_ALERTS, false) == true -> navRequests.value = NavRequest.OpenAlerts(locationId)
+            // e.g. an aurora notification: open on the place it was about.
+            locationId != null -> navRequests.value = NavRequest.ShowLocation(locationId)
         }
     }
 

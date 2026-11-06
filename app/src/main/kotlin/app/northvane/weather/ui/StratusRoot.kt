@@ -69,6 +69,8 @@ import kotlinx.coroutines.flow.StateFlow
 
 sealed interface NavRequest {
     data class OpenAlerts(val locationId: String?) : NavRequest
+    /** Show this place on the Today tab (e.g. from an aurora notification). */
+    data class ShowLocation(val locationId: String) : NavRequest
 }
 
 object Routes {
@@ -146,6 +148,11 @@ fun NorthvaneRoot(
             is NavRequest.OpenAlerts -> {
                 r.locationId?.let { id -> if (state.locations.any { it.id == id } || !state.ready) vm.selectLocation(id) }
                 navController.navigateToTab(Routes.ALERTS)
+                onNavRequestHandled()
+            }
+            is NavRequest.ShowLocation -> {
+                if (state.locations.any { it.id == r.locationId } || !state.ready) vm.selectLocation(r.locationId)
+                navController.navigateToTab(Routes.TODAY)
                 onNavRequestHandled()
             }
             null -> Unit

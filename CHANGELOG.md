@@ -3,6 +3,34 @@
 All notable changes to SuperAwesomeMagicalWeather (called Northvane before 1.7.0). The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.7.3] - 2026-11-06
+
+Fixes from a full review of the code.
+
+### Fixed
+- **Canadian forecasts:** between midnight and Environment Canada's morning update, every day was dated a week ahead. Dates now count from when the forecast was issued.
+- **Garden crash:** places whose last spring frost fell on Feb 29 in a leap year crashed the app when the garden or heating card was on.
+- **Current conditions:** a station that stopped reporting days ago was shown as current, and stopped OpenWeatherMap (with your key) from being used. Readings over 6 hours old now give way to the forecast estimate, and the "updated" time is when it was measured.
+- **Missed alerts:** while notifications were blocked, alerts were still recorded as sent, so they never appeared after you allowed them. Both apps now keep them until they can be shown. Mini also asks for permission on Android 13+.
+- **Notification taps:** after rotating the phone, the app jumped back to the place and tab of an old notification. Aurora notifications now open the place they're about.
+- **Traffic:** switching places while traffic was loading could show the previous place's events.
+- **Removed places:** a place removed while it was refreshing could come back.
+- **Saved keys:** a passing Android Keystore error could delete your saved API keys and passwords.
+- **Air quality times** were an hour off in summer (AirNow reports standard time) and around daylight-saving changes (Open-Meteo).
+- **Work zones:** one bad coordinate in a state's feed hid all of its work zones.
+- **Mini:** a refresh for the previous place could show under the new one, "Use my location" could add the same place twice, the radar loop cancelled its own downloads on slow connections, and old cached hours showed as current.
+
+### Improved
+- **Radar:** future-cast frames are drawn off the main thread (no more pause opening Radar), and decoding the model data uses about 15 MB less memory per frame.
+- **Mini on low-memory phones:** radar pictures use half the memory and at most 8 MB in all, and are freed when Android needs memory. Location asks every location source at once, so phones without Google services get a fix from GPS.
+- **Less data:** no more 150-day history requests for places outside the contiguous US, and Canadian places' background alert checks go straight to Environment Canada.
+- **Mini settings** are written atomically, survive a full disk without crashing, and a damaged file is kept as `settings.json.bad` instead of being overwritten.
+
+### Security
+- The F-Droid repository job installs only hash-pinned packages, gets only the secrets it needs, and can't publish to Pages itself.
+- Release builds can't read the workflow's GitHub token, every APK is checked against the fixed release certificate, and a published release can only be rebuilt from its own tag.
+- Work-zone feeds from the public USDOT registry can't point the app at an IP address or a local network name.
+
 ## [1.7.2] - 2026-11-06
 
 ### Changed

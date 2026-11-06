@@ -67,6 +67,22 @@ class HomeAndGardenTest {
 
     // --- Frost climatology ---
 
+    /** A leap year whose last spring frost falls on Feb 29 (Gulf Coast climates) must not crash. */
+    @Test
+    fun lastFrostOnLeapDay() {
+        val rows = (2000..2023).flatMap { year ->
+            val start = java.time.LocalDate.of(year, 1, 1)
+            (0 until start.lengthOfYear()).map { d ->
+                val date = start.plusDays(d.toLong())
+                // Mild all year except a frost on the last day of February.
+                val lastFeb = date.monthValue == 2 && date.dayOfMonth == date.lengthOfMonth()
+                date to if (lastFeb || date.monthValue == 12 && date.dayOfMonth == 20) 30.0 else 50.0
+            }
+        }
+        val climate = kotlin.test.assertNotNull(FrostClimate.compute(rows, Instant.now()))
+        assertEquals(java.time.LocalDate.of(2026, 2, 28), climate.lastFrost(2026))
+    }
+
     @Test
     fun frostDatesFromThirtyYearsOfNoaaLows() {
         assertEquals(30, climate.years)

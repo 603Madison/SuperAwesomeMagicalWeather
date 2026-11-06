@@ -107,7 +107,9 @@ class RadarService(
                 source.buffer.readByteArray()
             }
         } ?: return null
-        val argb = decodePng(bytes)?.takeIf { it.size == width * height } ?: return null
+        // Decoding about 200k pixels is CPU work: never on the caller's (often the main) thread.
+        val argb = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { decodePng(bytes) }
+            ?.takeIf { it.size == width * height } ?: return null
         return ObservedRadar(time, width, height, argb)
     }
 

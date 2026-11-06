@@ -36,10 +36,14 @@ class MiniAlertWorker(context: Context, params: WorkerParameters) : CoroutineWor
         container.store.load()
         val settings = container.store.settings.value
         if (!settings.alertsEnabled || settings.places.isEmpty()) return Result.success()
+        // Without permission nothing can be shown: don't mark alerts as notified, so they still
+        // appear once notifications are allowed.
+        if (!canNotify(applicationContext)) return Result.success()
         var state = settings.notified
         var failures = 0
         val tracker = AlertTracker()
-        for (place in settings.places.filter { it.notify }.take(10)) {
+        val checked = settings.places.filter { it.notify }.take(10)
+        for (place in checked) {
             val alerts = attempt { container.repository.alerts(place.point) }.getOrNull()
             if (alerts == null) {
                 failures++
@@ -50,7 +54,7 @@ class MiniAlertWorker(context: Context, params: WorkerParameters) : CoroutineWor
             items.forEach { notify(applicationContext, place.displayName, it.alert.event, it.alert.headline ?: it.alert.description, it.alert.severity, it.alert.id) }
         }
         container.store.update { it.copy(notified = state) }
-        return if (failures > 0 && failures == settings.places.size) Result.retry() else Result.success()
+        return if (failures > 0 && failures == checked.size) Result.retry() else Result.success()
     }
 
     companion object {

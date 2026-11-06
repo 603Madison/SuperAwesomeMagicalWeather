@@ -45,7 +45,8 @@ data class FrostClimate(
         fun compute(rows: List<Pair<LocalDate, Double>>, now: Instant): FrostClimate? {
             val byYear = rows.groupBy { it.first.year }.filterValues { it.size >= 330 }
             if (byYear.size < 10) return null
-            fun doy(d: LocalDate) = LocalDate.of(2025, d.monthValue, d.dayOfMonth).dayOfYear
+            // Day of year in a non-leap year; Feb 29 counts as Feb 28.
+            fun doy(d: LocalDate) = LocalDate.of(2025, d.monthValue, if (d.monthValue == 2) minOf(d.dayOfMonth, 28) else d.dayOfMonth).dayOfYear
             val last = mutableListOf<Int>()
             val first = mutableListOf<Int>()
             val hard = mutableListOf<Int>()

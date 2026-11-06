@@ -1,0 +1,1 @@
+Fixes from a full code review: location finds a fix faster on phones without Google services, radar uses much less memory and plays smoothly on slow connections, alerts missed while notifications were blocked still appear once allowed, and settings survive a full or failing disk.

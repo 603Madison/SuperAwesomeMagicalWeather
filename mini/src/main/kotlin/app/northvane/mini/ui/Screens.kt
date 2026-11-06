@@ -84,6 +84,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.style.TextAlign
 import app.northvane.core.model.WeatherCondition
+import app.northvane.mini.work.MiniAlertWorker
 import app.northvane.ui.TemperatureRange
 import app.northvane.ui.WeatherIcon
 import app.northvane.ui.skyGradient
@@ -154,6 +155,18 @@ fun MiniRoot(vm: MiniViewModel, openAlerts: Boolean, onExit: () -> Unit, hub: Ke
     LaunchedEffect(state.ready, state.settings.places.isEmpty()) {
         if (state.ready && state.settings.places.isEmpty() && stack.last() == Route.HOME) go(Route.ADD)
     }
+    // Android 13+: alerts are on by default, so ask once for permission to show them, after the first place.
+    val notifyPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    LaunchedEffect(state.ready, state.settings.places.isNotEmpty()) {
+        val s = state.settings
+        if (state.ready && s.places.isNotEmpty() && s.alertsEnabled && !s.notifyAsked &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            vm.markNotifyAsked()
+            notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
 
     MiniTheme(dark) {
         androidx.compose.runtime.CompositionLocalProvider(LocalKeyHub provides hub, LocalFocusMemory provides memory) {
@@ -180,7 +193,7 @@ fun MiniRoot(vm: MiniViewModel, openAlerts: Boolean, onExit: () -> Unit, hub: Ke
                             route == Route.RADAR -> RadarScreen(state, fmt)
                             route == Route.PLACES -> PlacesScreen(state, ::go, onUse = { vm.select(it); stack.clear(); stack.add(Route.HOME) })
                             route.startsWith("place:") -> PlaceScreen(state, route.substringAfter(':'), vm, ::back)
-                            route == Route.ADD -> AddPlaceScreen(state, vm, onAdded = { stack.clear(); stack.add(Route.HOME) })
+                            route == Route.ADD -> AddPlaceScreen(state, vm, onAdded = { if (stack.lastOrNull() == Route.ADD) { stack.clear(); stack.add(Route.HOME) } })
                             route == Route.SETTINGS -> SettingsScreen(state, vm, ::go)
                             route == Route.HELP -> HelpScreen()
                         }
@@ -251,8 +264,10 @@ private fun HomeScreen(state: MiniState, fmt: Fmt, go: (String) -> Unit, refresh
 private fun NowHeader(state: MiniState, snapshot: WeatherSnapshot?, fmt: Fmt) {
     val f = fmt.units
     val current = snapshot?.current
-    val hour = snapshot?.hourly?.firstOrNull()
-    val today = snapshot?.daily?.firstOrNull { it.highC != null || it.lowC != null }
+    val now = Instant.now()
+    val hour = snapshot?.hourly?.firstOrNull { it.time.plusSeconds(3600) > now }
+    val todayDate = LocalDate.now(fmt.zone)
+    val today = snapshot?.daily?.firstOrNull { !it.date.isBefore(todayDate) && (it.highC != null || it.lowC != null) }
     val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val warning = snapshot?.alerts.orEmpty().firstOrNull { it.category == AlertCategory.WARNING }
     val condition = current?.condition?.takeIf { it != WeatherCondition.UNKNOWN } ?: hour?.condition ?: WeatherCondition.UNKNOWN
@@ -306,7 +321,8 @@ private fun NowHeader(state: MiniState, snapshot: WeatherSnapshot?, fmt: Fmt) {
 
 @Composable
 private fun HourlyScreen(state: MiniState, fmt: Fmt, refresh: () -> Unit) {
-    val hours = state.snapshot?.hourly.orEmpty().take(48)
+    // A cached forecast can be hours old: start at the current hour.
+    val hours = state.snapshot?.hourly.orEmpty().filter { it.time.plusSeconds(3600) > Instant.now() }.take(48)
     ScreenKeysEffect(ScreenKeys(left = refreshKey(state, refresh)))
     if (hours.isEmpty()) return Hint(if (state.loading) "Loading…" else "No hourly forecast for this place.")
     MiniList(screen = Route.HOURLY, count = hours.size) { i, focus, onFocused ->
@@ -459,7 +475,10 @@ private fun AlertScreen(alert: WeatherAlert?, fmt: Fmt) {
 
 @Composable
 private fun RadarScreen(state: MiniState, fmt: Fmt) {
-    val place = state.place ?: return Hint("Add a place first.")
+    val place = state.place ?: run {
+        ScreenKeysEffect(ScreenKeys())
+        return Hint("Add a place first.")
+    }
     val radar = (LocalContext.current.applicationContext as MiniApp).container.radar
     var zoom by rememberSaveable { mutableIntStateOf(1) }
     var panX by rememberSaveable { mutableIntStateOf(0) }
@@ -488,10 +507,12 @@ private fun RadarScreen(state: MiniState, fmt: Fmt) {
             }
         }),
     )
+    // The frame whose picture is on screen: playback waits for each one on slow connections.
+    var shownFrame by remember { mutableIntStateOf(-1) }
     LaunchedEffect(playing) {
         while (playing) {
             delay(if (frame == times.lastIndex) 1500 else 700)
-            frame = if (frame >= times.lastIndex) 0 else frame + 1
+            if (shownFrame == frame) frame = if (frame >= times.lastIndex) 0 else frame + 1
         }
     }
     BoxWithConstraints(
@@ -520,7 +541,10 @@ private fun RadarScreen(state: MiniState, fmt: Fmt) {
             failed = false
             val bitmap = radar.image(view, times[frame], widthPx, heightPx)
             if (bitmap != null) image = bitmap else failed = true
-            // Fetch the rest of the loop in the background so playback is smooth.
+            shownFrame = frame
+        }
+        // The rest of the loop downloads separately, so stepping or playing doesn't cancel it.
+        LaunchedEffect(view, widthPx, heightPx) {
             times.forEach { radar.image(view, it, widthPx, heightPx) }
         }
         Column(Modifier.fillMaxSize()) {
@@ -589,7 +613,10 @@ private fun PlacesScreen(state: MiniState, go: (String) -> Unit, onUse: (String)
 
 @Composable
 private fun PlaceScreen(state: MiniState, id: String, vm: MiniViewModel, back: () -> Unit) {
-    val place = state.settings.places.firstOrNull { it.id == id } ?: return Hint("This place was removed.")
+    val place = state.settings.places.firstOrNull { it.id == id } ?: run {
+        ScreenKeysEffect(ScreenKeys())
+        return Hint("This place was removed.")
+    }
     var confirm by remember { mutableStateOf(false) }
     ScreenKeysEffect(ScreenKeys(center = "Select"))
     val rows = listOf<Pair<String, () -> Unit>>(
@@ -672,7 +699,13 @@ private fun AddPlaceScreen(state: MiniState, vm: MiniViewModel, onAdded: () -> U
 private fun SettingsScreen(state: MiniState, vm: MiniViewModel, go: (String) -> Unit) {
     val s = state.settings
     val context = LocalContext.current
-    val notifyPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    var blocked by remember { mutableStateOf(!MiniAlertWorker.canNotify(context)) }
+    val notifyPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { blocked = !MiniAlertWorker.canNotify(context) }
+    // Coming back from the phone's settings: check again.
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        blocked = !MiniAlertWorker.canNotify(context)
+        onPauseOrDispose {}
+    }
     ScreenKeysEffect(ScreenKeys(center = "Change"))
     val intervals = listOf(15, 30, 60, 120)
     val rows = listOf<Pair<String, () -> Unit>>(
@@ -680,14 +713,32 @@ private fun SettingsScreen(state: MiniState, vm: MiniViewModel, go: (String) -> 
             vm.setUnits(if (s.units == UnitSystem.IMPERIAL) UnitSystem.METRIC else UnitSystem.IMPERIAL)
         },
         "Theme: ${s.theme.label}" to { vm.setTheme(MiniTheme.entries[(s.theme.ordinal + 1) % MiniTheme.entries.size]) },
-        "Alert notifications: ${if (s.alertsEnabled) "On" else "Off"}" to {
-            val on = !s.alertsEnabled
-            if (on && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-            ) {
-                notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        "Alert notifications: ${if (!s.alertsEnabled) "Off" else if (blocked) "On, but blocked (OK to allow)" else "On"}" to {
+            when {
+                // On but the phone blocks them: ask again, or open the app's notification settings.
+                s.alertsEnabled && blocked -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }
+                }
+                else -> {
+                    val on = !s.alertsEnabled
+                    if (on && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                    vm.setAlerts(on)
+                }
             }
-            vm.setAlerts(on)
         },
         "Check for alerts every ${s.alertCheckMinutes} min" to {
             vm.setAlerts(s.alertsEnabled, intervals[(intervals.indexOf(s.alertCheckMinutes) + 1).mod(intervals.size)])

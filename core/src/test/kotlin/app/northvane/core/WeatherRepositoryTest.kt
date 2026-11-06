@@ -23,6 +23,7 @@ import app.northvane.core.weewx.WeeWxClient
 import app.northvane.core.weewx.WeeWxSecret
 import app.northvane.core.weewx.WeeWxStation
 import kotlinx.coroutines.test.runTest
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -50,6 +51,22 @@ class WeatherRepositoryTest {
         on("/gridpoints/TOP/32,81/forecast", body = Nws.daily)
         on("/alerts/active?point=39.7456,-97.0892", body = Nws.alerts)
         on("/gridpoints/TOP/32,81", body = Nws.grid)
+    }
+
+    /** A station that stopped reporting days ago must not be shown as "current". */
+    @Test
+    fun staleObservationLosesToTheEstimate() {
+        val now = Instant.parse("2026-11-06T18:00:00Z")
+        val hour = app.northvane.core.model.HourlyForecast(
+            now, 10.0, app.northvane.core.model.WeatherCondition.CLEAR, true, "Sunny", 0, 5.0, "W", humidityPercent = 50.0,
+        )
+        fun obs(hoursOld: Long) = app.northvane.core.model.CurrentConditions(
+            now.minus(java.time.Duration.ofHours(hoursOld)), app.northvane.core.model.DataSource.NWS, temperatureC = -3.0,
+        )
+        val r = repo(FakeNetwork())
+        assertEquals(app.northvane.core.model.DataSource.NWS_FORECAST_ESTIMATE, r.chooseCurrent(null, obs(48), null, listOf(hour), now)?.source)
+        assertEquals(-3.0, r.chooseCurrent(null, obs(4), null, listOf(hour), now)?.temperatureC)
+        assertEquals(-3.0, r.chooseCurrent(null, obs(1), null, listOf(hour), now)?.temperatureC)
     }
 
     private fun repo(fake: FakeNetwork, cache: NwsPointCache = MemoryCache(), extras: Boolean = false): WeatherRepository {

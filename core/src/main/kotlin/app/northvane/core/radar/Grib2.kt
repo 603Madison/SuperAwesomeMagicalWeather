@@ -199,29 +199,34 @@ object Grib2 {
         if (groups > 0) lengths[groups - 1] = lastLength
         bits.align()
 
-        val raw = LongArray(points)
+        // Undo the spatial differencing as values are unpacked, straight into the output: keeping
+        // every raw value first would cost another 15 MB for a CONUS field.
+        val out = FloatArray(points)
         var k = 0
+        var previous = 0L
+        var beforePrevious = 0L
         for (g in 0 until groups) {
             val w = widths[g]
             val count = lengths[g].toInt()
             for (m in 0 until count) {
                 if (k >= points) break
-                raw[k++] = refs[g] + if (w == 0) 0 else bits.read(w)
+                val packed = refs[g] + if (w == 0) 0 else bits.read(w)
+                val value = when (order) {
+                    1 -> if (k == 0) firsts[0] else packed + minimum + previous
+                    2 -> when (k) {
+                        0 -> firsts[0]
+                        1 -> firsts[1]
+                        else -> packed + minimum + 2 * previous - beforePrevious
+                    }
+                    else -> packed
+                }
+                beforePrevious = previous
+                previous = value
+                out[k++] = scale.value(value)
             }
         }
         if (k != points) throw ParseException("GRIB2 groups don't add up to the grid")
-        when (order) {
-            1 -> {
-                raw[0] = firsts[0]
-                for (i in 1 until points) raw[i] = raw[i] + minimum + raw[i - 1]
-            }
-            2 -> {
-                raw[0] = firsts[0]
-                if (points > 1) raw[1] = firsts[1]
-                for (i in 2 until points) raw[i] = raw[i] + minimum + 2 * raw[i - 1] - raw[i - 2]
-            }
-        }
-        return FloatArray(points) { scale.value(raw[it]) }
+        return out
     }
 
     private class BitReader(private val bytes: ByteArray, startByte: Int) {

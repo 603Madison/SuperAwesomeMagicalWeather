@@ -68,6 +68,18 @@ class CanadaAndAiTest {
         assertNotNull(f.sunrise)
     }
 
+    /** The afternoon issue is still current after midnight: its dates mustn't jump a week ahead. */
+    @Test
+    fun frederictonDatesAfterMidnight() {
+        // 01:30 Friday in Moncton time, before the morning issue replaces Thursday afternoon's.
+        val f = EcccClient.parse(resource("/eccc/site_nb29.json"), Instant.parse("2026-10-30T04:30:00Z"))
+        val dates = f.daily.map { it.date }
+        assertEquals(LocalDate.parse("2026-10-29"), dates.first())
+        assertEquals("Thursday night", f.daily.first().name)
+        assertEquals(LocalDate.parse("2026-10-30"), dates[1])
+        assertEquals(dates.indices.map { LocalDate.parse("2026-10-29").plusDays(it.toLong()) }, dates)
+    }
+
     @Test
     fun parsesCanadianWarnings() {
         val f = EcccClient.parse(resource("/eccc/site_nt20.json"), captured)

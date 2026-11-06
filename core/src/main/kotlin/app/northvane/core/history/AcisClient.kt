@@ -1,5 +1,6 @@
 package app.northvane.core.history
 
+import app.northvane.core.repo.attempt
 import app.northvane.core.json.NorthvaneJson
 import app.northvane.core.json.arr
 import app.northvane.core.json.asObj
@@ -54,7 +55,7 @@ class AcisClient(
         )
         val (observed, elevationFt) = parseGrid(grid)
         val snow = if (includeSnowDepth) {
-            runCatching { parseSnowDepth(post("MultiStnData", snowRequest(p, today)), p) }.getOrNull()
+            attempt { parseSnowDepth(post("MultiStnData", snowRequest(p, today)), p) }.getOrNull()
         } else {
             null
         }

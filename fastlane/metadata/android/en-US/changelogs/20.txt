@@ -1,0 +1,1 @@
+Fixes from a full code review: Canadian forecast dates no longer jump a week ahead after midnight, a garden crash on leap days is gone, and a days-old station reading is no longer shown as current. Alerts missed while notifications were blocked now still appear once allowed, and the radar no longer freezes the screen while drawing.

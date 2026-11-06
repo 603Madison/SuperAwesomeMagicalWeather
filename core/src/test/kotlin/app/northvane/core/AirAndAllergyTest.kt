@@ -66,7 +66,8 @@ class AirAndAllergyTest {
         assertEquals("PM2.5", current.pollutant)
         assertEquals(AqiCategory.MODERATE, current.category)
         assertEquals("Portland, ME", current.area)
-        assertEquals(Instant.parse("2026-10-29T18:00:00Z"), current.observedAt)
+        // AirNow gives the hour in local standard time (EST here, although Maine was on EDT).
+        assertEquals(Instant.parse("2026-10-29T19:00:00Z"), current.observedAt)
         val days = AirNowClient.parseForecast(resource("/air/airnow_forecast.json"))
         assertEquals(2, days.size)
         assertEquals(48, days[0].aqi)

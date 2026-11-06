@@ -25,6 +25,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.longOrNull
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.time.Duration
@@ -160,6 +161,11 @@ class TrafficClient(
                 if (!keyless || !active || !url.startsWith("https://") || url.contains("key=", ignoreCase = true) && url.endsWith("=")) {
                     return@mapNotNull null
                 }
+                // Feeds are public web services: never an address or a local-network name from the registry.
+                val host = url.toHttpUrlOrNull()?.host ?: return@mapNotNull null
+                if (app.northvane.core.net.UrlPolicy.isIpLiteral(host) || app.northvane.core.net.UrlPolicy.looksLikeLocalNetworkHost(host)) {
+                    return@mapNotNull null
+                }
                 WzdxFeed(r.str("issuingorganization") ?: "State DOT", r.str("state").orEmpty(), url)
             }
         }
@@ -172,7 +178,9 @@ class TrafficClient(
                 val feature = f.asObj() ?: return@mapNotNull null
                 val props = feature.obj("properties") ?: return@mapNotNull null
                 val core = props.obj("core_details") ?: props // v3 has the fields directly on properties
+                // [lon, lat] pairs; feeds sometimes swap them, and one bad point mustn't drop the whole feed.
                 val points = coordinates(feature.obj("geometry"))
+                    .filter { it.size >= 2 && it[1] in -90.0..90.0 && it[0] in -180.0..180.0 }
                 if (points.isEmpty()) return@mapNotNull null
                 val nearest = points.minBy { center.distanceKm(GeoPoint(it[1], it[0])) }
                 val distance = center.distanceKm(GeoPoint(nearest[1], nearest[0]))

@@ -38,22 +38,32 @@ class WeatherCache(context: Context) {
     }
 
     suspend fun write(snapshot: WeatherSnapshot) = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            dir.mkdirs()
-            val target = fileFor(snapshot.locationId)
-            val tmp = File(dir, target.name + ".tmp")
-            tmp.writeText(NorthvaneJson.encodeToString(WeatherSnapshot.serializer(), snapshot))
-            if (!tmp.renameTo(target)) {
-                target.delete()
-                tmp.renameTo(target)
-            }
+        mutex.withLock { writeLocked(snapshot) }
+    }
+
+    /** Call with [mutex] held. */
+    private fun writeLocked(snapshot: WeatherSnapshot) {
+        dir.mkdirs()
+        val target = fileFor(snapshot.locationId)
+        val tmp = File(dir, target.name + ".tmp")
+        tmp.writeText(NorthvaneJson.encodeToString(WeatherSnapshot.serializer(), snapshot))
+        if (!tmp.renameTo(target)) {
+            target.delete()
+            tmp.renameTo(target)
         }
     }
 
     /** Refresh just the alerts of a cached snapshot (used by the background alert check). */
     suspend fun updateAlerts(locationId: String, alerts: List<WeatherAlert>) {
-        val existing = read(locationId) ?: return
-        write(existing.copy(alerts = alerts))
+        // One read-modify-write under the lock, so a foreground refresh written meanwhile isn't overwritten.
+        withContext(Dispatchers.IO) {
+            mutex.withLock {
+                val file = fileFor(locationId)
+                val existing = runCatching { NorthvaneJson.decodeFromString(WeatherSnapshot.serializer(), file.readText()) }.getOrNull()
+                    ?: return@withLock
+                writeLocked(existing.copy(alerts = alerts))
+            }
+        }
     }
 
     suspend fun delete(locationId: String) = withContext(Dispatchers.IO) {

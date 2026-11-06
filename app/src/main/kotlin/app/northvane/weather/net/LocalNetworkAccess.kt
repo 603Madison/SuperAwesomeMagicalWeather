@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.core.content.ContextCompat
 import app.northvane.core.net.UrlPolicy
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -37,11 +38,11 @@ object LocalNetworkAccess {
         val host = url.trim().toHttpUrlOrNull()?.host ?: return false
         if (UrlPolicy.looksLikeLocalNetworkHost(host)) return true
         if (UrlPolicy.isIpLiteral(host)) return false
-        return withContext(Dispatchers.IO) {
-            withTimeoutOrNull(3_000) {
-                runCatching { InetAddress.getAllByName(host).any(UrlPolicy::isLocalNetworkAddress) }.getOrDefault(false)
-            } ?: false
+        // The lookup itself can't be interrupted, so wait for it with a timeout instead of inside one.
+        val lookup = kotlinx.coroutines.CoroutineScope(Dispatchers.IO).async {
+            runCatching { InetAddress.getAllByName(host).any(UrlPolicy::isLocalNetworkAddress) }.getOrDefault(false)
         }
+        return withTimeoutOrNull(3_000) { lookup.await() } ?: false
     }
 
     /** Whether the app must ask before it can reach [url]. */

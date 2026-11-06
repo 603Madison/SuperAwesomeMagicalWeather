@@ -34,6 +34,8 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+          # Don't leave the write token in .git/config, where the Gradle build (and its plugins) could read it.
+          persist-credentials: false
 
       # An existing tag is rebuilt as tagged; otherwise the chosen commit (or branch tip).
       # Inputs reach the script only through env and are checked before use, so a
@@ -50,6 +52,12 @@ jobs:
           if [ -n "$INPUT_COMMIT" ]; then
             if ! [[ "$INPUT_COMMIT" =~ ^([0-9a-f]{7,40}|v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?)$ ]]; then
               echo "::error::Commit must be a commit hash or a v1.2.3 tag"
+              exit 1
+            fi
+            # An existing release is only ever rebuilt from its own tag.
+            if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null &&
+              [ "$(git rev-parse "$INPUT_COMMIT^{commit}" 2>/dev/null)" != "$(git rev-parse "refs/tags/$TAG^{commit}")" ]; then
+              echo "::error::$TAG already exists at another commit; leave Commit empty to rebuild it as tagged"
               exit 1
             fi
             REF="$INPUT_COMMIT"
@@ -101,7 +109,7 @@ jobs:
             exit 1
           fi
           echo "$KEYSTORE_BASE64" | tr -d ' \n\r' | base64 -d > "$RUNNER_TEMP/release.jks"
-          if ! keytool -list -keystore "$RUNNER_TEMP/release.jks" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
+          if ! keytool -list -keystore "$RUNNER_TEMP/release.jks" -storepass:env KEYSTORE_PASSWORD -alias "$KEY_ALIAS" >/dev/null 2>&1; then
             echo "::error::The keystore couldn't be opened: check that RELEASE_KEYSTORE_BASE64 was pasted completely and the password matches"
             exit 1
           fi
@@ -109,18 +117,24 @@ jobs:
 
       - name: Build signed release APK
         env:
+          EVENT_SHA: ${{ github.sha }}
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
           ./gradlew --no-daemon :app:assembleRelease :mini:assembleRelease
           cp app/build/outputs/apk/release/app-release.apk "SuperAwesomeMagicalWeather-${TAG}.apk"
-          # The Mini app (flip phones) only exists from 1.6.0 on.
-          if [ -f mini/build/outputs/apk/release/mini-release.apk ]; then
+          # The Mini app (flip phones) only exists from 1.6.0 on; when it's in the source, its APK must be too.
+          if [ -d mini ]; then
             cp mini/build/outputs/apk/release/mini-release.apk "SuperAwesomeMagicalWeather-Mini-${TAG}.apk"
           fi
+          # Every APK must carry the one release certificate, or installed copies couldn't update.
+          EXPECTED=$(git show "$EVENT_SHA:.github/release-certificate.sha256" | tr -d ' \n')
           for apk in SuperAwesomeMagicalWeather-*.apk; do
-            "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$apk" | grep -i "SHA-256 digest"
+            if ! "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$apk" | grep -qi "SHA-256 digest: $EXPECTED"; then
+              echo "::error::$apk isn't signed with the release certificate ($EXPECTED)"
+              exit 1
+            fi
           done
           sha256sum SuperAwesomeMagicalWeather-*.apk | tee SHA256SUMS.txt
 
@@ -162,4 +176,9 @@ jobs:
       pages: write
       id-token: write
     uses: ./.github/workflows/fdroid-repo.yml
-    secrets: inherit
+    # Only what it needs, not every repository secret.
+    secrets:
+      RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+      RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+      RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+      RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}

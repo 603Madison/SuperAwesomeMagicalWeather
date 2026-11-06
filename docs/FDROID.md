@@ -55,6 +55,19 @@ Each release needs an F-Droid changelog for its `versionCode` in
 `mini/fastlane/metadata/android/en-US/changelogs/` (up to 500 characters). The
 release workflow stops if one is missing.
 
+### Updating fdroidserver
+
+The workflow installs fdroidserver and its dependencies from
+`fdroid/requirements.txt`, where every package is pinned with its hash. To
+update, change the version in `fdroid/requirements.in` and regenerate the file
+with Python 3.13 (the version the workflow uses):
+
+```bash
+pip install pip-tools
+pip-compile --generate-hashes --allow-unsafe --strip-extras \
+  --output-file fdroid/requirements.txt fdroid/requirements.in
+```
+
 ## Building from source
 
 The apps also meet F-Droid's rules for building from source: everything is free

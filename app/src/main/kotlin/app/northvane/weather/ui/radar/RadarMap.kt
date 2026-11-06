@@ -120,8 +120,17 @@ fun RadarMap(
         map?.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(center.latitude, center.longitude), DEFAULT_ZOOM))
     }
 
-    LaunchedEffect(style, frames) {
+    // Forecast frames are drawn on the phone: about a million pixels each, so build the bitmaps off
+    // the main thread, once per set of frames (a light/dark style change reuses them).
+    val prepared by androidx.compose.runtime.produceState<Pair<List<RadarFrame>, List<Bitmap?>>?>(null, frames) {
+        value = frames to kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            frames.map { f -> f.image?.let { Bitmap.createBitmap(it.argb(), it.width, it.height, Bitmap.Config.ARGB_8888) } }
+        }
+    }
+
+    LaunchedEffect(style, prepared) {
         val s = style ?: return@LaunchedEffect
+        val (frames, bitmaps) = prepared ?: return@LaunchedEffect
         layerIds.forEach { id ->
             s.removeLayer(id)
             s.removeSource(id.replace("radar-layer-", "radar-src-"))
@@ -132,9 +141,9 @@ fun RadarMap(
             val sourceId = "radar-src-$i"
             val layerId = "radar-layer-$i"
             val image = frame.image
-            if (image != null) {
+            val bitmap = bitmaps[i]
+            if (image != null && bitmap != null) {
                 // Drawn on the phone from model data: one image stretched over its tile area.
-                val bitmap = Bitmap.createBitmap(image.argb(), image.width, image.height, Bitmap.Config.ARGB_8888)
                 val quad = LatLngQuad(
                     LatLng(image.north, image.west), LatLng(image.north, image.east),
                     LatLng(image.south, image.east), LatLng(image.south, image.west),

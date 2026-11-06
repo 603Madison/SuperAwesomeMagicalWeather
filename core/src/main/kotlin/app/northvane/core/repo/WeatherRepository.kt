@@ -117,6 +117,8 @@ class WeatherRepository(
     /** Active alerts for background checks: NWS in the US, Environment Canada for Canadian places. */
     suspend fun alerts(point: GeoPoint): List<WeatherAlert> {
         val p = point.rounded()
+        // A place already known to be Canadian goes straight to Environment Canada.
+        if (eccc != null) ecccSites[p.nwsKey()]?.let { return eccc.forecast(it, clock()).alerts }
         return try {
             nws.alerts(p)
         } catch (e: app.northvane.core.net.HttpStatusException) {
@@ -158,7 +160,8 @@ class WeatherRepository(
             async { attempt { latestObservation(m, plan.observationStations, now) } }
         }
         val today = now.atZone(zone ?: ZoneId.systemDefault()).toLocalDate()
-        val historyJob = acis?.takeIf { wants(Section.HISTORY) }?.let { client ->
+        // ACIS gridded history covers the contiguous US only: don't spend a 150-day request elsewhere.
+        val historyJob = acis?.takeIf { wants(Section.HISTORY) && !outsideNws && inContiguousUs(point) }?.let { client ->
             // Late winter to spring needs the whole winter's freeze for the thaw model.
             val sinceMarch = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.of(today.year, 3, 1), today).toInt() + 1
             val days = when (today.monthValue) {
@@ -234,7 +237,9 @@ class WeatherRepository(
         // OpenWeatherMap only fills gaps the free sources couldn't, and only for sections the plan wants.
         val needOwmForecast = (wants(Section.DAILY_FORECAST) && daily.isEmpty()) ||
             (wants(Section.HOURLY_FORECAST) && hourly.isEmpty())
-        val needOwmCurrent = wants(Section.CURRENT_CONDITIONS) && weewxCurrent == null && forecastObservation == null
+        // A days-old or temperature-less station reading doesn't count: OWM (with a key) is better.
+        val needOwmCurrent = wants(Section.CURRENT_CONDITIONS) && weewxCurrent == null &&
+            (forecastObservation?.temperatureC == null || !forecastObservation.isFresh(now, Duration.ofHours(2)))
         var owmForecast: OwmForecast? = null
         var owmCurrent: CurrentConditions? = null
         val apiKey = config.owmApiKey?.takeIf { wants(Section.OWM_FALLBACK) }
@@ -304,7 +309,10 @@ class WeatherRepository(
             uv = airResult?.uv,
             aurora = auroraResult?.getOrNull(),
             sectionTimes = buildMap {
-                if (current != null && current.source != DataSource.NWS_FORECAST_ESTIMATE) put(Section.CURRENT_CONDITIONS, now)
+                // Stamped with when it was measured, so an old reading shows (and ages) as old.
+                if (current != null && current.source != DataSource.NWS_FORECAST_ESTIMATE) {
+                    put(Section.CURRENT_CONDITIONS, current.observedAt?.coerceAtMost(now) ?: now)
+                }
                 if (weewxCurrent != null) put(Section.LOCAL_STATION, now)
                 if (alertsResult?.isSuccess == true || ecccAlerts != null) put(Section.ALERTS, now)
                 if (daily.isNotEmpty() && wants(Section.DAILY_FORECAST)) put(Section.DAILY_FORECAST, now)
@@ -397,7 +405,8 @@ class WeatherRepository(
                 supplementedFrom = supplement.source,
             )
         }
-        return freshNws ?: owm ?: nws?.takeIf { it.temperatureC != null } ?: estimate
+        // An older reading beats the estimate only while it's still reasonably recent.
+        return freshNws ?: owm ?: nws?.takeIf { it.temperatureC != null && it.isFresh(now, STALE_OBSERVATION) } ?: estimate
     }
 
     private fun withDaylight(c: CurrentConditions, location: SavedLocation, now: Instant): CurrentConditions =
@@ -406,6 +415,8 @@ class WeatherRepository(
         } else {
             c
         }
+
+    private fun inContiguousUs(p: GeoPoint) = p.latitude in 24.0..50.0 && p.longitude in -125.5..-66.5
 
     private fun CurrentConditions.isFresh(now: Instant, maxAge: Duration): Boolean =
         observedAt?.let { Duration.between(it, now) <= maxAge } ?: false
@@ -448,6 +459,7 @@ class WeatherRepository(
 
     private companion object {
         const val POINT_CACHE_MS = 14L * 24 * 60 * 60 * 1000
+        val STALE_OBSERVATION: Duration = Duration.ofHours(6)
     }
 }
 

@@ -168,22 +168,29 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
                     container.deviceLocation.current()?.let { p ->
                         if (Solar.distanceKm(location.latitude, location.longitude, p.latitude, p.longitude) > 1.0) {
                             target = location.copy(latitude = p.latitude, longitude = p.longitude)
-                            container.locations.upsertLocation(target)
+                            // Update only: if the place was removed meanwhile, it stays removed.
+                            container.locations.updateLocation(target.id) { it.copy(latitude = p.latitude, longitude = p.longitude) }
                         }
                     }
                 }
                 val snapshot = container.weather.refresh(target)
+                // Removed while it was loading: don't bring it back.
+                if (state.value.locations.none { it.id == target.id }) {
+                    container.weatherCache.delete(target.id)
+                    return@launch
+                }
                 snapshots.update { it + (target.id to snapshot) }
                 val place = snapshot.placeName
                 if (target.isDeviceLocation && place != null && place != target.name) {
-                    container.locations.upsertLocation(target.copy(name = place))
+                    container.locations.updateLocation(target.id) { it.copy(name = place) }
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 error.value = e.toUserMessage()
             } finally {
-                refreshing.value = false
+                // A cancelled refresh finishing late must not hide the spinner of the one that replaced it.
+                if (refreshJob === coroutineContext[kotlinx.coroutines.Job]) refreshing.value = false
             }
         }
     }
@@ -225,6 +232,7 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun removeLocation(id: String) {
+        if (refreshingId == id) refreshJob?.cancel()
         viewModelScope.launch {
             container.locations.removeLocation(id)
             container.weatherCache.delete(id)

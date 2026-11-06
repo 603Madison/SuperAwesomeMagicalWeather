@@ -160,6 +160,16 @@ weather services described below.
   variables and checks their format first, so a crafted version or commit
   can't run commands. The signing key is restored only after the tests, for
   the build step alone.
+- Checkouts don't keep the workflow's GitHub token on disk, so build tools and
+  Gradle plugins can't read it. Passwords reach `keytool` through environment
+  variables, never the command line.
+- Every APK is checked against the release certificate's fixed SHA-256
+  (`.github/release-certificate.sha256`), and an existing release can only be
+  rebuilt from its own tag.
+- The F-Droid repository job installs fdroidserver and every dependency with
+  pinned hashes (`fdroid/requirements.txt`), receives only the signing secrets
+  it needs, and has read-only access; only its separate deploy job can publish
+  to GitHub Pages.
 
 ## SuperAwesomeMagicalWeather Mini
 

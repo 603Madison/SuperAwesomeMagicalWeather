@@ -43,6 +43,9 @@ class AlertCheckWorker(appContext: Context, params: WorkerParameters) : Coroutin
         if (locations.isEmpty()) return Result.success()
 
         val tracker = AlertTracker()
+        // Without permission nothing can be shown: keep alerts un-notified so they still appear once
+        // notifications are allowed (the cached alerts for each place are refreshed either way).
+        val canNotify = AlertNotifier.canNotify(applicationContext)
         var state = container.alertState.read()
         val toNotify = mutableListOf<AlertToNotify>()
         var failures = 0
@@ -56,16 +59,19 @@ class AlertCheckWorker(appContext: Context, params: WorkerParameters) : Coroutin
                 failures++
                 continue
             }
+            container.weatherCache.updateAlerts(location.id, alerts)
+            if (!canNotify) continue
             val gardenFrost = settings.gardenEnabled && settings.gardenFrostAlerts
             val (items, updated) = tracker.select(location.id, alerts, settings.alertCategories, state, Instant.now()) { alert ->
                 gardenFrost && (alert.event.contains("Frost", ignoreCase = true) || alert.event.contains("Freeze", ignoreCase = true))
             }
             state = updated
             toNotify += items
-            container.weatherCache.updateAlerts(location.id, alerts)
         }
-        container.alertState.write(state)
-        AlertNotifier.notify(applicationContext, toNotify, locations.associate { it.id to it.displayName })
+        if (canNotify) {
+            AlertNotifier.notify(applicationContext, toNotify, locations.associate { it.id to it.displayName })
+            container.alertState.write(state)
+        }
         return if (failures == locations.size) Result.retry() else Result.success()
     }
 

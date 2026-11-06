@@ -23,6 +23,12 @@ class MiniApp : Application() {
     lateinit var container: MiniContainer
         private set
 
+    /** Radar pictures are the biggest thing Mini keeps in memory; drop them when Android asks. */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (::container.isInitialized && level >= TRIM_MEMORY_BACKGROUND) container.radar.clear()
+    }
+
     override fun onCreate() {
         super.onCreate()
         container = MiniContainer(this)

@@ -41,6 +41,7 @@ class TrafficViewModel(private val container: AppContainer) : ViewModel() {
     private val _state = MutableStateFlow(TrafficUiState())
     val state: StateFlow<TrafficUiState> = _state.asStateFlow()
     private var job: Job? = null
+    private var jobKey: String? = null
 
     // The USDOT registry changes rarely; keep it for the app session.
     private val registryLock = Mutex()
@@ -64,8 +65,10 @@ class TrafficViewModel(private val container: AppContainer) : ViewModel() {
             refreshFlow(flowLayer, dark)
             return
         }
-        if (job?.isActive == true && !force) return
+        // The same load already running: let it finish. A different place or radius replaces it.
+        if (job?.isActive == true && !force && jobKey == key) return
         job?.cancel()
+        jobKey = key
         job = viewModelScope.launch {
             _state.update { it.copy(loading = true, error = null) }
             val (ne511, tomTom) = withContext(Dispatchers.IO) {
@@ -75,10 +78,12 @@ class TrafficViewModel(private val container: AppContainer) : ViewModel() {
                 container.traffic.load(stateCode, location.point, radiusKm, ne511, { registry() }, Instant.now())
             }
             result.getOrNull()?.let { container.trafficCache.write(location.id, it) }
+            // On failure keep showing this place's events: the ones on screen may be another place's.
+            val fallback = if (result.isSuccess) null else if (_state.value.loadedFor == key) _state.value.snapshot else container.trafficCache.read(location.id)
             _state.update {
                 it.copy(
                     loading = false,
-                    snapshot = result.getOrNull() ?: it.snapshot,
+                    snapshot = result.getOrNull() ?: fallback,
                     error = result.exceptionOrNull()?.toUserMessage(),
                     loadedFor = key,
                     hasNe511Key = ne511 != null,

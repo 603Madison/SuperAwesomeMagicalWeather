@@ -1,5 +1,6 @@
 package app.northvane.core.air
 
+import app.northvane.core.repo.attempt
 import app.northvane.core.json.NorthvaneJson
 import app.northvane.core.json.arr
 import app.northvane.core.json.asObj
@@ -54,7 +55,7 @@ class AirNowClient(private val http: OkHttpClient, private val baseUrl: String =
             .addQueryParameter("API_KEY", apiKey)
             .build()
         val current = parseCurrent(get(url("aq/observation/latLong/current/", emptyMap()).toString()), zone)
-        val days = runCatching { parseForecast(get(url("aq/forecast/latLong/", mapOf("date" to today.toString())).toString())) }
+        val days = attempt { parseForecast(get(url("aq/forecast/latLong/", mapOf("date" to today.toString())).toString())) }
             .getOrDefault(emptyList())
             .filter { !it.date.isBefore(today) }
         if (current == null && days.isEmpty()) throw WeatherApiException("No AirNow monitors near this location")
@@ -90,9 +91,26 @@ class AirNowClient(private val http: OkHttpClient, private val baseUrl: String =
             return AqiReading(
                 aqi = best.int("AQI")!!,
                 pollutant = best.str("ParameterName"),
-                observedAt = if (date != null && hour != null) date.atTime(hour.coerceIn(0, 23), 0).atZone(zone).toInstant() else null,
+                // AirNow reports the hour in local *standard* time ("EST" even in summer).
+                observedAt = if (date != null && hour != null) {
+                    date.atTime(hour.coerceIn(0, 23), 0).atZone(standardZone(best.str("LocalTimeZone")) ?: zone).toInstant()
+                } else {
+                    null
+                },
                 area = listOfNotNull(best.str("ReportingArea"), best.str("StateCode")).joinToString(", ").ifEmpty { null },
             )
+        }
+
+        /** Fixed standard-time offsets for AirNow's zone abbreviations. */
+        private fun standardZone(abbreviation: String?): ZoneId? = when (abbreviation?.trim()?.uppercase()) {
+            "AST" -> ZoneOffset.ofHours(-4)
+            "EST" -> ZoneOffset.ofHours(-5)
+            "CST" -> ZoneOffset.ofHours(-6)
+            "MST" -> ZoneOffset.ofHours(-7)
+            "PST" -> ZoneOffset.ofHours(-8)
+            "AKST" -> ZoneOffset.ofHours(-9)
+            "HST" -> ZoneOffset.ofHours(-10)
+            else -> null
         }
 
         fun parseForecast(json: String): List<AqiDay> =
@@ -128,7 +146,7 @@ class EpaUvClient(private val http: OkHttpClient, private val baseUrl: String = 
     suspend fun forecast(zip: String, zone: ZoneId, now: Instant): UvForecast {
         require(zip.matches(Regex("^\\d{5}$"))) { "Not a US ZIP code" }
         val hourly = parseHourly(get("$baseUrl/efservice/getEnvirofactsUVHOURLY/ZIP/$zip/JSON"), zone)
-        val daily = runCatching { parseDaily(get("$baseUrl/efservice/getEnvirofactsUVDAILY/ZIP/$zip/JSON")) }.getOrNull()
+        val daily = attempt { parseDaily(get("$baseUrl/efservice/getEnvirofactsUVDAILY/ZIP/$zip/JSON")) }.getOrNull()
         if (hourly.isEmpty() && daily == null) throw WeatherApiException("No EPA UV forecast for this ZIP code")
         return UvForecast(
             hourly = hourly,
@@ -202,8 +220,9 @@ class OpenMeteoAirClient(private val http: OkHttpClient, private val baseUrl: St
                 ?: throw ParseException("Unexpected response from Open-Meteo")
             root.str("reason")?.let { throw WeatherApiException("Open-Meteo: $it") }
             val offset = ZoneOffset.ofTotalSeconds(root.int("utc_offset_seconds") ?: 0)
-            fun time(text: String?) = text?.let { runCatching { LocalDateTime.parse(it).toInstant(offset) }.getOrNull() }
             val zone = root.str("timezone")?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: offset
+            // Local times in the place's zone, so hours after a daylight-saving change aren't off by one.
+            fun time(text: String?) = text?.let { runCatching { LocalDateTime.parse(it).atZone(zone).toInstant() }.getOrNull() }
 
             val current = root.obj("current")?.let { c ->
                 val aqi = c.dbl("us_aqi")?.toInt() ?: return@let null

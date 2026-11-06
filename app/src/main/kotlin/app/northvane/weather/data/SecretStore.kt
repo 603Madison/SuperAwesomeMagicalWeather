@@ -30,8 +30,12 @@ class SecretStore(context: Context) {
         try {
             decrypt(name, stored)
         } catch (e: Exception) {
-            // Keystore key was reset (e.g. lock-screen change on some devices); the value is unrecoverable.
-            prefs.edit { remove(name) }
+            // Delete only when the value can never be read again (key reset, e.g. after a lock-screen
+            // change on some devices, or damaged data). A passing Keystore error keeps it for next time.
+            val permanent = e is javax.crypto.AEADBadTagException ||
+                e is android.security.keystore.KeyPermanentlyInvalidatedException ||
+                e is IllegalArgumentException
+            if (permanent) prefs.edit { remove(name) }
             null
         }
     }
@@ -51,6 +55,9 @@ class SecretStore(context: Context) {
     private fun secretKey(): SecretKey {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
         (keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry)?.let { return it.secretKey }
+        // The key exists but couldn't be read just now: never generate a new one over it, which would
+        // make every saved key and password unreadable.
+        if (keyStore.containsAlias(KEY_ALIAS)) throw java.security.KeyStoreException("Keystore key temporarily unavailable")
         val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
         generator.init(
             KeyGenParameterSpec.Builder(KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)

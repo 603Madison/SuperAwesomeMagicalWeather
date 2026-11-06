@@ -15,6 +15,7 @@ import app.northvane.core.repo.attempt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -82,13 +83,19 @@ class DeviceLocation(context: Context) {
     @SuppressLint("MissingPermission") // callers check the permission first
     suspend fun current(timeout: Duration = Duration.ofSeconds(30)): Location? {
         val m = manager ?: return null
-        val providers = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER)
-            .filter { runCatching { m.isProviderEnabled(it) }.getOrDefault(false) }
+        val candidates = buildList {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) add(LocationManager.FUSED_PROVIDER)
+            add(LocationManager.NETWORK_PROVIDER)
+            add(LocationManager.GPS_PROVIDER)
+        }
+        val providers = candidates.filter { runCatching { m.isProviderEnabled(it) }.getOrDefault(false) }
         val recent = providers.mapNotNull { runCatching { m.getLastKnownLocation(it) }.getOrNull() }
             .filter { System.currentTimeMillis() - it.time < Duration.ofMinutes(30).toMillis() }
             .minByOrNull { it.accuracy }
         if (recent != null) return recent
-        val provider = providers.firstOrNull() ?: return null
+        if (providers.isEmpty()) return null
+        // Ask every enabled provider at once and take the first answer: on phones without Google
+        // services the network provider can be "enabled" yet never answer, while GPS would.
         return withTimeoutOrNull(timeout.toMillis()) {
             suspendCancellableCoroutine { cont ->
                 val listener = object : LocationListener {
@@ -96,8 +103,12 @@ class DeviceLocation(context: Context) {
                         m.removeUpdates(this)
                         if (cont.isActive) cont.resume(location)
                     }
+                    override fun onProviderDisabled(provider: String) {}
+                    override fun onProviderEnabled(provider: String) {}
                 }
-                m.requestLocationUpdates(provider, 0L, 0f, listener, Looper.getMainLooper())
+                providers.forEach { provider ->
+                    runCatching { m.requestLocationUpdates(provider, 0L, 0f, listener, Looper.getMainLooper()) }
+                }
                 cont.invokeOnCancellation { m.removeUpdates(listener) }
             }
         }
@@ -115,9 +126,16 @@ class RadarImages(private val http: OkHttpClient) {
 
     data class View(val latitude: Double, val longitude: Double, val zoom: Int)
 
-    private val cache = object : LinkedHashMap<String, Bitmap>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>?) = size > 24
+    /** Recent pictures, up to [CACHE_BYTES]: flip phones have little memory. */
+    private val cache = object : android.util.LruCache<String, Bitmap>(CACHE_BYTES) {
+        override fun sizeOf(key: String, value: Bitmap) = value.byteCount
     }
+
+    /** Downloads in progress, so the loop prefetch and the frame on screen never fetch the same picture twice. */
+    private val inFlight = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.CompletableDeferred<Bitmap?>>()
+
+    /** Frees the pictures, e.g. when Android is short of memory. */
+    fun clear() = cache.evictAll()
 
     /** Frame times every 10 minutes over the past hour, oldest first, a few minutes behind for processing. */
     fun frameTimes(now: Instant): List<Instant> {
@@ -145,7 +163,30 @@ class RadarImages(private val http: OkHttpClient) {
 
     suspend fun image(view: View, time: Instant, width: Int, height: Int): Bitmap? {
         val url = url(view, time, width, height)
-        synchronized(cache) { cache[url] }?.let { return it }
+        cache[url]?.let { return it }
+        val mine = kotlinx.coroutines.CompletableDeferred<Bitmap?>()
+        inFlight.putIfAbsent(url, mine)?.let { other ->
+            return try {
+                other.await()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // The other download was cancelled; this caller wasn't, so it just gets nothing this time.
+                kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                null
+            }
+        }
+        try {
+            val bitmap = download(url)
+            mine.complete(bitmap)
+            return bitmap
+        } catch (e: Throwable) {
+            mine.completeExceptionally(e)
+            throw e
+        } finally {
+            inFlight.remove(url, mine)
+        }
+    }
+
+    private suspend fun download(url: String): Bitmap? {
         val bitmap = attempt {
             runInterruptible(Dispatchers.IO) {
                 http.newCall(Request.Builder().url(url).build()).execute().use { response ->
@@ -157,17 +198,19 @@ class RadarImages(private val http: OkHttpClient) {
                     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
                     if (bounds.outWidth !in 1..MAX_EDGE || bounds.outHeight !in 1..MAX_EDGE) return@use null
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    // Radar maps have no transparency: 16-bit pixels halve the memory.
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.RGB_565 })
                 }
             }
         }.getOrNull() ?: return null
-        synchronized(cache) { cache[url] = bitmap }
+        cache.put(url, bitmap)
         return bitmap
     }
 
     private companion object {
         const val MAX_BYTES = 1024L * 1024
         const val MAX_EDGE = 2048
+        const val CACHE_BYTES = 8 * 1024 * 1024
         val STAMP: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMddHHmm").withZone(ZoneOffset.UTC)
     }
 }

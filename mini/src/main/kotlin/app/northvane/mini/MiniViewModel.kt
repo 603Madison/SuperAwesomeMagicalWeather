@@ -58,6 +58,9 @@ class MiniViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Shows the cached forecast for the selected place right away, then refreshes it if it's old. */
     private suspend fun showSelected(refreshIfOlderThan: Duration?) {
+        // A refresh still running is for the place shown before; it must not land on this one.
+        refreshJob?.cancel()
+        _state.update { it.copy(loading = false) }
         val place = store.settings.value.selected ?: run {
             _state.update { it.copy(snapshot = null) }
             return
@@ -81,6 +84,8 @@ class MiniViewModel(app: Application) : AndroidViewModel(app) {
                     store.update { s -> s.copy(places = s.places.map { if (it.id == place.id) it.copy(name = snapshot.placeName!!) else it }) }
                 }
             }
+            // Only show it if this place is still the one on screen.
+            if (store.settings.value.selected?.id != place.id) return@launch
             _state.update {
                 it.copy(
                     loading = false,
@@ -153,26 +158,31 @@ class MiniViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Adds (or updates) the "My location" place from the phone's position. Permission is checked by the caller. */
     fun useMyLocation(onDone: (Boolean) -> Unit) {
+        // One request at a time: pressing OK again while it's looking does nothing.
+        if (_state.value.locating) return
+        _state.update { it.copy(locating = true, message = null) }
         viewModelScope.launch {
-            _state.update { it.copy(locating = true, message = null) }
             val fix = attempt { container.deviceLocation.current() }.getOrNull()
             _state.update { it.copy(locating = false, message = if (fix == null) "Couldn't get a location fix. Try near a window, or search instead." else null) }
             if (fix == null) {
                 onDone(false)
                 return@launch
             }
-            val existing = store.settings.value.places.firstOrNull { it.isDeviceLocation }
-            if (existing != null) {
-                store.update { s ->
+            // Find-or-add in one store update, so there is only ever one "My location".
+            store.update { s ->
+                val existing = s.places.firstOrNull { it.isDeviceLocation }
+                if (existing != null) {
                     s.copy(
                         places = s.places.map { if (it.id == existing.id) it.copy(latitude = fix.latitude, longitude = fix.longitude, name = MY_LOCATION) else it },
                         selectedId = existing.id,
                     )
+                } else {
+                    val place = SavedLocation(UUID.randomUUID().toString(), MY_LOCATION, fix.latitude, fix.longitude, isDeviceLocation = true)
+                    s.copy(places = s.places + place, selectedId = place.id)
                 }
-                showSelected(refreshIfOlderThan = null)
-            } else {
-                addPlace(SavedLocation(UUID.randomUUID().toString(), MY_LOCATION, fix.latitude, fix.longitude, isDeviceLocation = true))
             }
+            _state.update { it.copy(results = null) }
+            showSelected(refreshIfOlderThan = null)
             onDone(true)
         }
     }
@@ -188,6 +198,8 @@ class MiniViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun dismissMessage() = _state.update { it.copy(message = null) }
+
+    fun markNotifyAsked() = viewModelScope.launch { store.update { it.copy(notifyAsked = true) } }
 
     companion object {
         const val MY_LOCATION = "My location"

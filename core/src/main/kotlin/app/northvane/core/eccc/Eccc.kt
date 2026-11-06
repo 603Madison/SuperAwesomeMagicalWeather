@@ -214,14 +214,20 @@ class EcccClient(private val http: OkHttpClient, private val baseUrl: String = D
             val periods = group?.arr("forecasts").orEmpty().mapNotNull { it.asObj() }
             if (periods.isEmpty()) return emptyList()
             val today = now.atZone(zone).toLocalDate()
+            // Dates count from when the forecast was issued, not from now: the afternoon issue is
+            // still current after midnight, when its "Tonight" is the evening before.
+            val issued = group?.enText("timestamp")?.let { runCatching { Instant.parse(it) }.getOrNull() }
+                ?.atZone(zone)?.toLocalDate() ?: today
             val result = mutableListOf<DailyForecast>()
-            var date = today
+            var date = issued
             var i = 0
             while (i < periods.size) {
                 val first = periods[i]
                 val firstName = first.obj("period")?.enText("textForecastName").orEmpty()
                 val isNight = firstName.contains("night", ignoreCase = true) || firstName.equals("Tonight", ignoreCase = true)
-                date = dateFor(firstName, date, today)
+                // "value" names the real day ("Thursday night") where the label says "Tonight".
+                val dayName = first.obj("period")?.enText("value") ?: firstName
+                date = dateFor(dayName, date, issued)
                 val day = if (isNight) null else first
                 val night = if (isNight) first else periods.getOrNull(i + 1)?.takeIf {
                     it.obj("period")?.enText("textForecastName").orEmpty().contains("night", ignoreCase = true)
@@ -246,7 +252,8 @@ class EcccClient(private val http: OkHttpClient, private val baseUrl: String = D
                 val humidity = listOfNotNull(day, night).mapNotNull { it.value("relativeHumidity") }
                 result += DailyForecast(
                     date = date,
-                    name = if (isNight && date == today) "Tonight" else firstName,
+                    // After midnight, last evening's "Tonight" is named for its day instead.
+                    name = if (isNight && date == today) "Tonight" else if (firstName.equals("Tonight", true)) dayName else firstName,
                     highC = temp(day, "high"),
                     lowC = temp(night, "low"),
                     condition = icon?.let(::condition) ?: WeatherCondition.fromText(summary),
@@ -265,11 +272,12 @@ class EcccClient(private val http: OkHttpClient, private val baseUrl: String = D
             return result
         }
 
-        private fun dateFor(name: String, expected: LocalDate, today: LocalDate): LocalDate {
-            if (name.equals("Today", true) || name.equals("Tonight", true)) return today
+        /** The date of a named period, the first matching weekday from the day before [expected] on. */
+        private fun dateFor(name: String, expected: LocalDate, issued: LocalDate): LocalDate {
+            if (name.equals("Today", true) || name.equals("Tonight", true)) return issued
             val dayName = name.substringBefore(' ').lowercase()
             val dow = DayOfWeek.entries.firstOrNull { it.getDisplayName(TextStyle.FULL, Locale.ENGLISH).lowercase() == dayName } ?: return expected
-            var d = expected
+            var d = expected.minusDays(1)
             while (d.dayOfWeek != dow) d = d.plusDays(1)
             return d
         }

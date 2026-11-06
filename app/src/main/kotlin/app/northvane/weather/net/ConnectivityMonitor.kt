@@ -20,6 +20,7 @@ import app.northvane.weather.data.SatelliteFeature
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 data class NetworkStatus(
     val connected: Boolean = true,
@@ -90,7 +91,8 @@ class ConnectivityMonitor(context: Context) {
         val dataSaverReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 val (dataSaver, restricted) = restriction()
-                _status.value = _status.value.copy(dataSaver = dataSaver, restricted = restricted)
+                // Atomic: a network callback on another thread may be updating the status too.
+                _status.update { it.copy(dataSaver = dataSaver, restricted = restricted) }
             }
         }
         runCatching {
