@@ -6,7 +6,9 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import androidx.compose.ui.graphics.Color
 import android.widget.RemoteViews
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -19,8 +21,7 @@ import app.northvane.core.model.AlertCategory
 import app.northvane.core.model.SavedLocation
 import app.northvane.core.model.WeatherCondition
 import app.northvane.core.model.WeatherSnapshot
-import app.northvane.core.outlook.NextRain
-import app.northvane.core.outlook.PrecipKind
+import app.northvane.core.outlook.TodayHeadline
 import app.northvane.core.repo.attempt
 import app.northvane.core.util.UnitFormatter
 import app.northvane.ui.gradientBitmap
@@ -40,9 +41,9 @@ import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
 /**
- * Home-screen widget: the place on the Today screen, its temperature and
- * conditions on the main app's sky colors, today's high and low, and when the
- * next rain or snow starts. It shows the last downloaded forecast; the app
+ * Home-screen widget in three sizes: small (temperature and icon), medium
+ * (conditions, high and low, and the headline) and large (plus the next five
+ * hours), on the main app's sky colors or the wallpaper's with a dynamic theme. It shows the last downloaded forecast; the app
  * refreshes it after every update, and [WidgetRefreshWorker] hourly.
  */
 class WeatherWidget : AppWidgetProvider() {
@@ -104,6 +105,15 @@ class WeatherWidget : AppWidgetProvider() {
             return render(context, widthDp, heightDp, location, snapshot, settings)
         }
 
+        /** Which layout fits the space the launcher gives the widget. */
+        internal enum class Size { SMALL, MEDIUM, LARGE }
+
+        internal fun sizeFor(widthDp: Int, heightDp: Int): Size = when {
+            widthDp < 160 || heightDp < 95 -> Size.SMALL
+            heightDp >= 190 && widthDp >= 220 -> Size.LARGE
+            else -> Size.MEDIUM
+        }
+
         /** The widget's views at [widthDp] × [heightDp]. */
         internal fun render(
             context: Context,
@@ -113,7 +123,13 @@ class WeatherWidget : AppWidgetProvider() {
             snapshot: WeatherSnapshot?,
             settings: AppSettings,
         ): RemoteViews {
-            val views = RemoteViews(context.packageName, R.layout.widget_weather)
+            val size = sizeFor(widthDp, heightDp)
+            val layout = when (size) {
+                Size.SMALL -> R.layout.widget_small
+                Size.MEDIUM -> R.layout.widget_weather
+                Size.LARGE -> R.layout.widget_large
+            }
+            val views = RemoteViews(context.packageName, layout)
             val open = PendingIntent.getActivity(
                 context, 7301,
                 Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
@@ -130,20 +146,38 @@ class WeatherWidget : AppWidgetProvider() {
             val isDay = current?.isDaytime ?: hour?.isDaytime ?: true
             val warning = snapshot?.alerts.orEmpty().any { it.category == AlertCategory.WARNING && (it.ends ?: it.expires)?.isAfter(now) != false }
 
-            // Background sized to the widget, at most 1.5× density to keep the bitmap small.
+            // Background sized to the widget, at most 1.5× density to keep the bitmap small. With a dynamic
+            // (wallpaper) theme the widget takes the wallpaper's colors, except during a warning.
             val density = context.resources.displayMetrics.density.coerceAtMost(1.5f)
-            val colors = if (warning) warningGradient(dark = false) else skyGradient(condition, isDay, dark = false)
+            val colors = when {
+                warning -> warningGradient(dark = false)
+                settings.dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> listOf(
+                    Color(context.getColor(android.R.color.system_accent1_500)),
+                    Color(context.getColor(android.R.color.system_accent1_700)),
+                )
+                else -> skyGradient(condition, isDay, dark = false)
+            }
             views.setImageViewBitmap(R.id.widget_background, gradientBitmap(colors, (widthDp * density).toInt(), (heightDp * density).toInt(), 20 * density))
 
-            views.setTextViewText(R.id.widget_place, location?.displayName ?: context.getString(R.string.app_name))
+            val placeName = location?.displayName ?: context.getString(R.string.app_name)
+            views.setTextViewText(R.id.widget_place, placeName)
             if (snapshot == null) {
                 views.setTextViewText(R.id.widget_temperature, "--")
-                views.setTextViewText(R.id.widget_condition, "Open the app to load the forecast")
-                views.setTextViewText(R.id.widget_rain, "")
+                if (size != Size.SMALL) {
+                    views.setTextViewText(R.id.widget_condition, "Open the app to load the forecast")
+                    views.setTextViewText(R.id.widget_rain, "")
+                }
                 return views
             }
-            views.setImageViewBitmap(R.id.widget_icon, weatherIconBitmap(condition, isDay, (48 * context.resources.displayMetrics.density).toInt()))
+            val iconPx = ((if (size == Size.SMALL) 28 else 48) * context.resources.displayMetrics.density).toInt()
+            views.setImageViewBitmap(R.id.widget_icon, weatherIconBitmap(condition, isDay, iconPx))
             views.setTextViewText(R.id.widget_temperature, f.temperature(current?.temperatureC ?: hour?.temperatureC))
+            // An old forecast says so next to the place.
+            if (Duration.between(snapshot.fetchedAt, now) > Duration.ofHours(2)) {
+                views.setTextViewText(R.id.widget_place, "$placeName · ${time.smart(snapshot.fetchedAt)}")
+            }
+            if (size == Size.SMALL) return views
+
             val today = time.today()
             val day = snapshot.daily.firstOrNull { it.date == today } ?: snapshot.daily.firstOrNull { !it.date.isBefore(today) }
             val highLow = listOfNotNull(day?.highC?.let { "H ${f.temperature(it)}" }, day?.lowC?.let { "L ${f.temperature(it)}" }).joinToString(" ")
@@ -151,26 +185,33 @@ class WeatherWidget : AppWidgetProvider() {
                 R.id.widget_condition,
                 listOf(current?.description ?: hour?.shortForecast ?: condition.label, highLow).filter { it.isNotBlank() }.joinToString(" · "),
             )
-            // An old forecast says so next to the place.
-            if (Duration.between(snapshot.fetchedAt, now) > Duration.ofHours(2)) {
-                views.setTextViewText(R.id.widget_place, "${location?.displayName ?: context.getString(R.string.app_name)} · ${time.smart(snapshot.fetchedAt)}")
-            }
-            val rain = NextRain.find(snapshot.hourly, now, Duration.ofHours(12))
+            val headline = TodayHeadline.write(snapshot.hourly, snapshot.daily, now, zone, f, time::time, time::hour, maxSentences = if (size == Size.LARGE) 2 else 1)
             views.setTextViewText(
                 R.id.widget_rain,
                 when {
                     warning -> snapshot.alerts.first { it.category == AlertCategory.WARNING }.event
-                    rain == null -> "Dry for the next 12 hours"
-                    else -> {
-                        val what = if (rain.kind == PrecipKind.MIX) "Wintry mix" else rain.kind.noun
-                        when {
-                            rain.ongoing && rain.end != null -> "$what until ${time.hour(rain.end!!)}"
-                            rain.ongoing -> "$what continuing"
-                            else -> "$what from ${time.hour(rain.start)} (${rain.chance}%)"
-                        }
-                    }
+                    headline.isNotEmpty() -> headline.joinToString(" ")
+                    else -> ""
                 },
             )
+            if (size == Size.LARGE) {
+                val cells = listOf(
+                    Triple(R.id.widget_h1_time, R.id.widget_h1_icon, R.id.widget_h1_temp),
+                    Triple(R.id.widget_h2_time, R.id.widget_h2_icon, R.id.widget_h2_temp),
+                    Triple(R.id.widget_h3_time, R.id.widget_h3_icon, R.id.widget_h3_temp),
+                    Triple(R.id.widget_h4_time, R.id.widget_h4_icon, R.id.widget_h4_temp),
+                    Triple(R.id.widget_h5_time, R.id.widget_h5_icon, R.id.widget_h5_temp),
+                )
+                // The next five hours after this one.
+                val next = snapshot.hourly.filter { it.time.isAfter(now) }.take(cells.size)
+                val small = (24 * context.resources.displayMetrics.density).toInt()
+                cells.forEachIndexed { i, (t, icon, temp) ->
+                    val h = next.getOrNull(i)
+                    views.setTextViewText(t, h?.let { time.hour(it.time) }.orEmpty())
+                    views.setTextViewText(temp, h?.let { f.temperature(it.temperatureC) }.orEmpty())
+                    if (h != null) views.setImageViewBitmap(icon, weatherIconBitmap(h.condition, h.isDaytime, small))
+                }
+            }
             return views
         }
     }

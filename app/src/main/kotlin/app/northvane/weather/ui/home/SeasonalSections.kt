@@ -1,5 +1,6 @@
 package app.northvane.weather.ui.home
 
+import app.northvane.weather.ui.components.WeatherCard
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +49,7 @@ import app.northvane.core.garden.GardenAdvisor
 import app.northvane.core.model.Units
 import app.northvane.core.outlook.DryingBlocker
 import app.northvane.core.outlook.DryingReport
+import app.northvane.core.outlook.HeatingAdvisor
 import app.northvane.core.outlook.HeatingPhase
 import app.northvane.core.outlook.HeatingReport
 import app.northvane.core.outlook.OutlookText
@@ -94,34 +96,31 @@ internal fun GardenCard(
     val plants = GardenAdvisor.plants(report, today, planting = settings.gardenPlanting, harvest = settings.gardenHarvest)
     if (plants.isEmpty() && !report.inGrowingSeason) return
     val c = report.climate
-    Column {
-        SectionTitle("Garden")
-        SeasonCard {
-            Note(
-                "Last spring frost usually ${time.monthDay(c.lastFrost(today.year))} (1 year in 10: ${time.monthDay(c.lastFrostLate(today.year))}); " +
-                    "first fall frost ${time.monthDay(c.firstFrost(today.year))}. From 30 years of NOAA data.",
-            )
-            var all by rememberSaveable { mutableStateOf(false) }
-            val shown = if (all) plants else plants.take(8)
-            shown.forEach { p ->
-                Column(Modifier.padding(top = 4.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(p.crop.label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                        val step = p.planting
-                        if (step != null && step.step != PlantingStep.START_INDOORS && step.step != PlantingStep.HARDEN_OFF &&
-                            step.status in setOf(StepStatus.NOW, StepStatus.GOOD_DAY, StepStatus.LATE)
-                        ) {
-                            TextButton(onClick = { onMarkPlanted(p.crop) }) { Text("Planted") }
-                        }
+    WeatherCard("Garden") {
+        Note(
+            "Last spring frost usually ${time.monthDay(c.lastFrost(today.year))} (1 year in 10: ${time.monthDay(c.lastFrostLate(today.year))}); " +
+                "first fall frost ${time.monthDay(c.firstFrost(today.year))}. From 30 years of NOAA data.",
+        )
+        var all by rememberSaveable { mutableStateOf(false) }
+        val shown = if (all) plants else plants.take(8)
+        shown.forEach { p ->
+            Column(Modifier.padding(top = 4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(p.crop.label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                    val step = p.planting
+                    if (step != null && step.step != PlantingStep.START_INDOORS && step.step != PlantingStep.HARDEN_OFF &&
+                        step.status in setOf(StepStatus.NOW, StepStatus.GOOD_DAY, StepStatus.LATE)
+                    ) {
+                        TextButton(onClick = { onMarkPlanted(p.crop) }) { Text("Planted") }
                     }
-                    p.planting?.let { PlantingLine(it, f, time, today) }
-                    p.harvest?.let { HarvestLine(it, f, time) }
                 }
+                p.planting?.let { PlantingLine(it, f, time, today) }
+                p.harvest?.let { HarvestLine(it, f, time) }
             }
-            if (plants.size > shown.size) TextButton(onClick = { all = true }) { Text("Show ${plants.size - shown.size} more") }
-            if (plants.any { it.harvest?.estimated == true }) Note("~ Estimated from the recommended planting date; mark crops planted for exact timing.")
-            GardenExtras(report, settings, f, time)
         }
+        if (plants.size > shown.size) TextButton(onClick = { all = true }) { Text("Show ${plants.size - shown.size} more") }
+        if (plants.any { it.harvest?.estimated == true }) Note("~ Estimated from the recommended planting date; mark crops planted for exact timing.")
+        GardenExtras(report, settings, f, time)
     }
 }
 
@@ -229,68 +228,65 @@ private fun dryColor(index: Int) = when {
 
 @Composable
 internal fun DryingSection(report: DryingReport, laundryOut: Boolean, f: UnitFormatter, time: TimeFormat, onLaundry: (Boolean) -> Unit) {
-    Column {
-        SectionTitle("Clothes drying")
-        SeasonCard {
-            val best = report.best
-            val nowBlocker = report.hours.firstOrNull()?.blocker
-            if (best != null) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    ScoreRing(best.index, dryColor(best.index), Modifier.size(48.dp))
-                    Spacer(Modifier.width(12.dp))
-                    Column {
+    WeatherCard("Clothes drying") {
+        val best = report.best
+        val nowBlocker = report.hours.firstOrNull()?.blocker
+        if (best != null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ScoreRing(best.index, dryColor(best.index), Modifier.size(48.dp))
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(
+                        "Best: ${time.smart(best.start)} – ${time.time(best.end)}",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Note("A load should dry in about ${"%.1f".format(best.hoursToDry)} h")
+                }
+            }
+        } else {
+            Text(
+                when (nowBlocker) {
+                    DryingBlocker.FREEZING -> "Too cold to line-dry: wet clothes freeze below 32°F"
+                    DryingBlocker.RAIN -> "Rain: dry indoors today"
+                    DryingBlocker.DAMP -> "Too damp for clothes to dry outside"
+                    else -> "No good drying window in the next two days"
+                },
+                style = MaterialTheme.typography.titleMedium,
+            )
+        }
+        report.nextRain?.let { Note("Rain likely around ${time.smart(it)}${report.nextRainChance?.let { c -> " ($c%)" } ?: ""}: have laundry in before then", color = Caution) }
+        if (report.days.size > 1) {
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                report.days.forEach { d ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                        Text(time.weekday(d.date), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(
-                            "Best: ${time.smart(best.start)} – ${time.time(best.end)}",
-                            style = MaterialTheme.typography.titleMedium,
+                            when (d.blocker) {
+                                DryingBlocker.FREEZING -> "frz"
+                                DryingBlocker.RAIN -> "rain"
+                                else -> "${d.score}"
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            color = dryColor(d.score),
                         )
-                        Note("A load should dry in about ${"%.1f".format(best.hoursToDry)} h")
-                    }
-                }
-            } else {
-                Text(
-                    when (nowBlocker) {
-                        DryingBlocker.FREEZING -> "Too cold to line-dry: wet clothes freeze below 32°F"
-                        DryingBlocker.RAIN -> "Rain: dry indoors today"
-                        DryingBlocker.DAMP -> "Too damp for clothes to dry outside"
-                        else -> "No good drying window in the next two days"
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                )
-            }
-            report.nextRain?.let { Note("Rain likely around ${time.smart(it)}${report.nextRainChance?.let { c -> " ($c%)" } ?: ""}: have laundry in before then", color = Caution) }
-            if (report.days.size > 1) {
-                Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                    report.days.forEach { d ->
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                            Text(time.weekday(d.date), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(
-                                when (d.blocker) {
-                                    DryingBlocker.FREEZING -> "frz"
-                                    DryingBlocker.RAIN -> "rain"
-                                    else -> "${d.score}"
-                                },
-                                style = MaterialTheme.typography.labelLarge,
-                                color = dryColor(d.score),
-                            )
-                        }
                     }
                 }
             }
-            if (laundryOut) {
-                Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "Watching for rain: you'll get a notification to bring it in",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.weight(1f),
-                        )
-                        TextButton(onClick = { onLaundry(false) }) { Text("Brought in") }
-                    }
+        }
+        if (laundryOut) {
+            Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
+                Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "Watching for rain: you'll get a notification to bring it in",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(onClick = { onLaundry(false) }) { Text("Brought in") }
                 }
-            } else if (nowBlocker != DryingBlocker.FREEZING && nowBlocker != DryingBlocker.RAIN) {
-                OutlinedButton(onClick = { onLaundry(true) }) { Text("My laundry is out") }
             }
+        } else if (nowBlocker != DryingBlocker.FREEZING && nowBlocker != DryingBlocker.RAIN) {
+            OutlinedButton(onClick = { onLaundry(true) }) { Text("My laundry is out") }
         }
     }
 }
@@ -299,50 +295,47 @@ internal fun DryingSection(report: DryingReport, laundryOut: Boolean, f: UnitFor
 
 @Composable
 internal fun HeatingSection(report: HeatingReport, hasSources: Boolean, aggressive: Boolean, f: UnitFormatter, time: TimeFormat, onConfigure: () -> Unit) {
-    Column {
-        SectionTitle("Heating")
-        SeasonCard {
-            Text(report.phase.label, style = MaterialTheme.typography.titleMedium)
-            val start = report.typicalStart
-            val end = report.typicalEnd
-            if (start != null && end != null) Note("Heating season here usually runs ${time.monthDay(start)} to ${time.monthDay(end)}.")
-            if (hasSources && report.phase != HeatingPhase.OFF && report.recommended.isNotEmpty() && !aggressive) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Run: ", style = MaterialTheme.typography.bodyLarge)
-                    Text(report.recommended.joinToString(" + ") { shortName(it) }, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
-                }
-                report.outlookMeanC?.let { Note("Based on the two-week average of about ${f.temperatureWithUnit(it)} (past week plus forecast), so it won't flip between systems day to day.") }
-                Note("Heating demand this week: ${report.weekHdd.roundToInt()} degree days" + (report.recentHdd?.let { ", last 30 days ${it.roundToInt()}" } ?: ""))
+    WeatherCard("Heating") {
+        Text(report.phase.label, style = MaterialTheme.typography.titleMedium)
+        val start = report.typicalStart
+        val end = report.typicalEnd
+        if (start != null && end != null) Note("Heating season here usually runs ${time.monthDay(start)} to ${time.monthDay(end)}.")
+        if (hasSources && report.phase != HeatingPhase.OFF && report.recommended.isNotEmpty() && !aggressive) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Run: ", style = MaterialTheme.typography.bodyLarge)
+                Text(report.recommended.joinToString(" + ") { shortName(it) }, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
             }
-            if (hasSources && report.phase != HeatingPhase.OFF && aggressive && report.days.isNotEmpty()) {
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    report.days.forEach { d ->
-                        Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-                            Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp).width(92.dp)) {
-                                Text(time.dayName(d.date), style = MaterialTheme.typography.labelLarge)
-                                Note("low ${f.temperature(d.lowC)}")
-                                Text(
-                                    d.sources.joinToString(" + ") { shortName(it) }.ifEmpty { "–" },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                                if (d.nightSources.isNotEmpty()) Note("night: " + d.nightSources.joinToString(" + ") { shortName(it) })
-                            }
+            report.outlookMeanC?.let { Note("Based on the two-week average of about ${f.temperatureWithUnit(it)} (past week plus forecast), so it won't flip between systems day to day.") }
+            Note(HeatingAdvisor.demandText(report.weekHdd, report.recentHdd))
+        }
+        if (hasSources && report.phase != HeatingPhase.OFF && aggressive && report.days.isNotEmpty()) {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                report.days.forEach { d ->
+                    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp).width(92.dp)) {
+                            Text(time.dayName(d.date), style = MaterialTheme.typography.labelLarge)
+                            Note("low ${f.temperature(d.lowC)}")
+                            Text(
+                                d.sources.joinToString(" + ") { shortName(it) }.ifEmpty { "–" },
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            if (d.nightSources.isNotEmpty()) Note("night: " + d.nightSources.joinToString(" + ") { shortName(it) })
                         }
                     }
                 }
-                Note("Heating demand this week: ${report.weekHdd.roundToInt()} degree days" + (report.recentHdd?.let { ", last 30 days ${it.roundToInt()}" } ?: ""))
             }
-            report.tasks.forEach { task ->
-                Row(verticalAlignment = Alignment.Top) {
-                    StatusDot(Caution)
-                    Spacer(Modifier.width(8.dp))
-                    Text(OutlookText.heatingTask(task, f), style = MaterialTheme.typography.bodySmall)
-                }
-            }
-            if (!hasSources) Button(onClick = onConfigure) { Text("Set up my heating") } else TextButton(onClick = onConfigure) { Text("Edit my heating") }
+            Note(HeatingAdvisor.demandText(report.weekHdd, report.recentHdd))
         }
+        report.tasks.forEach { task ->
+            Row(verticalAlignment = Alignment.Top) {
+                StatusDot(Caution)
+                Spacer(Modifier.width(8.dp))
+                Text(OutlookText.heatingTask(task, f), style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        if (!hasSources) Button(onClick = onConfigure) { Text("Set up my heating") } else TextButton(onClick = onConfigure) { Text("Edit my heating") }
     }
 }
 

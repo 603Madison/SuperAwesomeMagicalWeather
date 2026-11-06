@@ -54,7 +54,7 @@ weather services described below.
 
 ## Secrets
 
-- The OpenWeatherMap, Google Pollen, EPA AirNow, New England 511 and TomTom keys and WeeWX passwords/tokens are encrypted with
+- The OpenWeatherMap, Google Pollen, EPA AirNow and AI provider keys and WeeWX passwords/tokens are encrypted with
   AES-256-GCM under a non-exportable **Android Keystore** key
   (`SecretStore`). The entry name is bound as associated data.
 - Secrets are write-only in the UI: screens show whether a value is saved,
@@ -118,12 +118,6 @@ weather services described below.
   device), air-quality-api.open-meteo.com (rounded coordinates), and
   www.airnowapi.org only with the user's key (the key must go in the URL, so
   those requests are `no-store`).
-- Traffic (only while the Traffic tab is used): datahub.transportation.gov
-  (USDOT WZDx registry), the keyless state DOT WZDx feeds it lists (HTTPS
-  only), newengland511.org with the user's key (`no-store`), and TomTom tiles
-  with the user's key (the key is part of the tile URL by TomTom's design).
-  Traffic requests don't include your coordinates except TomTom tile
-  addresses, which reveal the map area being viewed.
 - Garden and heating frost dates: one download of 30 years of daily lows
   from data.rcc-acis.org per place (~40 KB), cached on the device for a year,
   and only when those features are on.
@@ -143,6 +137,8 @@ weather services described below.
   `no-store`. Each provider's key is stored encrypted on its own and sent only
   to that provider. The settings page sets `FLAG_SECURE`. Discussion and alert
   rewrites are cached in `noBackupFilesDir` for four days.
+- The traffic feature was removed in 2.0. On first start, 2.0 deletes any
+  saved New England 511 or TomTom key and the traffic cache.
 - All of these hosts are HTTPS-only with system CAs in the network security config.
 - Place search uses the platform `Geocoder` (on most devices this is backed
   by the system location provider) and OpenWeatherMap geocoding only if the

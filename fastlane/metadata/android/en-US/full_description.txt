@@ -14,8 +14,8 @@ A private, ad-free weather app built on free NOAA and National Weather Service d
 <li>Air quality, UV index and a personal allergy score.</li>
 <li>Aurora forecast with notifications when the northern lights may be visible.</li>
 <li>Power outage risk, frozen pipes, black ice and frost.</li>
-<li>Outdoor activity scores, fall foliage, trail mud, clothes drying, garden, heating, maple sap runs and burn days.</li>
-<li>Traffic: work zones, crashes and closures.</li>
+<li>Outdoor activities with the best hours to go, fall foliage, clothes drying, garden, heating, maple sap runs and burn days.</li>
+<li>A headline on what matters next ("Rain in about 20 min"), cards you can reorder or hide, and widgets in three sizes.</li>
 <li>Storm totals, wildfire smoke, and rivers &amp; tides for paddling.</li>
 </ul>
 
@@ -29,6 +29,6 @@ A private, ad-free weather app built on free NOAA and National Weather Service d
 Saves data on satellite connections such as T-Mobile T-Satellite, and while Android's Data Saver is on. You choose exactly what it may still download.
 
 <b>Optional services</b>
-Some extras use services that need your own key: Google Pollen API (pollen), EPA AirNow (air quality), New England 511 (traffic incidents), TomTom (traffic speeds), OpenWeatherMap (fallback outside North America) and your own AI server (forecast summary). None of them are needed, and nothing is sent to them unless you add a key.
+Some extras use services that need your own key: Google Pollen API (pollen), EPA AirNow (air quality), OpenWeatherMap (fallback outside North America) and an AI provider (Claude, or your own server) for forecasters' notes, alert explanations and questions. None of them are needed, and nothing is sent to them unless you add a key.
 
 There's also SuperAwesomeMagicalWeather Mini, a separate app for flip phones.

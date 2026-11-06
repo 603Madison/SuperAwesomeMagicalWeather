@@ -73,11 +73,18 @@ import app.northvane.weather.notify.AlertNotifier
 import app.northvane.weather.ui.MainUiState
 import app.northvane.weather.ui.components.ChoiceDropdown
 import app.northvane.weather.ui.components.LabeledSwitch
+import app.northvane.weather.ui.components.NorthvaneIcons
 import app.northvane.weather.ui.components.SectionCard
 import app.northvane.weather.ui.components.SegmentedChoice
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Switch
+import app.northvane.weather.data.TodayCard
+import app.northvane.weather.data.isOn
+import app.northvane.weather.ui.components.ReorderableColumn
 
 /** Literal so lint doesn't flag the API 33 constant; only requested on API 33+. */
 private const val POST_NOTIFICATIONS = "android.permission.POST_NOTIFICATIONS"
@@ -88,9 +95,9 @@ enum class SettingsPage(val route: String, val title: String) {
     TODAY("today", "Today screen"),
     OUTLOOK("outlook", "Outlook"),
     ALERTS("alerts", "Alerts & notifications"),
-    MAPS("maps", "Radar & traffic"),
+    MAPS("maps", "Radar"),
     SATELLITE("satellite", "Backwoods mode"),
-    AI("ai", "AI summary"),
+    AI("ai", "AI"),
     ABOUT("about", "About & privacy"),
 }
 
@@ -146,20 +153,20 @@ private fun SettingsIndex(state: MainUiState, onBack: () -> Unit, nav: SettingsN
     val s = state.settings
     fun onOff(on: Boolean) = if (on) "on" else "off"
     SettingsScaffold("Settings", onBack) {
-        SectionCard(null) {
+        SectionCard("What you see") {
             NavRow("Appearance", "${s.appTheme.label} theme · ${s.themeMode.name.lowercase().replaceFirstChar { it.uppercase() }} · ${if (s.units == UnitSystem.IMPERIAL) "°F" else "°C"}") { nav.openPage(SettingsPage.APPEARANCE) }
-            NavRow("Today screen", "Air quality, UV, pollen & allergies, outage outlook, AI summary") { nav.openPage(SettingsPage.TODAY) }
-            NavRow("Outlook", "Activities, garden, heating, clothes drying, trail mud, fall foliage") { nav.openPage(SettingsPage.OUTLOOK) }
+            NavRow("Today screen", "Card order, air quality, UV, pollen, storm, smoke, aurora") { nav.openPage(SettingsPage.TODAY) }
+            NavRow("Outlook", "Activities, rivers & tides, garden, drying, heating, seasonal cards") { nav.openPage(SettingsPage.OUTLOOK) }
             NavRow("Alerts & notifications", "Alerts ${onOff(s.alertsEnabled)} · every ${s.alertCheckMinutes} min") { nav.openPage(SettingsPage.ALERTS) }
-            NavRow("Radar & traffic", "${s.radarSource.label} · traffic tab ${onOff(s.trafficEnabled)}") { nav.openPage(SettingsPage.MAPS) }
+            NavRow("Radar", "${s.radarSource.label} · future cast ${onOff(s.futureCastEnabled)}") { nav.openPage(SettingsPage.MAPS) }
         }
-        SectionCard(null) {
+        SectionCard("Data & privacy") {
             NavRow("Backwoods mode", when (s.dataSaver) {
                 DataSaverMode.AUTO -> "Turns on by itself on satellite or with Data Saver"
                 DataSaverMode.ALWAYS -> "Always on"
                 DataSaverMode.OFF -> "Off"
             } + if (s.showStaleData) " · showing stale data" else "") { nav.openPage(SettingsPage.SATELLITE) }
-            NavRow("Data sources & API keys", "NWS, Environment Canada, WeeWX, pollen, air quality, traffic, OpenWeatherMap", nav.openSources)
+            NavRow("Data sources & API keys", "NWS, Environment Canada, WeeWX, pollen, air quality, OpenWeatherMap", nav.openSources)
             NavRow("AI", if (s.aiEnabled) "${s.aiProvider.label} · ${s.aiModel.ifBlank { "no model" }}" else "Off. Forecasters' notes, alert explanations and questions") { nav.openPage(SettingsPage.AI) }
             NavRow("About & privacy", "SuperAwesomeMagicalWeather ${BuildConfig.VERSION_NAME}") { nav.openPage(SettingsPage.ABOUT) }
         }
@@ -230,44 +237,64 @@ private fun TodayPage(state: MainUiState, container: AppContainer, onBack: () ->
         }
     }
     SettingsScaffold("Today screen", onBack) {
-        SectionCard("Cards") {
-            LabeledSwitch("Hourly details open by default", s.hourlyExpanded, { on -> update { setHourlyExpanded(on) } },
-                subtitle = "You can also tap the hourly card any time; it remembers your choice")
-            LabeledSwitch("Air quality (AQI)", s.airQualityEnabled, { on -> update { setAirQuality(on) } },
-                subtitle = "EPA AirNow with your free key, otherwise Open-Meteo's model")
-            LabeledSwitch("UV index", s.uvEnabled, { on -> update { setUv(on) } }, subtitle = "EPA's hourly UV forecast by ZIP code")
+        SectionCard("Cards on Today") {
+            Hint(
+                "Long-press a card and drag it to change the order; switch off the ones you don't want. Air quality, UV and pollen " +
+                    "sit as small chips at the top until they matter (AQI over 50, UV 6 or more, high pollen). Each card's ⋮ menu " +
+                    "on Today does the same.",
+            )
+            val cards = s.todayOrder.filter { (it != TodayCard.FORECASTERS && it != TodayCard.ASK) || s.aiEnabled }
+            ReorderableColumn(cards, key = { it }, onReorder = { order ->
+                // Cards not listed here (AI ones while AI is off) keep their places at the end.
+                update { setTodayOrder(order + s.todayOrder.filter { it !in order }) }
+            }) { card, dragging ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(if (dragging) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent, RoundedCornerShape(12.dp))
+                        .padding(vertical = 2.dp),
+                ) {
+                    Icon(NorthvaneIcons.DragHandle, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 12.dp))
+                    Text(if (card == TodayCard.DAILY) "Daily forecast" else card.label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                    if (card.hideable) {
+                        Switch(checked = s.isOn(card), onCheckedChange = { on ->
+                            if (card == TodayCard.AURORA) syncAurora { setTodayCard(card, on) } else update { setTodayCard(card, on) }
+                        })
+                    } else {
+                        Text("Always on", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = 14.dp))
+                    }
+                }
+            }
+        }
+        SectionCard("In each day's details") {
             LabeledSwitch("Power outage outlook", s.outageRiskEnabled, { on -> update { setOutageRisk(on) } },
-                subtitle = "In each day's details; tap High risk for preparation steps")
+                subtitle = "Tap High risk for preparation steps")
             LabeledSwitch("Frozen pipe risk", s.pipeRiskEnabled, { on -> update { setPipeRisk(on) } },
-                subtitle = "In each day's details on nights near 20°F or colder, with steps to protect your pipes")
+                subtitle = "Nights near 20°F or colder, with steps to protect your pipes")
             LabeledSwitch("Black ice & frost", s.morningIceEnabled, { on -> update { setMorningIce(on) } },
-                subtitle = "In each day's details: icy roads and frosty windshields that morning")
-            LabeledSwitch("Storm totals", s.stormEnabled, { on -> update { setStorm(on) } },
-                subtitle = "When a big storm is coming: snow, ice and rain totals, timing and the heaviest hours")
-            LabeledSwitch("Wildfire smoke", s.smokeEnabled, { on -> update { setSmoke(on) } },
-                subtitle = "Only when smoke is in the forecast (NOAA HRRR, about 2 MB every 6 hours, continental US)")
-            LabeledSwitch("Aurora forecast", s.auroraEnabled, { on -> syncAurora { setAurora(on) } },
-                subtitle = "Shows up only when the northern lights may be visible from here (NOAA, free)")
-            if (s.auroraEnabled) {
+                subtitle = "Icy roads and frosty windshields that morning")
+        }
+        if (s.auroraEnabled) {
+            SectionCard("Aurora") {
                 LabeledSwitch("Aurora notifications", s.auroraNotify, { on ->
                     if (on) askForNotifications()
                     syncAurora { setAuroraNotify(on) }
                 }, subtitle = "For places with notifications on: a heads-up the day before, and when it may be visible now")
                 if (s.auroraNotify) {
-                    ChoiceDropdown("Notify when it may be", listOf(AuroraView.CAMERA, AuroraView.HORIZON, AuroraView.OVERHEAD), s.auroraNotifyView, {
+                    ChoiceDropdown("Notify when it's", listOf(AuroraView.CAMERA, AuroraView.HORIZON, AuroraView.OVERHEAD), s.auroraNotifyView, {
                         when (it) {
-                            AuroraView.CAMERA -> "Visible to a phone camera"
-                            AuroraView.HORIZON -> "Visible to the eye, low on the horizon"
-                            else -> "Overhead (rare, big storms)"
+                            AuroraView.CAMERA -> "Visible to a camera"
+                            AuroraView.HORIZON -> "Low on the horizon"
+                            else -> "Overhead (rare)"
                         }
                     }, { view -> update { setAuroraNotifyView(view) } })
                 }
             }
         }
-        SectionCard("Pollen & allergies") {
-            LabeledSwitch("Pollen forecast", s.pollenEnabled, { on -> update { setPollen(on) } },
-                subtitle = if (state.pollenKeySet || !s.pollenEnabled) "Shown only when you have a Google Pollen API key" else "Add a Google Pollen key in Data sources")
-            if (s.pollenEnabled) {
+        if (s.pollenEnabled) SectionCard("Pollen & allergies") {
+            if (!state.pollenKeySet) Hint("The pollen card needs a free Google Pollen API key: add one in Data sources.")
+            run {
                 LabeledSwitch("Personal allergy score", s.allergyEnabled, { on -> update { setAllergy(on) } },
                     subtitle = "Inside the pollen card")
                 NavRow("My allergies", if (s.allergies.isEmpty()) "Choose allergens" else s.allergies.keys.joinToString(", ") { it.label.lowercase() }, nav.openAllergies)
@@ -281,7 +308,6 @@ private fun OutlookPage(state: MainUiState, container: AppContainer, onBack: () 
     val s = state.settings
     val update = rememberUpdater(container)
     val scope = rememberCoroutineScope()
-    var showActivities by rememberSaveable { mutableStateOf(false) }
     SettingsScaffold("Outlook", onBack) {
         Text(
             "These cards live on the Outlook tab and appear only in season.",
@@ -289,25 +315,12 @@ private fun OutlookPage(state: MainUiState, container: AppContainer, onBack: () 
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         SectionCard("Outdoors") {
-            LabeledSwitch("Outdoor activity scores", s.activitiesEnabled, { on -> update { setActivitiesEnabled(on) } },
-                subtitle = "0–100 with tips; seasonal ones appear only when they make sense")
-            if (s.activitiesEnabled) {
-                ExpandRow("Activities", "${s.activities.size} of ${Activity.entries.size} on", showActivities) { showActivities = !showActivities }
-                if (showActivities) {
-                    Activity.entries.forEach { activity ->
-                        val checked = activity in s.activities
-                        CheckRow(activity.label + if (activity.overnight) " (overnight)" else "", activitySeason(activity), checked) { on -> update { setActivity(activity, on) } }
-                    }
-                }
-            }
-            LabeledSwitch("Trail mud", s.mudEnabled, { on -> update { setMud(on) } }, subtitle = "Rain, snowmelt and spring thaw (NOAA observed data)")
+            LabeledSwitch("Outdoor activities", s.activitiesEnabled, { on -> update { setActivitiesEnabled(on) } },
+                subtitle = "When to go and how good it looks; trail mud counts for hiking and biking. Pick your activities on the Outlook tab.")
             LabeledSwitch("Rivers & tides", s.waterEnabled, { on -> update { setWater(on) } },
                 subtitle = "Nearest river gauge (USGS) and tide times (NOAA); water temperature and rising rivers also feed paddling")
-            LabeledSwitch("Fall foliage", s.foliageEnabled, { on -> update { setFoliage(on) } }, subtitle = "Only while leaves are changing")
         }
         SectionCard("Home") {
-            LabeledSwitch("Clothes drying", s.dryingEnabled, { on -> update { setDrying(on) } },
-                subtitle = "Best line-drying hours and a rain warning while laundry is out")
             LabeledSwitch("Garden", s.gardenEnabled, { on ->
                 scope.launch {
                     container.settings.setGarden(on)
@@ -317,15 +330,20 @@ private fun OutlookPage(state: MainUiState, container: AppContainer, onBack: () 
             if (s.gardenEnabled) {
                 NavRow("My garden", if (s.gardenPlan.isEmpty()) "Choose what you're planting" else s.gardenPlan.joinToString(", ") { it.crop.label.substringBefore(" (").lowercase() }, nav.openGarden)
             }
-            LabeledSwitch("Burn days", s.burnEnabled, { on -> update { setBurn(on) } },
-                subtitle = "Good days to burn brush, from wind, humidity, dry spells and fire weather alerts")
-            LabeledSwitch("Maple sap runs", s.sapEnabled, { on -> update { setSap(on) } },
-                subtitle = "Freeze-thaw days for tapping, mid-January through April")
+            LabeledSwitch("Clothes drying", s.dryingEnabled, { on -> update { setDrying(on) } },
+                subtitle = "Best line-drying hours and a rain warning while laundry is out")
             LabeledSwitch("Heating season", s.heatingEnabled, { on -> update { setHeating(on) } },
                 subtitle = "Which system to run, and when to buy fuel or stack wood")
             if (s.heatingEnabled) {
                 NavRow("My heating", if (s.heatSources.isEmpty()) "Add how you heat" else s.heatSources.joinToString(", ") { it.label.substringBefore(" (").lowercase() }, nav.openHeating)
             }
+        }
+        SectionCard("Seasonal") {
+            LabeledSwitch("Fall foliage", s.foliageEnabled, { on -> update { setFoliage(on) } }, subtitle = "Only while leaves are changing")
+            LabeledSwitch("Maple sap runs", s.sapEnabled, { on -> update { setSap(on) } },
+                subtitle = "Freeze-thaw days for tapping, mid-January through April")
+            LabeledSwitch("Burn days", s.burnEnabled, { on -> update { setBurn(on) } },
+                subtitle = "Good days to burn brush, from wind, humidity, dry spells and fire weather alerts")
         }
     }
 }
@@ -439,7 +457,7 @@ private fun AlertsPage(state: MainUiState, container: AppContainer, onBack: () -
 private fun MapsPage(state: MainUiState, container: AppContainer, onBack: () -> Unit) {
     val s = state.settings
     val update = rememberUpdater(container)
-    SettingsScaffold("Radar & traffic", onBack) {
+    SettingsScaffold("Radar", onBack) {
         SectionCard("Radar") {
             ChoiceDropdown("Past radar", RadarSource.entries, s.radarSource, { it.label }, { source -> update { setRadarSource(source) } })
             LabeledSwitch("Future cast", s.futureCastEnabled, { on -> update { setFutureCast(on) } }, subtitle = "NOAA's HRRR model, newest run, in the same colors as the radar (continental US)")
@@ -449,16 +467,6 @@ private fun MapsPage(state: MainUiState, container: AppContainer, onBack: () -> 
             LabeledSwitch("Satellite imagery", s.satelliteLayer, { on -> update { setSatelliteLayer(on) } }, subtitle = "GOES clouds under the radar (also toggles on the map)")
             if (s.satelliteLayer) {
                 ChoiceDropdown("Imagery", SatelliteImagery.entries, s.satelliteImagery, { it.label }, { i -> update { setSatelliteImagery(i) } })
-            }
-        }
-        SectionCard("Traffic") {
-            LabeledSwitch("Traffic tab", s.trafficEnabled, { on -> update { setTraffic(on) } }, subtitle = "Work zones, closures and crashes from state DOTs")
-            if (s.trafficEnabled) {
-                val radii = listOf(16.0, 40.0, 80.0)
-                ChoiceDropdown("Show events within", radii, radii.minBy { kotlin.math.abs(it - s.trafficRadiusKm) }, {
-                    if (s.units == UnitSystem.IMPERIAL) "${(it / 1.609344).roundToInt()} miles" else "${it.roundToInt()} km"
-                }, { km -> update { setTrafficRadius(km) } })
-                LabeledSwitch("Live speed layer", s.trafficFlowLayer, { on -> update { setTrafficFlow(on) } }, subtitle = "TomTom, needs your key in Data sources")
             }
         }
     }
@@ -471,15 +479,10 @@ private fun SatellitePage(state: MainUiState, container: AppContainer, onBack: (
     var expanded by rememberSaveable { mutableStateOf<String?>(null) }
     SettingsScaffold("Backwoods mode", onBack) {
         SectionCard(null) {
-            Hint(
-                "Backwoods mode is SuperAwesomeMagicalWeather's light-packing mode for satellite connections such as T-Mobile T-Satellite: " +
-                    "choose exactly what it may download. Anything you turn off keeps its last downloaded data. " +
-                    "When set to automatic, it also turns on while Android's Data Saver is on and you're on mobile data, " +
-                    "even if SuperAwesomeMagicalWeather has unrestricted data.",
-            )
+            Hint("Light packing for satellite and metered connections: pick what may download. Everything else keeps its last data.")
             ChoiceDropdown("Backwoods mode turns on", DataSaverMode.entries, s.dataSaver, {
                 when (it) {
-                    DataSaverMode.AUTO -> "Automatically on satellite or with Data Saver"
+                    DataSaverMode.AUTO -> "Automatically"
                     DataSaverMode.ALWAYS -> "Always"
                     DataSaverMode.OFF -> "Never"
                 }
@@ -555,9 +558,9 @@ private fun AboutPage(onBack: () -> Unit) {
                 "No accounts, ads, analytics or trackers. Your locations, settings and keys stay on this device and are excluded from " +
                     "backups. Weather requests send rounded coordinates (about 11 m) only to the services you use: weather.gov, " +
                     "Environment Canada, NOAA's climate data service (ACIS), EPA (UV index by ZIP code, and AirNow if you add a key), " +
-                    "Open-Meteo (air quality model), state DOT traffic feeds, your WeeWX server and, if enabled, OpenWeatherMap, " +
-                    "New England 511 and TomTom. Pollen requests send coordinates rounded to about 1 km to Google. If you turn on the " +
-                    "AI summary, the place name and forecast numbers go to the AI server you configure, and nothing else. Map tiles " +
+                    "Open-Meteo (air quality and 15-minute rain), USGS and NOAA (rivers, tides), your WeeWX server and, if enabled, " +
+                    "OpenWeatherMap. Pollen requests send coordinates rounded to about 1 km to Google. If you turn on AI, the place " +
+                    "name and weather text go to the AI provider you choose (Claude or your own server), and nothing else. Map tiles " +
                     "come from OpenFreeMap; radar and satellite imagery from NOAA and the Iowa Environmental Mesonet. The aurora forecast " +
                     "is downloaded from NOAA's Space Weather Prediction Center without sending your location. Place search uses " +
                     "your device's built-in geocoder.",
@@ -565,7 +568,7 @@ private fun AboutPage(onBack: () -> Unit) {
             Text(
                 "Map data © OpenStreetMap contributors, © OpenMapTiles. Weather data: NOAA / National Weather Service; Environment and " +
                     "Climate Change Canada; NOAA Regional Climate Centers (ACIS); NOAA Space Weather Prediction Center. Pollen: Google Pollen " +
-                    "API. Activity, mud, foliage, garden, heating, outage, frozen pipe, ice, aurora, sap and burn outlooks are SuperAwesomeMagicalWeather estimates. AI summaries are written by your own AI server.",
+                    "API. Activity, mud, foliage, garden, heating, outage, frozen pipe, ice, aurora, sap and burn outlooks are this app's estimates. AI summaries are written by your own AI server.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -583,17 +586,6 @@ internal fun NavRow(title: String, subtitle: String, onClick: () -> Unit) {
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-    }
-}
-
-@Composable
-private fun ExpandRow(title: String, subtitle: String, open: Boolean, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Icon(if (open) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown, contentDescription = if (open) "Collapse" else "Expand")
     }
 }
 
@@ -621,13 +613,3 @@ private fun Label(text: String) {
 private fun CategoryRow(category: AlertCategory, title: String, subtitle: String, enabled: Set<AlertCategory>, onChange: (AlertCategory, Boolean) -> Unit) =
     CheckRow(title, subtitle, category in enabled) { onChange(category, it) }
 
-private fun activitySeason(a: Activity): String? = when (a) {
-    Activity.SKIING -> "Winter, with reported snow on the ground"
-    Activity.XC_SKIING, Activity.SNOWSHOEING -> "Winter, with 4\"+ of reported snow"
-    Activity.SNOWMOBILING -> "Winter, with 8\"+ of reported snow"
-    Activity.ICE_FISHING -> "Winter, once lakes have likely frozen solid"
-    Activity.SWIMMING -> "Summer (June to mid-September)"
-    Activity.HUNTING -> "Fall and spring turkey seasons"
-    Activity.PADDLING, Activity.OFF_ROADING -> "Hidden while there's snowpack"
-    else -> null
-}

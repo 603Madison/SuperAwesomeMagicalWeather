@@ -78,16 +78,8 @@ object NorthvaneIcons {
         )
     }
 
-    /** A car seen from the front, for the Traffic tab. */
-    val Traffic: ImageVector by lazy {
-        icon(
-            "traffic",
-            "M5,11 L6.6,6.4 A2,2 0 0,1 8.5,5 h7 a2,2 0 0,1 1.9,1.4 L19,11 " +
-                "M4,11 h16 a1,1 0 0,1 1,1 v4 a1,1 0 0,1 -1,1 H4 a1,1 0 0,1 -1,-1 v-4 a1,1 0 0,1 1,-1 z " +
-                "M5.5,17 v2 M18.5,17 v2 M7,14 h1 M16,14 h1",
-            stroked = true,
-        )
-    }
+    /** Two bars: grab here to drag a row. */
+    val DragHandle: ImageVector by lazy { icon("drag", "M5,9.5 h14 M5,14.5 h14", stroked = true) }
 
     /** A flower, for allergies. */
     val Pollen: ImageVector by lazy {

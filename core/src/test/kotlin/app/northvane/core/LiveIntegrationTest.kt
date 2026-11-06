@@ -122,7 +122,7 @@ class LiveIntegrationTest {
     }
 
     @Test
-    fun airQualityUvAndTrafficLive() = runBlocking {
+    fun airQualityAndUvLive() = runBlocking {
         val now = Instant.now()
         val zone = java.time.ZoneId.of("America/New_York")
         val uv = app.northvane.core.air.EpaUvClient(http).forecast("04101", zone, now)
@@ -131,12 +131,7 @@ class LiveIntegrationTest {
         val (air, modelUv) = app.northvane.core.air.OpenMeteoAirClient(http).fetch(app.northvane.core.model.GeoPoint(43.66, -70.26), now)
         println("Open-Meteo AQI ${air.current?.aqi} ${air.current?.pollutant}; days ${air.days.size}; UV max ${modelUv.todayMax}")
         assertNotNull(air.current)
-        val client = app.northvane.core.traffic.TrafficClient(http)
-        val traffic = app.northvane.core.traffic.TrafficService(client)
-            .load("ME", app.northvane.core.model.GeoPoint(43.6591, -70.2568), 40.0, null, { client.registry() }, now)
-        println("Traffic: ${traffic.events.size} events from ${traffic.sources}; issues ${traffic.issues}")
-        traffic.events.take(5).forEach { println("  ${it.type} ${it.road} ${it.direction} ${"%.1f".format(it.distanceKm)} km") }
-        assertTrue(traffic.sources.isNotEmpty())
+        Unit
     }
 
     @Test

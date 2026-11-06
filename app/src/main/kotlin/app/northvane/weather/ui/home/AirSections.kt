@@ -1,5 +1,6 @@
 package app.northvane.weather.ui.home
 
+import app.northvane.weather.ui.components.WeatherCard
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -89,45 +90,42 @@ private fun aqiAdvice(category: AqiCategory): String = when (category) {
 internal fun AirQualitySection(air: AirQuality, time: TimeFormat) {
     val current = air.current
     val category = current?.category ?: air.days.firstOrNull()?.category ?: return
-    Column {
-        SectionTitle("Air quality")
-        AirCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    current?.aqi?.toString() ?: "--",
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = aqiColor(category),
-                )
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(category.label, style = MaterialTheme.typography.titleMedium)
-                    Small(listOfNotNull("AQI", current?.pollutant?.let { pollutantName(it) }, current?.area).joinToString(" · "))
-                }
+    WeatherCard("Air quality") {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                current?.aqi?.toString() ?: "--",
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = aqiColor(category),
+            )
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(category.label, style = MaterialTheme.typography.titleMedium)
+                Small(listOfNotNull("AQI", current?.pollutant?.let { pollutantName(it) }, current?.area).joinToString(" · "))
             }
+        }
+        Spacer(Modifier.height(10.dp))
+        AqiScale(current?.aqi ?: category.max.coerceAtMost(300))
+        Small(aqiAdvice(category), Modifier.padding(top = 8.dp))
+        val ahead = air.days.filter { it.date.isAfter(time.today()) }.take(4)
+        if (ahead.isNotEmpty()) {
             Spacer(Modifier.height(10.dp))
-            AqiScale(current?.aqi ?: category.max.coerceAtMost(300))
-            Small(aqiAdvice(category), Modifier.padding(top = 8.dp))
-            val ahead = air.days.filter { it.date.isAfter(time.today()) }.take(4)
-            if (ahead.isNotEmpty()) {
-                Spacer(Modifier.height(10.dp))
-                Row(Modifier.fillMaxWidth()) {
-                    ahead.forEach { d ->
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                            Text(time.weekday(d.date), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(
-                                d.aqi?.toString() ?: d.category?.label?.substringBefore(' ') ?: "--",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = d.category?.let(::aqiColor) ?: MaterialTheme.colorScheme.onSurface,
-                            )
-                        }
+            Row(Modifier.fillMaxWidth()) {
+                ahead.forEach { d ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                        Text(time.weekday(d.date), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            d.aqi?.toString() ?: d.category?.label?.substringBefore(' ') ?: "--",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = d.category?.let(::aqiColor) ?: MaterialTheme.colorScheme.onSurface,
+                        )
                     }
                 }
             }
-            air.days.firstOrNull { it.actionDay }?.let { Small("Air Quality Action Day ${time.weekday(it.date)}.", Modifier.padding(top = 6.dp)) }
-            air.days.firstOrNull { it.discussion != null }?.discussion?.let { Small(it, Modifier.padding(top = 4.dp)) }
-            Small(air.source.label, Modifier.padding(top = 8.dp))
         }
+        air.days.firstOrNull { it.actionDay }?.let { Small("Air Quality Action Day ${time.weekday(it.date)}.", Modifier.padding(top = 6.dp)) }
+        air.days.firstOrNull { it.discussion != null }?.discussion?.let { Small(it, Modifier.padding(top = 4.dp)) }
+        Small(air.source.label, Modifier.padding(top = 8.dp))
     }
 }
 
@@ -164,33 +162,30 @@ internal fun UvSection(uv: UvForecast, time: TimeFormat) {
     val level = UvLevel.of(current)
     val peak = uv.peak()
     val todayMax = uv.todayMax ?: peak?.index ?: current
-    Column {
-        SectionTitle("UV index")
-        AirCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    current.roundToInt().toString(),
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = uvColor(level),
+    WeatherCard("UV index") {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                current.roundToInt().toString(),
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = uvColor(level),
+            )
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text("${level.label} now", style = MaterialTheme.typography.titleMedium)
+                Small(
+                    "Today's peak ${todayMax.roundToInt()} (${UvLevel.of(todayMax).label.lowercase()})" +
+                        (peak?.let { " around ${time.hour(it.time)}" } ?: ""),
                 )
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("${level.label} now", style = MaterialTheme.typography.titleMedium)
-                    Small(
-                        "Today's peak ${todayMax.roundToInt()} (${UvLevel.of(todayMax).label.lowercase()})" +
-                            (peak?.let { " around ${time.hour(it.time)}" } ?: ""),
-                    )
-                }
             }
-            if (uv.hourly.size > 3) {
-                Spacer(Modifier.height(12.dp))
-                UvBars(uv, now, time)
-            }
-            Small(uvAdvice(todayMax, uv, time), Modifier.padding(top = 8.dp))
-            if (uv.alert) Small("EPA UV Alert: higher than normal UV today.", Modifier.padding(top = 4.dp))
-            Small(uv.source, Modifier.padding(top = 8.dp))
         }
+        if (uv.hourly.size > 3) {
+            Spacer(Modifier.height(12.dp))
+            UvBars(uv, now, time)
+        }
+        Small(uvAdvice(todayMax, uv, time), Modifier.padding(top = 8.dp))
+        if (uv.alert) Small("EPA UV Alert: higher than normal UV today.", Modifier.padding(top = 4.dp))
+        Small(uv.source, Modifier.padding(top = 8.dp))
     }
 }
 
@@ -249,12 +244,20 @@ internal fun AllergyBlock(
     f: UnitFormatter,
     time: TimeFormat,
     onEditAllergies: () -> Unit,
+    onDismissPrompt: (() -> Unit)? = null,
 ) {
     Text("Your allergies", style = MaterialTheme.typography.titleSmall)
     val today = days.firstOrNull()
+    if (hasProfile && today == null) {
+        Small("Your allergy score appears once today's pollen forecast is in.")
+        return
+    }
     if (!hasProfile || today == null) {
-        Small("Tell SuperAwesomeMagicalWeather what you're allergic to (birch, grass, ragweed, mold…) for a daily score of how your allergies will be.")
-        TextButton(onClick = onEditAllergies) { Text("Choose my allergies") }
+        Small("Add what you're allergic to (birch, grass, ragweed, mold…) for a daily allergy score.")
+        Row {
+            TextButton(onClick = onEditAllergies) { Text("Choose my allergies") }
+            if (!hasProfile && onDismissPrompt != null) TextButton(onClick = onDismissPrompt) { Text("Not now") }
+        }
         return
     }
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {

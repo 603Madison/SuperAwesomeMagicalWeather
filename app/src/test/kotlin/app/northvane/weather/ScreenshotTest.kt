@@ -1,5 +1,6 @@
 package app.northvane.weather
 
+import kotlin.test.assertEquals
 import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.runtime.Composable
@@ -33,16 +34,10 @@ import app.northvane.core.model.Allergen
 import app.northvane.core.model.Sensitivity
 import app.northvane.core.model.UvForecast
 import app.northvane.core.model.WeatherCondition
-import app.northvane.core.traffic.LaneImpact
-import app.northvane.core.traffic.TrafficClient
-import app.northvane.core.traffic.TrafficEventType
-import app.northvane.core.traffic.TrafficSnapshot
 import app.northvane.weather.ui.settings.AllergiesScreen
 import app.northvane.weather.ui.settings.ThemesScreen
 import app.northvane.weather.ui.theme.AppTheme
 import app.northvane.weather.ui.theme.ThemeWeather
-import app.northvane.weather.ui.traffic.TrafficEventList
-import app.northvane.weather.ui.traffic.TrafficUiState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -315,29 +310,6 @@ class ScreenshotTest {
     }
 
     @Test
-    @Config(qualifiers = "w400dp-h1800dp-xxhdpi")
-    fun trafficList() {
-        val events = TrafficClient.parseWzdx(resource("wzdx.json"), location.point, 40.0, Instant.parse("2026-10-29T18:00:00Z"), "NHDOT/VTAOT/MEDOT")
-        val crash = events.first().copy(
-            id = "crash", type = TrafficEventType.CRASH, road = "I-295", direction = "northbound",
-            description = "Crash blocking the right lane near Exit 7.", impact = LaneImpact.SOME_CLOSED,
-            start = Instant.now().minusSeconds(1200), end = null, distanceKm = 1.4, source = "New England 511",
-        )
-        val snapshot = TrafficSnapshot(
-            listOf(crash) + events.map { it.copy(end = it.end?.let { e -> maxOf(e, Instant.now().plusSeconds(86400)) }) },
-            listOf("NHDOT/VTAOT/MEDOT (WZDx)", "New England 511"), Instant.now(),
-        )
-        val zone = java.time.ZoneId.of("America/New_York")
-        render(dark = false) {
-            TrafficEventList(
-                TrafficUiState(snapshot = snapshot, hasNe511Key = true), UnitSystem.IMPERIAL, "ME",
-                app.northvane.weather.ui.TimeFormat(zone, false), onFocus = {},
-            )
-        }
-        save("traffic_list")
-    }
-
-    @Test
     fun locationsWithNicknames() {
         val container = AppContainer(ApplicationProvider.getApplicationContext())
         val vm = MainViewModel(container)
@@ -494,23 +466,34 @@ class ScreenshotTest {
         save("outlook_water")
     }
 
-    /** The home-screen widget, drawn by Android from its RemoteViews at its default size. */
+    /** The largest system font size: nothing on Today should clip or overlap. */
+    @Test
+    @Config(qualifiers = "w400dp-h2400dp-xxhdpi", fontScale = 1.6f)
+    fun todayLargeFont() {
+        render(dark = false) { HomeScreen(state(withStormSmokeAndWater(snapshot())), noActions, {}, {}, {}) }
+        save("today_large_font")
+    }
+
+    /** The home-screen widget in its three sizes, drawn by Android from its RemoteViews. */
     @Test
     fun homeScreenWidget() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val st = state(withStormSmokeAndWater(snapshot()))
-        val views = app.northvane.weather.widget.WeatherWidget.render(context, 250, 140, location, st.snapshot, st.settings)
-        val parent = android.widget.FrameLayout(context)
-        val view = views.apply(context, parent)
-        val density = context.resources.displayMetrics.density
-        val w = (250 * density).toInt()
-        val h = (140 * density).toInt()
-        view.measure(android.view.View.MeasureSpec.makeMeasureSpec(w, android.view.View.MeasureSpec.EXACTLY), android.view.View.MeasureSpec.makeMeasureSpec(h, android.view.View.MeasureSpec.EXACTLY))
-        view.layout(0, 0, w, h)
-        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        view.draw(android.graphics.Canvas(bitmap))
         val dir = File("build/outputs/screenshots").apply { mkdirs() }
-        File(dir, "widget.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        listOf(Triple("widget_small", 130, 60), Triple("widget", 250, 140), Triple("widget_large", 320, 220)).forEach { (name, wDp, hDp) ->
+            val views = app.northvane.weather.widget.WeatherWidget.render(context, wDp, hDp, location, st.snapshot, st.settings)
+            val view = views.apply(context, android.widget.FrameLayout(context))
+            val density = context.resources.displayMetrics.density
+            val w = (wDp * density).toInt()
+            val h = (hDp * density).toInt()
+            view.measure(android.view.View.MeasureSpec.makeMeasureSpec(w, android.view.View.MeasureSpec.EXACTLY), android.view.View.MeasureSpec.makeMeasureSpec(h, android.view.View.MeasureSpec.EXACTLY))
+            view.layout(0, 0, w, h)
+            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            view.draw(android.graphics.Canvas(bitmap))
+            File(dir, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        }
+        assertEquals(app.northvane.weather.widget.WeatherWidget.Companion.Size.SMALL, app.northvane.weather.widget.WeatherWidget.sizeFor(110, 60))
+        assertEquals(app.northvane.weather.widget.WeatherWidget.Companion.Size.LARGE, app.northvane.weather.widget.WeatherWidget.sizeFor(320, 220))
     }
 
     /** Demo only: a cold snap on the second day with black ice that morning and a hard freeze that night. */
@@ -596,7 +579,7 @@ class ScreenshotTest {
     @Config(qualifiers = "w400dp-h3000dp-xxhdpi")
     fun outlookTab() {
         val st = state()
-        val settings = st.settings.copy(mudEnabled = true, dryingEnabled = true)
+        val settings = st.settings.copy(dryingEnabled = true)
         render(dark = false) { OutlookScreen(st.copy(settings = settings), {}, {}, {}, {}) }
         save("outlook_tab")
     }

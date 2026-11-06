@@ -1,5 +1,6 @@
 package app.northvane.weather.ui.home
 
+import app.northvane.weather.ui.components.WeatherCard
 import app.northvane.ui.WeatherIcon
 import app.northvane.ui.TemperatureRange
 import androidx.compose.animation.animateContentSize
@@ -99,7 +100,9 @@ internal fun HourlySection(
     val compact = setOf(HourRow.TIME, HourRow.ICON, HourRow.TEMP, HourRow.PRECIP)
     val rows = HourRow.entries.filter { expanded || it in compact }.filter { r ->
         when (r) {
-            HourRow.TIME, HourRow.ICON, HourRow.TEMP, HourRow.PRECIP -> true
+            HourRow.TIME, HourRow.ICON, HourRow.TEMP -> true
+            // A row of 1%s is noise: only shown when some hour has a real chance.
+            HourRow.PRECIP -> shown.any { (it.precipitationChance ?: 0) >= 20 }
             HourRow.FEELS -> shown.any { h -> h.apparentTemperatureC != null && h.temperatureC != null }
             HourRow.AMOUNT -> shown.any { (it.precipitationMm ?: 0.0) >= 0.05 || (it.snowMm ?: 0.0) >= 1.0 }
             HourRow.WIND -> shown.any { it.windSpeedKph != null }
@@ -110,39 +113,31 @@ internal fun HourlySection(
         }
     }
     val secondary = MaterialTheme.colorScheme.onSurfaceVariant
-    Column {
-        SectionTitle("Hourly")
-        Card(
-            onClick = { onToggle(!expanded) },
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-            modifier = Modifier.animateContentSize(),
-        ) {
-            Row(Modifier.padding(top = 10.dp)) {
-                // Row labels, fixed on the left while the hours scroll.
-                Column(Modifier.padding(start = 14.dp, end = 4.dp).width(70.dp)) {
-                    rows.forEach { r ->
-                        Box(Modifier.height(r.height.dp), contentAlignment = Alignment.CenterStart) {
-                            val label = if (r == HourRow.WIND || r == HourRow.GUST) "${r.label} ${f.windUnit}" else r.label
-                            if (label.isNotEmpty()) Text(label, style = MaterialTheme.typography.labelSmall, color = secondary, maxLines = 1)
-                        }
-                    }
-                }
-                LazyRow(contentPadding = PaddingValues(end = 8.dp)) {
-                    items(shown, key = { it.time.toEpochMilli() }) { hour ->
-                        val isNow = hour == shown.first() && hour.time.isBefore(Instant.now())
-                        HourColumn(hour, rows, if (isNow) "Now" else time.hour(hour.time), f)
+    WeatherCard("Hourly", inset = false, onClick = { onToggle(!expanded) }, modifier = Modifier.animateContentSize()) {
+        Row {
+            // Row labels, fixed on the left while the hours scroll.
+            Column(Modifier.padding(start = 14.dp, end = 4.dp).width(70.dp)) {
+                rows.forEach { r ->
+                    Box(Modifier.height(r.height.dp), contentAlignment = Alignment.CenterStart) {
+                        val label = if (r == HourRow.WIND || r == HourRow.GUST) "${r.label} ${f.windUnit}" else r.label
+                        if (label.isNotEmpty()) Text(label, style = MaterialTheme.typography.labelSmall, color = secondary, maxLines = 1)
                     }
                 }
             }
-            Text(
-                if (expanded) "Tap for less" else "Tap for wind, humidity, clouds and more",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 10.dp),
-            )
+            LazyRow(contentPadding = PaddingValues(end = 8.dp)) {
+                items(shown, key = { it.time.toEpochMilli() }) { hour ->
+                    val isNow = hour == shown.first() && hour.time.isBefore(Instant.now())
+                    HourColumn(hour, rows, if (isNow) "Now" else time.hour(hour.time), f)
+                }
+            }
         }
+        Text(
+            if (expanded) "Tap for less" else "Tap for wind, humidity, clouds and more",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 10.dp),
+        )
     }
 }
 
@@ -242,98 +237,92 @@ internal fun DailySection(
     val temps = days.flatMap { listOfNotNull(it.lowC, it.highC) }
     val min = temps.minOrNull() ?: 0.0
     val max = temps.maxOrNull() ?: 1.0
-    Column {
-        SectionTitle("${days.size}-day forecast")
-        Card(
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        ) {
-            Column(Modifier.padding(vertical = 4.dp)) {
-                days.forEachIndexed { index, day ->
-                    val key = day.date.toString()
-                    val isOpen = expanded == key
-                    // No panel on days with nothing that could knock the power out.
-                    val outage = day.outageRisk?.takeIf { showOutage && it.hasRisk }
-                    val pipes = day.pipeRisk?.takeIf { showPipes }
-                    val ice = day.morningIce?.takeIf { showIce }
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { expanded = if (isOpen) null else key }
-                            .animateContentSize()
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Row(Modifier.width(80.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    if (day.highC == null && index == 0) day.name else time.dayName(day.date),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                )
-                                if (outage != null && outage.level >= OutageLevel.ELEVATED) {
-                                    Spacer(Modifier.width(4.dp))
-                                    PowerGlyph(outageColor(outage.level), Modifier.size(14.dp))
-                                }
-                                // One cold-weather mark: black ice first, then serious pipe risk.
-                                if (ice?.blackIce != null) {
-                                    Spacer(Modifier.width(3.dp))
-                                    IceGlyph(iceColor(ice), Modifier.size(12.dp))
-                                } else if (pipes != null && pipes.level >= OutageLevel.HIGH) {
-                                    Spacer(Modifier.width(3.dp))
-                                    DropGlyph(outageColor(pipes.level), Modifier.size(12.dp))
-                                }
-                            }
-                            WeatherIcon(day.condition, day.isDaytimeCondition, size = 30.dp)
+    WeatherCard("${days.size}-day forecast", inset = false) {
+        Column {
+            days.forEachIndexed { index, day ->
+                val key = day.date.toString()
+                val isOpen = expanded == key
+                // No panel on days with nothing that could knock the power out.
+                val outage = day.outageRisk?.takeIf { showOutage && it.hasRisk }
+                val pipes = day.pipeRisk?.takeIf { showPipes }
+                val ice = day.morningIce?.takeIf { showIce }
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { expanded = if (isOpen) null else key }
+                        .animateContentSize()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.width(80.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                day.precipitationChance?.takeIf { it >= 10 }?.let { "$it%" } ?: "",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = RainBlue,
-                                textAlign = TextAlign.End,
-                                modifier = Modifier.width(40.dp),
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                f.temperature(day.lowC),
+                                if (day.highC == null && index == 0) day.name else time.dayName(day.date),
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.End,
-                                modifier = Modifier.width(40.dp),
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
                             )
-                            TemperatureRange(day.lowC, day.highC, min, max, Modifier.weight(1f).padding(horizontal = 10.dp))
-                            Text(
-                                f.temperature(day.highC),
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.width(40.dp),
-                            )
-                        }
-                        if (isOpen) {
-                            Spacer(Modifier.height(12.dp))
-                            DayDetails(day, f)
-                            Spacer(Modifier.height(10.dp))
-                            day.dayDetail?.let { DetailParagraph("Day", it) }
-                            day.nightDetail?.let { DetailParagraph("Night", it) }
-                            if (day.dayDetail == null && day.nightDetail == null) {
-                                day.shortForecast?.let { DetailParagraph(null, it) }
+                            if (outage != null && outage.level >= OutageLevel.ELEVATED) {
+                                Spacer(Modifier.width(4.dp))
+                                PowerGlyph(outageColor(outage.level), Modifier.size(14.dp))
                             }
-                            outage?.let {
-                                Spacer(Modifier.height(4.dp))
-                                OutagePanel(it, f, heatTypes)
-                            }
-                            ice?.let {
-                                Spacer(Modifier.height(8.dp))
-                                IcePanel(it, f, time)
-                            }
-                            pipes?.let {
-                                Spacer(Modifier.height(8.dp))
-                                PipePanel(it, f, heatTypes)
+                            // One cold-weather mark: black ice first, then serious pipe risk.
+                            if (ice?.blackIce != null) {
+                                Spacer(Modifier.width(3.dp))
+                                IceGlyph(iceColor(ice), Modifier.size(12.dp))
+                            } else if (pipes != null && pipes.level >= OutageLevel.HIGH) {
+                                Spacer(Modifier.width(3.dp))
+                                DropGlyph(outageColor(pipes.level), Modifier.size(12.dp))
                             }
                         }
+                        WeatherIcon(day.condition, day.isDaytimeCondition, size = 30.dp)
+                        Text(
+                            day.precipitationChance?.takeIf { it >= 10 }?.let { "$it%" } ?: "",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = RainBlue,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.width(40.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            f.temperature(day.lowC),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.width(40.dp),
+                        )
+                        TemperatureRange(day.lowC, day.highC, min, max, Modifier.weight(1f).padding(horizontal = 10.dp))
+                        Text(
+                            f.temperature(day.highC),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.width(40.dp),
+                        )
                     }
-                    if (index < days.lastIndex) {
-                        HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    if (isOpen) {
+                        Spacer(Modifier.height(12.dp))
+                        DayDetails(day, f)
+                        Spacer(Modifier.height(10.dp))
+                        day.dayDetail?.let { DetailParagraph("Day", it) }
+                        day.nightDetail?.let { DetailParagraph("Night", it) }
+                        if (day.dayDetail == null && day.nightDetail == null) {
+                            day.shortForecast?.let { DetailParagraph(null, it) }
+                        }
+                        outage?.let {
+                            Spacer(Modifier.height(4.dp))
+                            OutagePanel(it, f, heatTypes)
+                        }
+                        ice?.let {
+                            Spacer(Modifier.height(8.dp))
+                            IcePanel(it, f, time)
+                        }
+                        pipes?.let {
+                            Spacer(Modifier.height(8.dp))
+                            PipePanel(it, f, heatTypes)
+                        }
                     }
+                }
+                if (index < days.lastIndex) {
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
         }
@@ -513,95 +502,88 @@ internal fun SunCard(location: SavedLocation, zone: ZoneId, time: TimeFormat) {
         null
     }
 
-    Column {
-        SectionTitle("Sun")
-        Card(
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(Modifier.padding(16.dp)) {
-                val headline = when {
-                    rise == null || set == null -> if (Solar.isDaylight(location.latitude, location.longitude, now)) "Sun up all day" else "Sun down all day"
-                    now.isBefore(rise) -> "Sunrise in ${span(Duration.between(now, rise))}"
-                    now.isBefore(set) -> "Sunset in ${span(Duration.between(now, set))}"
-                    tomorrowRise != null -> "Sunrise in ${span(Duration.between(now, tomorrowRise))}"
-                    else -> "After sunset"
+    WeatherCard("Sun", inset = false) {
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
+            val headline = when {
+                rise == null || set == null -> if (Solar.isDaylight(location.latitude, location.longitude, now)) "Sun up all day" else "Sun down all day"
+                now.isBefore(rise) -> "Sunrise in ${span(Duration.between(now, rise))}"
+                now.isBefore(set) -> "Sunset in ${span(Duration.between(now, set))}"
+                tomorrowRise != null -> "Sunrise in ${span(Duration.between(now, tomorrowRise))}"
+                else -> "After sunset"
+            }
+            Text(headline, style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            // Easter egg: long-press the sun and it puts on sunglasses.
+            var cool by remember { mutableStateOf(false) }
+            LaunchedEffect(cool) {
+                if (cool) {
+                    delay(4_000)
+                    cool = false
                 }
-                Text(headline, style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(8.dp))
-                // Easter egg: long-press the sun and it puts on sunglasses.
-                var cool by remember { mutableStateOf(false) }
-                LaunchedEffect(cool) {
-                    if (cool) {
-                        delay(4_000)
-                        cool = false
-                    }
-                }
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(96.dp)
-                        .pointerInput(Unit) { detectTapGestures(onLongPress = { cool = true }) },
-                ) {
-                    Canvas(Modifier.matchParentSize()) {
-                        val pad = 18.dp.toPx()
-                        val baseY = size.height - 10.dp.toPx()
-                        val rx = (size.width - 2 * pad) / 2
-                        val ry = baseY - 12.dp.toPx()
-                        val cx = size.width / 2
-                        val topLeft = Offset(cx - rx, baseY - ry)
-                        val arcSize = Size(2 * rx, 2 * ry)
-                        drawLine(horizonColor, Offset(0f, baseY), Offset(size.width, baseY), strokeWidth = 1.dp.toPx())
+            }
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(96.dp)
+                    .pointerInput(Unit) { detectTapGestures(onLongPress = { cool = true }) },
+            ) {
+                Canvas(Modifier.matchParentSize()) {
+                    val pad = 18.dp.toPx()
+                    val baseY = size.height - 10.dp.toPx()
+                    val rx = (size.width - 2 * pad) / 2
+                    val ry = baseY - 12.dp.toPx()
+                    val cx = size.width / 2
+                    val topLeft = Offset(cx - rx, baseY - ry)
+                    val arcSize = Size(2 * rx, 2 * ry)
+                    drawLine(horizonColor, Offset(0f, baseY), Offset(size.width, baseY), strokeWidth = 1.dp.toPx())
+                    drawArc(
+                        trackColor, 180f, 180f, false, topLeft, arcSize,
+                        style = Stroke(width = 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))),
+                    )
+                    if (fraction != null) {
+                        // Cover the dashed track where the sun has already been.
+                        drawArc(cardColor, 180f, 180f * fraction, false, topLeft, arcSize, style = Stroke(width = 5.dp.toPx()))
                         drawArc(
-                            trackColor, 180f, 180f, false, topLeft, arcSize,
-                            style = Stroke(width = 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))),
+                            Brush.horizontalGradient(listOf(sunColor.copy(alpha = 0.75f), sunColor)),
+                            180f, 180f * fraction, false, topLeft, arcSize,
+                            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round),
                         )
-                        if (fraction != null) {
-                            // Cover the dashed track where the sun has already been.
-                            drawArc(cardColor, 180f, 180f * fraction, false, topLeft, arcSize, style = Stroke(width = 5.dp.toPx()))
-                            drawArc(
-                                Brush.horizontalGradient(listOf(sunColor.copy(alpha = 0.75f), sunColor)),
-                                180f, 180f * fraction, false, topLeft, arcSize,
-                                style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round),
-                            )
-                            val angle = Math.PI * (1 - fraction)
-                            val sun = Offset(cx + (rx * cos(angle)).toFloat(), baseY - (ry * sin(angle)).toFloat())
-                            drawCircle(sunColor.copy(alpha = 0.25f), 14.dp.toPx(), sun)
-                            drawCircle(sunColor, 8.dp.toPx(), sun)
-                            if (cool) {
-                                // Tiny sunglasses: two lenses and a bridge.
-                                val lens = 3.6.dp.toPx()
-                                drawCircle(Color(0xFF1B1B1B), lens, Offset(sun.x - lens * 1.15f, sun.y - 1.dp.toPx()))
-                                drawCircle(Color(0xFF1B1B1B), lens, Offset(sun.x + lens * 1.15f, sun.y - 1.dp.toPx()))
-                                drawLine(Color(0xFF1B1B1B), Offset(sun.x - lens * 0.3f, sun.y - 2.dp.toPx()), Offset(sun.x + lens * 0.3f, sun.y - 2.dp.toPx()), 1.5.dp.toPx())
-                            }
-                        } else {
-                            // Night: the sun waits on the horizon at the sunrise end.
-                            drawCircle(trackColor, 4.dp.toPx(), Offset(cx - rx, baseY))
-                            drawCircle(trackColor, 4.dp.toPx(), Offset(cx + rx, baseY))
-                        }
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.Top) {
-                    SunLabel("Sunrise", rise?.let(time::time) ?: "--", Alignment.Start, Modifier.weight(1f))
-                    val length = if (rise != null && set != null) Duration.between(rise, set) else null
-                    val yLength = if (yRise != null && ySet != null) Duration.between(yRise, ySet) else null
-                    val change = if (length != null && yLength != null) {
-                        val delta = length.seconds - yLength.seconds
-                        val minutes = (abs(delta) / 60.0).roundToInt()
-                        when {
-                            minutes == 0 -> "same as yesterday"
-                            delta > 0 -> "+$minutes min vs yesterday"
-                            else -> "−$minutes min vs yesterday"
+                        val angle = Math.PI * (1 - fraction)
+                        val sun = Offset(cx + (rx * cos(angle)).toFloat(), baseY - (ry * sin(angle)).toFloat())
+                        drawCircle(sunColor.copy(alpha = 0.25f), 14.dp.toPx(), sun)
+                        drawCircle(sunColor, 8.dp.toPx(), sun)
+                        if (cool) {
+                            // Tiny sunglasses: two lenses and a bridge.
+                            val lens = 3.6.dp.toPx()
+                            drawCircle(Color(0xFF1B1B1B), lens, Offset(sun.x - lens * 1.15f, sun.y - 1.dp.toPx()))
+                            drawCircle(Color(0xFF1B1B1B), lens, Offset(sun.x + lens * 1.15f, sun.y - 1.dp.toPx()))
+                            drawLine(Color(0xFF1B1B1B), Offset(sun.x - lens * 0.3f, sun.y - 2.dp.toPx()), Offset(sun.x + lens * 0.3f, sun.y - 2.dp.toPx()), 1.5.dp.toPx())
                         }
                     } else {
-                        null
+                        // Night: the sun waits on the horizon at the sunrise end.
+                        drawCircle(trackColor, 4.dp.toPx(), Offset(cx - rx, baseY))
+                        drawCircle(trackColor, 4.dp.toPx(), Offset(cx + rx, baseY))
                     }
-                    SunLabel("Daylight", length?.let(::span) ?: "--", Alignment.CenterHorizontally, Modifier.weight(1f), change)
-                    SunLabel("Sunset", set?.let(time::time) ?: "--", Alignment.End, Modifier.weight(1f))
                 }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.Top) {
+                SunLabel("Sunrise", rise?.let(time::time) ?: "--", Alignment.Start, Modifier.weight(1f))
+                val length = if (rise != null && set != null) Duration.between(rise, set) else null
+                val yLength = if (yRise != null && ySet != null) Duration.between(yRise, ySet) else null
+                val change = if (length != null && yLength != null) {
+                    val delta = length.seconds - yLength.seconds
+                    val minutes = (abs(delta) / 60.0).roundToInt()
+                    when {
+                        minutes == 0 -> "same as yesterday"
+                        delta > 0 -> "+$minutes min vs yesterday"
+                        else -> "−$minutes min vs yesterday"
+                    }
+                } else {
+                    null
+                }
+                SunLabel("Daylight", length?.let(::span) ?: "--", Alignment.CenterHorizontally, Modifier.weight(1f), change)
+                SunLabel("Sunset", set?.let(time::time) ?: "--", Alignment.End, Modifier.weight(1f))
             }
         }
     }

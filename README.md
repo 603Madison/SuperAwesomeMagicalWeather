@@ -12,6 +12,7 @@ Weather Service data. No accounts, no analytics, no built-in API keys.
 <img src="docs/screenshots/warning.png" width="200" alt="Today screen turned red during a Winter Storm Warning">
 <img src="docs/screenshots/outlook.png" width="200" alt="Outlook tab with outdoor activity scores and garden">
 <img src="docs/screenshots/ai_cards.png" width="200" alt="Forecasters' notes and a forecast question, written by AI">
+<img src="docs/screenshots/widget.png" width="260" alt="Large home-screen widget with the headline and the next five hours">
 </p>
 
 - **Forecasts with real numbers**: hourly and 7-day, with gusts, rain and snow
@@ -79,10 +80,12 @@ Each card can be turned on or off in Settings. The last column is the default.
 
 | Feature | What it shows | Default |
 |---|---|---|
-| **Current conditions** | From your WeeWX station if one is nearby, otherwise the nearest NWS observation | On |
+| **Current conditions** | From your WeeWX station if one is nearby, otherwise the nearest NWS observation; tap **Details** for humidity, dew point, pressure and more | On |
+| **Headline** | One or two sentences under the temperature on what matters next: "Rain in about 20 min", "Snow from 3 PM, about 4 in", gusts, frost after a mild day, a big change tomorrow | On |
+| **At a glance** | Air quality, UV, pollen and sunset as small chips; tap one for its full card. Each becomes a full card by itself when it matters (AQI over 50, UV 6 or more, high pollen) | On |
 | **Hourly** | Temperature and rain chance at a glance; tap for wind, gusts, humidity, dew point and clouds over 36 hours | On |
 | **7-day** | Tap a day for wind, rain and snow totals, humidity, cloud cover and thunder chance | On |
-| **Sun** | The sun's path, time to sunset or sunrise, and day length | On |
+| **Sun** | The sun's path, time to sunset or sunrise, and day length (tap the sunset chip) | On |
 | **Air quality** | AQI with a 4-day outlook, from EPA AirNow (free key) or Open-Meteo | On |
 | **UV index** | Today's peak and an hourly chart, from the EPA | On |
 | **Allergy score** | A personal daily score from your allergens, pollen, mold and air quality | On |
@@ -100,15 +103,16 @@ On the Alerts tab, **Explain** rewrites an alert in plain words for your place (
 
 When an NWS **warning** is in effect, the Today screen turns red.
 
+Every card has a **⋮** menu to move it up or down, hide it (with undo) or open its settings, and Settings › Today screen lists all the cards: long-press and drag to reorder.
+
 ### Outlook tab
 
-Planning cards, each shown only when it's in season.
+Planning cards in three groups (Outdoors, Home and Seasonal), each shown only when it's in season.
 
 | Feature | What it shows | Default |
 |---|---|---|
-| **Outdoor activities** | Daily 0–100 scores with tips for hiking, camping, biking, paddling and stargazing, plus seasonal ones like skiing, ice fishing, swimming and hunting | On |
+| **Outdoor activities** | The best hours to go today and tomorrow ("Best 1–4 PM · dry, 59°"), a 0–100 score and what decides it, for the activities you pick on the tab (hiking, biking, paddling and stargazing to start; also camping, skiing, ice fishing, swimming, hunting and more). Trail mud counts for hiking and biking | On |
 | **Fall foliage** | Estimated color stage and peak for your spot | On |
-| **Trail mud** | A daily mud level, including spring mud season | Off |
 | **Clothes drying** | The best line-drying window, and a "my laundry is out" rain watch | Off |
 | **Garden** | Planting and harvest dates from your local frost dates, frost warnings and watering advice | Off |
 | **Heating** | Which heat source to run each day, and chores like buying oil or stacking wood | Off |
@@ -140,13 +144,7 @@ Planning cards, each shown only when it's in season.
 |---|---|---|
 | **Morning briefing** | Today's forecast in a few sentences, once a day at the time you pick | Off |
 | **Rain starting soon** | A heads-up up to an hour before rain or snow starts, from a 15-minute forecast (never 10 PM–6 AM) | Off |
-| **Home-screen widget** | Temperature, conditions, high and low and the next rain for the place on your Today screen, on its sky colors | Add it from your home screen |
-
-### Traffic tab
-
-Work zones from state DOT feeds, crashes and closures from New England 511, and
-optional live speeds from TomTom (your own free key), on a map and in a list
-sorted by distance.
+| **Home-screen widget** | Three sizes: small (temperature), medium (conditions, high and low, the headline) and large (plus the next five hours). Sky colors, or your wallpaper's colors with a dynamic theme | Add it from your home screen |
 
 ### Backwoods mode
 
@@ -164,7 +162,6 @@ follow the system, and °F or °C.
 
 <p>
 <img src="docs/screenshots/alerts.png" width="200" alt="Alerts tab in dark mode">
-<img src="docs/screenshots/traffic.png" width="200" alt="Traffic events near Portland, ME">
 <img src="docs/screenshots/themes.png" width="200" alt="Theme picker">
 <img src="docs/screenshots/weewx_dark.png" width="200" alt="Dark theme with a local WeeWX station">
 </p>
@@ -179,8 +176,6 @@ stored encrypted on the phone.
 | [WeeWX](weewx/README.md) station | Your own current conditions for places near it | Free (your station) |
 | Google Pollen API | Pollen by plant | Free for typical use: 5,000 requests a month free, and the app uses about 124 per place |
 | EPA AirNow | Official air quality forecasts | Free key |
-| New England 511 | Crashes and closures | Free key |
-| TomTom | Live traffic speeds | Free tier |
 | OpenWeatherMap | A fallback where NWS and Environment Canada don't reach | Free tier |
 | Claude (Anthropic) or your own AI server | Forecasters' notes, alert explanations and questions | Claude: billed per use to your Anthropic account. Your own server: free |
 
@@ -250,9 +245,8 @@ keyPassword=…
 - Wildfire smoke: NOAA HRRR smoke model via NOAA Open Data on AWS (public domain).
 - Rivers: USGS Water Data (public domain). Tides and coastal water temperature: NOAA Tides & Currents (public domain).
 - Satellite imagery: NOAA nowCOAST (GOES-East/West).
-- Work zones: state DOT WZDx feeds via the USDOT registry. Incidents: New England 511.
 - Basemap: OpenFreeMap; © OpenMapTiles; © OpenStreetMap contributors.
-- Optional, with your own keys: Google Pollen API, TomTom, OpenWeatherMap.
+- Optional, with your own keys: Google Pollen API, OpenWeatherMap, and Claude (Anthropic) for the AI features.
 - Activity, mud, foliage, outage, frozen pipe, ice, aurora, sap and burn
   outlooks are the app's own estimates, not official forecasts.
 

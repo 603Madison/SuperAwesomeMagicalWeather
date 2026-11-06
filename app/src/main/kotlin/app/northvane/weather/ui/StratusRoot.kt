@@ -2,6 +2,7 @@
 
 package app.northvane.weather.ui
 
+import app.northvane.weather.data.TodayCard
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -19,7 +20,6 @@ import app.northvane.weather.ui.settings.GardenScreen
 import app.northvane.weather.ui.settings.HeatingScreen
 import app.northvane.weather.ui.theme.LocalBackdrop
 import app.northvane.weather.ui.theme.LocalIsDark
-import app.northvane.weather.ui.traffic.TrafficScreen
 import app.northvane.weather.ui.outlook.OutlookScreen
 import app.northvane.weather.ui.outlook.hasOutlookFeatures
 import app.northvane.weather.ui.components.StormChaser
@@ -80,7 +80,6 @@ object Routes {
     const val LOCATIONS = "locations"
     const val SETTINGS = "settings"
     const val SOURCES = "sources"
-    const val TRAFFIC = "traffic"
     const val ALLERGIES = "allergies"
     const val THEMES = "themes"
     const val GARDEN = "garden"
@@ -94,7 +93,6 @@ private val tabs = listOf(
     Tab(Routes.TODAY, "Today", Icons.Filled.Home),
     Tab(Routes.RADAR, "Radar", NorthvaneIcons.Radar),
     Tab(Routes.OUTLOOK, "Outlook", NorthvaneIcons.Pollen),
-    Tab(Routes.TRAFFIC, "Traffic", NorthvaneIcons.Traffic),
     Tab(Routes.ALERTS, "Alerts", Icons.Filled.Warning),
 )
 
@@ -116,7 +114,7 @@ fun NorthvaneRoot(
     val backStackEntry by navController.currentBackStackEntryAsState()
     val route = backStackEntry?.destination?.route
     val request by navRequests.collectAsStateWithLifecycle()
-    val homeActions = remember(vm) {
+    val homeActions = remember(vm, navController) {
         HomeActions(
             refresh = { vm.refresh() },
             selectLocation = vm::selectLocation,
@@ -128,6 +126,15 @@ fun NorthvaneRoot(
             laundryOut = vm::laundryOut,
             markPlanted = vm::markPlanted,
             refreshDiscussion = vm::refreshDiscussion,
+            moveCard = vm::moveCard,
+            setCardShown = vm::setCardShown,
+            openCardSettings = { card ->
+                val page = if (card == TodayCard.FORECASTERS || card == TodayCard.ASK) SettingsPage.AI else SettingsPage.TODAY
+                navController.navigate("${Routes.SETTINGS}/${page.route}")
+            },
+            dismissAllergyPrompt = vm::dismissAllergyPrompt,
+            setUnits = vm::setUnits,
+            setInterest = vm::setInterest,
             ask = vm::ask,
             clearAnswer = vm::clearAnswer,
             ignoreRestrictedData = { vm.setFollowRestrictedData(false) },
@@ -165,13 +172,8 @@ fun NorthvaneRoot(
     // (unless the user chose to see stale data).
     val settings = state.settings
     val hideStale = state.liteMode && !settings.showStaleData
-    val trafficAge = remember(state.selected?.id, state.network, hideStale) {
-        state.selected?.let { container.trafficCache.age(it.id) }
-    }
     val visibleTabs = tabs.filter { tab ->
         when (tab.route) {
-            Routes.TRAFFIC -> settings.trafficEnabled && !(hideStale && SatelliteFeature.TRAFFIC !in settings.satelliteFeatures &&
-                (trafficAge == null || trafficAge > MainUiState.STALE_AFTER))
             Routes.RADAR -> !(hideStale && SatelliteFeature.RADAR !in settings.satelliteFeatures)
             Routes.ALERTS -> !(hideStale && SatelliteFeature.ALERTS !in settings.satelliteFeatures && !state.shows(Section.ALERTS))
             Routes.OUTLOOK -> settings.hasOutlookFeatures()
@@ -247,10 +249,8 @@ fun NorthvaneRoot(
                     onOpenHeating = { navController.navigate(Routes.HEATING) },
                     onLaundry = vm::laundryOut,
                     onMarkPlanted = vm::markPlanted,
+                    onSetActivity = vm::setActivity,
                 )
-            }
-            composable(Routes.TRAFFIC) {
-                TrafficScreen(state = state, container = container, onOpenSettings = { navController.navigate(Routes.SETTINGS) })
             }
             composable(Routes.ALLERGIES) {
                 AllergiesScreen(state = state, container = container, onBack = { navController.popBackStack() })

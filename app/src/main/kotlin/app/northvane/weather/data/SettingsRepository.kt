@@ -39,6 +39,9 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 /** When to apply satellite limits: automatically on satellite/constrained networks, always, or never. */
 enum class DataSaverMode { AUTO, ALWAYS, OFF }
 
+/** The activities on the Outlook tab until the user picks their own. */
+val DEFAULT_ACTIVITIES: Set<Activity> = setOf(Activity.HIKING, Activity.MOUNTAIN_BIKING, Activity.PADDLING, Activity.STARGAZING)
+
 /**
  * Everything that can be individually allowed or blocked while on a satellite
  * (or otherwise limited) connection. Sizes are typical compressed transfers.
@@ -57,7 +60,6 @@ enum class SatelliteFeature(val title: String, val description: String, val appr
     FUTURE_CAST("Radar future cast", "NOAA HRRR model radar, about 490 KB per 15 minutes ahead", "4–5 MB per view", false),
     SATELLITE_IMAGERY("Satellite imagery", "GOES cloud imagery under the radar", "0.3–2 MB per view", false),
     AIR_QUALITY("Air quality & UV", "AQI (EPA AirNow or Open-Meteo) and EPA UV index; at most every 30 minutes", "~3 KB", true),
-    TRAFFIC("Traffic events", "Work zones, closures and incidents from state DOT feeds", "50–700 KB per view", false),
     GARDEN_CLIMATE("Garden & heating frost dates", "30 years of NOAA lows, downloaded once per place", "~40 KB once", true),
     AURORA("Aurora forecast", "NOAA's geomagnetic forecast for the aurora card; at most every 3 hours", "~7 KB", false),
     SMOKE("Wildfire smoke", "NOAA HRRR smoke forecast for the next day; at most every 6 hours", "~2 MB", false),
@@ -65,7 +67,6 @@ enum class SatelliteFeature(val title: String, val description: String, val appr
     RAIN_SOON("Rain-starting checks", "15-minute rain forecast for \"rain starting soon\" notifications", "~1 KB per check", true),
     // Stored by name, so the original name stays.
     AI_SUMMARY("AI features", "Forecasters' notes, alert explanations and questions, sent to your AI provider", "~3–20 KB each", false),
-    TRAFFIC_FLOW("Traffic speed map", "TomTom flow tiles on the traffic map, if you've added a key", "0.3–1 MB per view", false),
     OWM_FALLBACK("OpenWeatherMap fallback", "Only if enabled in Data sources", "~5 KB", false);
 
     companion object {
@@ -111,8 +112,7 @@ data class AppSettings(
     val burnEnabled: Boolean = false,
     val pollenEnabled: Boolean = false,
     val activitiesEnabled: Boolean = true,
-    val activities: Set<Activity> = Activity.entries.toSet(),
-    val mudEnabled: Boolean = false,
+    val activities: Set<Activity> = DEFAULT_ACTIVITIES,
     val foliageEnabled: Boolean = true,
     val satelliteLayer: Boolean = false,
     val satelliteImagery: SatelliteImagery = SatelliteImagery.AUTO,
@@ -126,9 +126,6 @@ data class AppSettings(
     val uvEnabled: Boolean = true,
     val allergyEnabled: Boolean = true,
     val allergies: Map<Allergen, Sensitivity> = emptyMap(),
-    val trafficEnabled: Boolean = true,
-    val trafficRadiusKm: Double = 40.0,
-    val trafficFlowLayer: Boolean = true,
     val hourlyExpanded: Boolean = false,
     val dryingEnabled: Boolean = false,
     /** When the user said laundry is out on the line (epoch ms), for rain warnings. */
@@ -153,6 +150,10 @@ data class AppSettings(
     val aiProvider: AiProvider = AiProvider.OLLAMA,
     val aiBaseUrl: String = "",
     val aiModel: String = "",
+    /** The order of the movable cards on Today. */
+    val todayOrder: List<TodayCard> = TodayCard.DEFAULT,
+    /** The pollen card's "choose your allergies" prompt was dismissed. */
+    val allergyPromptDismissed: Boolean = false,
     /** The forecasters' discussion in plain words, on Today. */
     val aiDiscussion: Boolean = true,
     /** "Explain" on each alert. */
@@ -205,7 +206,6 @@ class SettingsRepository(context: Context) {
         val activitiesEnabled = booleanPreferencesKey("activities_enabled")
         val activities = stringSetPreferencesKey("activities") // 1.1–1.2: enabled set (only the original six existed)
         val activitiesOff = stringSetPreferencesKey("activities_off")
-        val mud = booleanPreferencesKey("mud")
         val foliage = booleanPreferencesKey("foliage")
         val satelliteLayer = booleanPreferencesKey("satellite_layer")
         val satelliteImagery = stringPreferencesKey("satellite_imagery")
@@ -218,9 +218,6 @@ class SettingsRepository(context: Context) {
         val uv = booleanPreferencesKey("uv")
         val allergy = booleanPreferencesKey("allergy")
         val allergies = stringSetPreferencesKey("allergies") // "BIRCH:SEVERE"
-        val traffic = booleanPreferencesKey("traffic")
-        val trafficRadius = doublePreferencesKey("traffic_radius_km")
-        val trafficFlow = booleanPreferencesKey("traffic_flow")
         val hourlyExpanded = booleanPreferencesKey("hourly_expanded")
         val drying = booleanPreferencesKey("drying")
         val laundryOut = longPreferencesKey("laundry_out_since")
@@ -242,6 +239,8 @@ class SettingsRepository(context: Context) {
         val aiProvider = stringPreferencesKey("ai_provider")
         val aiBaseUrl = stringPreferencesKey("ai_base_url")
         val aiModel = stringPreferencesKey("ai_model")
+        val todayOrder = stringPreferencesKey("today_order")
+        val allergyPromptDismissed = booleanPreferencesKey("allergy_prompt_dismissed")
         val aiDiscussion = booleanPreferencesKey("ai_discussion")
         val aiAlerts = booleanPreferencesKey("ai_alerts")
         val aiAsk = booleanPreferencesKey("ai_ask")
@@ -294,7 +293,6 @@ class SettingsRepository(context: Context) {
                 pollenEnabled = p[Keys.pollen] ?: d.pollenEnabled,
                 activitiesEnabled = p[Keys.activitiesEnabled] ?: d.activitiesEnabled,
                 activities = Activity.entries.toSet() - disabledActivities(p),
-                mudEnabled = p[Keys.mud] ?: d.mudEnabled,
                 foliageEnabled = p[Keys.foliage] ?: d.foliageEnabled,
                 satelliteLayer = p[Keys.satelliteLayer] ?: d.satelliteLayer,
                 satelliteImagery = p[Keys.satelliteImagery].toEnum(d.satelliteImagery),
@@ -311,9 +309,6 @@ class SettingsRepository(context: Context) {
                     val allergen = Allergen.entries.firstOrNull { it.name == a } ?: return@mapNotNull null
                     allergen to (Sensitivity.entries.firstOrNull { it.name == sens } ?: Sensitivity.MODERATE)
                 }?.toMap() ?: d.allergies,
-                trafficEnabled = p[Keys.traffic] ?: d.trafficEnabled,
-                trafficRadiusKm = p[Keys.trafficRadius] ?: d.trafficRadiusKm,
-                trafficFlowLayer = p[Keys.trafficFlow] ?: d.trafficFlowLayer,
                 hourlyExpanded = p[Keys.hourlyExpanded] ?: d.hourlyExpanded,
                 dryingEnabled = p[Keys.drying] ?: d.dryingEnabled,
                 laundryOutSince = p[Keys.laundryOut],
@@ -335,6 +330,8 @@ class SettingsRepository(context: Context) {
                 aiProvider = p[Keys.aiProvider].toEnum(d.aiProvider),
                 aiBaseUrl = p[Keys.aiBaseUrl] ?: d.aiBaseUrl,
                 aiModel = p[Keys.aiModel] ?: d.aiModel,
+                todayOrder = TodayCard.parse(p[Keys.todayOrder]),
+                allergyPromptDismissed = p[Keys.allergyPromptDismissed] ?: d.allergyPromptDismissed,
                 aiDiscussion = p[Keys.aiDiscussion] ?: d.aiDiscussion,
                 aiAlerts = p[Keys.aiAlerts] ?: d.aiAlerts,
                 aiAsk = p[Keys.aiAsk] ?: d.aiAsk,
@@ -389,7 +386,8 @@ class SettingsRepository(context: Context) {
      */
     private fun disabledActivities(p: Preferences): Set<Activity> {
         p[Keys.activitiesOff]?.let { off -> return off.mapNotNull { n -> Activity.entries.firstOrNull { it.name == n } }.toSet() }
-        val oldEnabled = p[Keys.activities] ?: return emptySet()
+        // New installs (and anyone who never chose) start with four; more are one tap away on the Outlook tab.
+        val oldEnabled = p[Keys.activities] ?: return Activity.entries.toSet() - DEFAULT_ACTIVITIES
         return ORIGINAL_ACTIVITIES.filterNot { it.name in oldEnabled }.toSet()
     }
 
@@ -403,7 +401,6 @@ class SettingsRepository(context: Context) {
             Activity.HIKING, Activity.CAMPING, Activity.OFF_ROADING, Activity.MOUNTAIN_BIKING, Activity.PADDLING, Activity.STARGAZING,
         )
     }
-    suspend fun setMud(enabled: Boolean) = store.edit { it[Keys.mud] = enabled }
     suspend fun setFoliage(enabled: Boolean) = store.edit { it[Keys.foliage] = enabled }
     suspend fun setSatelliteLayer(enabled: Boolean) = store.edit { it[Keys.satelliteLayer] = enabled }
     suspend fun setSatelliteImagery(imagery: SatelliteImagery) = store.edit { it[Keys.satelliteImagery] = imagery.name }
@@ -420,13 +417,27 @@ class SettingsRepository(context: Context) {
         val current = (p[Keys.allergies] ?: emptySet()).filterNot { it.substringBefore(':') == allergen.name }.toSet()
         p[Keys.allergies] = if (sensitivity == null) current else current + "${allergen.name}:${sensitivity.name}"
     }
-    suspend fun setTraffic(enabled: Boolean) = store.edit { it[Keys.traffic] = enabled }
-    suspend fun setTrafficRadius(km: Double) = store.edit { it[Keys.trafficRadius] = km.coerceIn(5.0, 160.0) }
-    suspend fun setTrafficFlow(enabled: Boolean) = store.edit { it[Keys.trafficFlow] = enabled }
     suspend fun setHeatingAggressive(enabled: Boolean) = store.edit { it[Keys.heatingAggressive] = enabled }
     suspend fun setShowStaleData(enabled: Boolean) = store.edit { it[Keys.showStale] = enabled }
     suspend fun setFollowRestrictedData(enabled: Boolean) = store.edit { it[Keys.followRestricted] = enabled }
     suspend fun setAiEnabled(enabled: Boolean) = store.edit { it[Keys.ai] = enabled }
+    suspend fun setTodayOrder(order: List<TodayCard>) = store.edit { it[Keys.todayOrder] = TodayCard.format(order) }
+    suspend fun dismissAllergyPrompt() = store.edit { it[Keys.allergyPromptDismissed] = true }
+
+    /** Shows or hides a Today card by switching its feature. */
+    suspend fun setTodayCard(card: TodayCard, shown: Boolean) {
+        when (card) {
+            TodayCard.STORM -> setStorm(shown)
+            TodayCard.SMOKE -> setSmoke(shown)
+            TodayCard.AURORA -> setAurora(shown)
+            TodayCard.AIR -> setAirQuality(shown)
+            TodayCard.UV -> setUv(shown)
+            TodayCard.POLLEN -> setPollen(shown)
+            TodayCard.FORECASTERS -> setAiDiscussion(shown)
+            TodayCard.ASK -> setAiAsk(shown)
+            TodayCard.HOURLY, TodayCard.DAILY -> Unit
+        }
+    }
     suspend fun setAiDiscussion(enabled: Boolean) = store.edit { it[Keys.aiDiscussion] = enabled }
     suspend fun setAiAlerts(enabled: Boolean) = store.edit { it[Keys.aiAlerts] = enabled }
     suspend fun setAiAsk(enabled: Boolean) = store.edit { it[Keys.aiAsk] = enabled }
@@ -475,14 +486,14 @@ enum class SatelliteGroup(val title: String, val description: String, val featur
             SatelliteFeature.HOURLY_FORECAST, SatelliteFeature.FORECAST_DETAILS, SatelliteFeature.LOCAL_STATION),
     ),
     EXTRAS(
-        "Extras", "Air quality, pollen, recent weather and frost dates, aurora, smoke, rivers & tides, rain notifications, AI summary, OpenWeatherMap.",
+        "Extras", "Air quality, pollen, recent weather and frost dates, aurora, smoke, rivers & tides, rain notifications, AI, OpenWeatherMap.",
         listOf(SatelliteFeature.AIR_QUALITY, SatelliteFeature.POLLEN, SatelliteFeature.HISTORY, SatelliteFeature.GARDEN_CLIMATE,
             SatelliteFeature.AURORA, SatelliteFeature.SMOKE, SatelliteFeature.WATER, SatelliteFeature.RAIN_SOON,
             SatelliteFeature.AI_SUMMARY, SatelliteFeature.OWM_FALLBACK),
     ),
     MAPS(
-        "Maps", "Radar, future cast, satellite imagery and traffic. These download the most.",
-        listOf(SatelliteFeature.RADAR, SatelliteFeature.FUTURE_CAST, SatelliteFeature.SATELLITE_IMAGERY, SatelliteFeature.TRAFFIC, SatelliteFeature.TRAFFIC_FLOW),
+        "Maps", "Radar, future cast and satellite imagery. These download the most.",
+        listOf(SatelliteFeature.RADAR, SatelliteFeature.FUTURE_CAST, SatelliteFeature.SATELLITE_IMAGERY),
     ),
 }
 

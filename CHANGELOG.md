@@ -5,6 +5,34 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-06
+
+A polish release: Today shows less, louder when it matters, and the traffic feature is gone.
+
+### Added
+- **Headline** under the temperature on what matters next: "Rain in about 20 min", "Snow from 3 PM, about 4 in", strong gusts, frost after a mild day, a big change in tomorrow's high. Written by the app, no AI. The 15-minute rain forecast it uses is about 1 KB.
+- **At a glance:** air quality, UV, pollen and sunset sit as small chips under the top card; tap one for its full card. Each turns into a full card by itself when it matters (AQI over 50, UV 6 or more, high pollen).
+- **Arrange Today your way:** every card has a ⋮ menu to move it, hide it (with undo) or open its settings, and Settings › Today screen lists the cards to drag into order.
+- **Best time to go** on the Outlook tab: the best few hours today and tomorrow for each activity ("Best 1–4 PM · dry, 59°"), plus what decides the score. Pick your activities right on the tab.
+- **Widgets in three sizes:** small (temperature), medium (adds the headline) and large (adds the next five hours), in your wallpaper's colors with a dynamic theme.
+- **Welcome screen:** pick units and what you care about (outdoors, rivers & tides, garden, heating, laundry, pollen, northern lights), and the matching cards turn on.
+- Saved places can be dragged into order (long-press).
+
+### Changed
+- One card style everywhere, with the title inside the card.
+- Today's details (humidity, dew point, pressure, visibility…) moved into the top card behind **Details**; the sun card opens from the sunset chip.
+- The hourly card hides its precipitation row when no hour has a real chance.
+- Outlook is grouped into Outdoors, Home and Seasonal, and starts with four activities (hiking, mountain biking, paddling, stargazing); add more with "Choose activities".
+- Trail mud is no longer a separate card: it counts in the hiking, biking and off-roading scores.
+- Settings are split into "What you see" and "Data & privacy"; Backwoods mode's explanation is two lines.
+- Saved places show their name, not coordinates.
+- Plainer words in a few places: heating demand instead of degree days, "the app" instead of the full app name mid-sentence, the weather station's own name in the top card.
+- The pollen card's "choose your allergies" prompt can be dismissed.
+
+### Removed
+- **Traffic** (the tab, its settings and its New England 511 and TomTom keys). Saved traffic keys are deleted on first start.
+- The "hourly details open by default" setting (the card remembers how you left it).
+
 ## [1.9.2] - 2026-11-06
 
 ### Fixed

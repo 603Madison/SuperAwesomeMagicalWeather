@@ -113,6 +113,22 @@ tiles are used instead.
 These are the app's own estimates from the forecast and recent observations,
 not official forecasts.
 
+### Headline
+
+The sentence or two under the temperature on Today (and on the medium and
+large widgets), worked out on the phone, no AI. In order, at most three:
+
+- Rain or snow starting or stopping in the next two hours, from Open-Meteo's
+  15-minute forecast ("Rain in about 20 min", "Rain ending around 3:45 PM").
+  It's downloaded with the forecast, about 1 KB at most every 10 minutes, and
+  follows the Backwoods setting for rain notifications.
+- Otherwise the next wet stretch in 18 hours from the hourly forecast, with
+  the amount ("Snow from 3 PM, about 4 in"), or "Dry for the next 18 hours".
+- Gusts of 35 mph or more in the next 12 hours.
+- Frost or a freeze tonight, only after a day above about 39°F (in midwinter
+  every night freezes, so it isn't news).
+- A change of about 11°F or more in tomorrow's high.
+
 ### Storm totals
 
 From the NWS gridpoint forecast's hourly rain, snow and ice amounts: wet
@@ -184,6 +200,14 @@ in Settings › Today screen.
 
 ### Outdoor activities
 
+For today and tomorrow, each daytime activity also gets its **best window**:
+the 2–4 consecutive daylight hours with the lowest penalty for rain chance,
+thunder, distance from the activity's comfortable temperature (feels-like;
+about 59°F for hiking, 72°F for paddling, 25°F for skiing) and gusts (over
+15 mph for paddling, 25 mph otherwise). Stargazing's window is the clearest
+two hours after dark. You start with hiking, mountain biking, paddling and
+stargazing and pick others on the tab.
+
 Daily 0–100 scores, with reasons and recommendations, for hiking, camping
 (overnight), off-roading, mountain biking, paddling and stargazing (overnight;
 uses cloud cover and the moon's phase). Seasonal activities appear when they
@@ -207,6 +231,8 @@ season.
 
 ### Trail mud
 
+There's no separate card since 2.0: the mud level feeds the hiking, mountain
+biking and off-roading scores, and shows as their deciding factor when it is.
 A daily level (dry, damp, muddy, very muddy, frozen, snow-covered) from a soil
 water balance run over the last 2–5 months of **observed** NOAA data (ACIS
 gridded daily highs, lows and precipitation) and on through the forecast. It
@@ -325,13 +351,6 @@ Weather Watches. Rules vary by town and state, and many need a burn permit.
   **Ollama, Open WebUI, LibreChat** (Agents API) or **OpenAI-compatible**
   server (LM Studio, vLLM, llama.cpp, LiteLLM, OpenAI and others). Reasoning
   tags (`<think>…</think>`) and markdown are removed from replies.
-- **Traffic**: work zones come from state DOT feeds in the USDOT **Work Zone
-  Data Exchange (WZDx)** standard, found in USDOT's public feed registry (New
-  Hampshire, Vermont and Maine publish one together). Crashes, closures and
-  incidents come from **New England 511** (NHDOT, MaineDOT, VTrans) with a free
-  developer key. No government source publishes road speeds, so the live speed
-  layer uses TomTom traffic tiles with your own key: the free tier is 50,000
-  tiles a day, and one look at the map uses about 20–60.
 - **NWS contact email** (optional) goes only into the User-Agent sent to
   weather.gov, as NWS asks.
 
@@ -376,6 +395,11 @@ it and adds a caution. About 15–30 KB per update, at most hourly.
   from 10 PM to 6 AM.
 - **Widget:** drawn from the last downloaded forecast whenever the app saves
   one, and refreshed in the background about hourly while a widget is placed.
+  The layout follows the size the launcher gives it: small (under about
+  160×95 dp) shows the temperature, icon and place; medium adds conditions,
+  high and low and the headline; large (about 220×190 dp and up) adds the next
+  five hours. With a dynamic (wallpaper) theme on Android 12+, the background
+  uses the wallpaper's accent colors, except during a warning.
 
 ## Backwoods mode
 
@@ -399,7 +423,7 @@ on (even if the app has "Unrestricted data"). You can also set it to always or n
   group and an expandable list of items.
 - Anything turned off keeps its last data, but cards whose data is more than 12
   hours old (or missing) are hidden while limits are on, and so are whole tabs
-  with nothing recent (Traffic, for example). **Show stale data** shows them
+  with nothing recent (Radar, for example). **Show stale data** shows them
   anyway.
 - Timeouts are generous for high-latency links.
 

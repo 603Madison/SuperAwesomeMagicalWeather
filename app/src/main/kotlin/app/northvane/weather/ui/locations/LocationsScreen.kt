@@ -80,6 +80,8 @@ import app.northvane.weather.ui.MainViewModel
 import app.northvane.weather.ui.home.LOCATION_PERMISSIONS
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import androidx.compose.ui.text.style.TextOverflow
+import app.northvane.weather.ui.components.ReorderableColumn
 
 @Composable
 fun LocationsScreen(state: MainUiState, vm: MainViewModel, container: AppContainer, onBack: () -> Unit) {
@@ -218,17 +220,21 @@ fun LocationsScreen(state: MainUiState, vm: MainViewModel, container: AppContain
                     Text("No saved locations yet.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            items(state.locations, key = { it.id }) { location ->
-                SavedLocationRow(
-                    location = location,
-                    selected = location.id == state.selected?.id,
-                    onSelect = { vm.selectLocation(location.id) },
-                    onRename = { renaming = location },
-                    onToggleNotify = { vm.setLocationNotify(location.id, !location.notify) },
-                    onRemove = { pendingDelete = location },
-                    onMoveUp = if (location != state.locations.first()) ({ vm.moveLocation(location.id, -1) }) else null,
-                    onMoveDown = if (location != state.locations.last()) ({ vm.moveLocation(location.id, 1) }) else null,
-                )
+            if (state.locations.size > 1) {
+                item { Text("Long-press and drag to reorder.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+            item(key = "saved") {
+                ReorderableColumn(state.locations, key = { it.id }, onReorder = { list -> vm.reorderLocations(list.map { it.id }) }) { location, dragging ->
+                    SavedLocationRow(
+                        location = location,
+                        selected = location.id == state.selected?.id,
+                        dragging = dragging,
+                        onSelect = { vm.selectLocation(location.id) },
+                        onRename = { renaming = location },
+                        onToggleNotify = { vm.setLocationNotify(location.id, !location.notify) },
+                        onRemove = { pendingDelete = location },
+                    )
+                }
             }
         }
     }
@@ -268,28 +274,21 @@ private fun SavedLocationRow(
     onRename: () -> Unit,
     onToggleNotify: () -> Unit,
     onRemove: () -> Unit,
-    onMoveUp: (() -> Unit)?,
-    onMoveDown: (() -> Unit)?,
+    dragging: Boolean = false,
 ) {
     var menu by remember { mutableStateOf(false) }
-    val place = if (location.isDeviceLocation) "Your location" else "${GeoPoint.format(location.latitude)}, ${GeoPoint.format(location.longitude)}"
+    // The place's own name (when it has a nickname), whether it follows you, and whether alerts are off. No coordinates.
     val details = buildList {
-        if (location.nickname != null) add(location.name)
-        add(place)
-        if (!location.notify) add("Alert notifications off")
-    }.distinct().joinToString(" · ")
+        if (location.nickname != null && !location.name.equals(location.nickname, ignoreCase = true)) add(location.name)
+        if (location.isDeviceLocation) add("Follows your location")
+        if (!location.notify) add("Alerts off")
+    }.joinToString(" · ")
     ListItem(
-        headlineContent = { Text(location.displayName) },
-        supportingContent = { Text(details) },
+        headlineContent = { Text(location.displayName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        supportingContent = details.takeIf { it.isNotEmpty() }?.let { { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) } },
         leadingContent = { RadioButton(selected = selected, onClick = onSelect) },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { onMoveUp?.invoke() }, enabled = onMoveUp != null) {
-                Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "Move ${location.displayName} up")
-            }
-            IconButton(onClick = { onMoveDown?.invoke() }, enabled = onMoveDown != null) {
-                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Move ${location.displayName} down")
-            }
             Box {
                 IconButton(onClick = { menu = true }) {
                     Icon(Icons.Filled.MoreVert, contentDescription = "Options for ${location.displayName}")
@@ -315,7 +314,10 @@ private fun SavedLocationRow(
             }
             }
         },
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = ListItemDefaults.colors(
+            containerColor = if (dragging) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surface,
+        ),
+        tonalElevation = if (dragging) 6.dp else 0.dp,
         modifier = Modifier.clickable(onClick = onSelect),
     )
 }

@@ -1,5 +1,6 @@
 package app.northvane.weather.ui.home
 
+import app.northvane.weather.ui.components.WeatherCard
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
@@ -56,6 +57,14 @@ import app.northvane.core.model.Tip
 import app.northvane.core.outlook.OutlookText
 import app.northvane.core.util.UnitFormatter
 import app.northvane.weather.ui.TimeFormat
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.AlertDialog
+import java.time.Instant
+import java.time.ZoneId
+import app.northvane.core.model.HourlyForecast
+import app.northvane.core.outlook.BestWindow
 
 internal fun bandColor(band: ScoreBand): Color = when (band) {
     ScoreBand.GREAT -> Color(0xFF2E9E5B)
@@ -74,7 +83,7 @@ internal fun mudColor(level: MudLevel): Color = when (level) {
     MudLevel.VERY_MUDDY -> Color(0xFF5D4027)
 }
 
-private fun pollenColor(index: Int?): Color = when (index) {
+internal fun pollenColor(index: Int?): Color = when (index) {
     null, 0 -> Color(0xFF9E9E9E)
     1 -> Color(0xFF4CAF50)
     2 -> Color(0xFF9CCC65)
@@ -99,18 +108,31 @@ private fun Muted(text: String, modifier: Modifier = Modifier) {
 
 // --- Activities ---
 
-/** Scores for the user's activities, for a day they pick, each expandable to its tips. */
+/**
+ * The user's activities for a day they pick: when to go (the best few hours,
+ * where the hourly forecast reaches), the score, and what decides it. Tap a
+ * row for all the tips; "Choose activities" adds or removes them.
+ */
 @Composable
-internal fun ActivitiesSection(days: List<DailyForecast>, activities: Set<Activity>, f: UnitFormatter, time: TimeFormat) {
+internal fun ActivitiesSection(
+    days: List<DailyForecast>,
+    hourly: List<HourlyForecast>,
+    zone: ZoneId,
+    activities: Set<Activity>,
+    f: UnitFormatter,
+    time: TimeFormat,
+    onSetActivity: (Activity, Boolean) -> Unit = { _, _ -> },
+) {
     val scored = days.filter { d -> d.activities.any { it.activity in activities } }.take(7)
-    if (scored.isEmpty()) return
+    var picking by rememberSaveable { mutableStateOf(false) }
     var selected by rememberSaveable { mutableIntStateOf(0) }
-    val index = selected.coerceIn(0, scored.lastIndex)
-    val day = scored[index]
-    Column {
-        SectionTitle("Outdoor outlook")
-        OutlookCard {
-            Column(Modifier.padding(vertical = 8.dp)) {
+    WeatherCard("Outdoor outlook", inset = false) {
+        if (scored.isEmpty()) {
+            Muted("None of your activities are in season right now.", Modifier.padding(horizontal = 16.dp))
+        } else {
+            val index = selected.coerceIn(0, scored.lastIndex)
+            val day = scored[index]
+            Column(Modifier.padding(bottom = 4.dp)) {
                 Row(
                     Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -125,19 +147,56 @@ internal fun ActivitiesSection(days: List<DailyForecast>, activities: Set<Activi
                     }
                 }
                 val rows = day.activities.filter { it.activity in activities }
+                val now = Instant.now()
                 rows.forEachIndexed { i, score ->
-                    ActivityRow(score, f)
+                    val window = remember(hourly, day.date, score.activity) { BestWindow.find(score.activity, hourly, day.date, zone, now) }
+                    ActivityRow(score, window, f, time)
                     if (i < rows.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
         }
+        TextButton(onClick = { picking = true }, modifier = Modifier.padding(start = 4.dp)) { Text("Choose activities") }
+    }
+    if (picking) {
+        AlertDialog(
+            onDismissRequest = { picking = false },
+            title = { Text("Your activities") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Activity.entries.forEach { a ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().clickable { onSetActivity(a, a !in activities) },
+                        ) {
+                            Checkbox(checked = a in activities, onCheckedChange = { onSetActivity(a, it) })
+                            Text(a.label, style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                    Muted("Snow and ice activities show up only when there's snow or ice.", Modifier.padding(top = 8.dp))
+                }
+            },
+            confirmButton = { TextButton(onClick = { picking = false }) { Text("Done") } },
+        )
+    }
+}
+
+/** "Best 1–4 PM · dry, 59°", or "Clearest 11 PM–1 AM · 5% cloud" for stargazing. */
+private fun windowText(w: BestWindow.Window, activity: Activity, f: UnitFormatter, time: TimeFormat): String {
+    val span = "${time.hour(w.start)}–${time.hour(w.end)}"
+    return if (activity == Activity.STARGAZING) {
+        "Clearest $span" + (w.cloudPercent?.let { " · $it% cloud" } ?: "")
+    } else {
+        val wet = if (w.chance >= 30) "${w.chance}% chance of rain" else "dry"
+        "Best $span · $wet" + (w.tempC?.let { ", ${f.temperature(it)}" } ?: "")
     }
 }
 
 @Composable
-private fun ActivityRow(score: ActivityScore, f: UnitFormatter) {
+private fun ActivityRow(score: ActivityScore, window: BestWindow.Window?, f: UnitFormatter, time: TimeFormat) {
     var open by rememberSaveable(score.activity) { mutableStateOf(false) }
     val color = bandColor(score.band)
+    // What decides the score: the main problem, only when there is one.
+    val decider = score.tips.firstOrNull()?.takeIf { score.band != ScoreBand.GREAT }?.let { OutlookText.tip(it, f) }
     Column(
         Modifier
             .fillMaxWidth()
@@ -156,17 +215,15 @@ private fun ActivityRow(score: ActivityScore, f: UnitFormatter) {
                         Text("overnight", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                Text(
-                    score.band.label + (score.tips.firstOrNull()?.let { " · " + OutlookText.tip(it, f) } ?: ""),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = if (open) 3 else 1,
-                )
+                val line = listOfNotNull(window?.let { windowText(it, score.activity, f, time) }, decider)
+                    .ifEmpty { listOf(score.band.label) }
+                    .joinToString(" · ")
+                Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = if (open) 4 else 2)
             }
         }
-        if (open && score.tips.size > 1) {
+        if (open && score.tips.isNotEmpty()) {
             Column(Modifier.padding(start = 58.dp, top = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                score.tips.drop(1).forEach { tip -> TipLine(tip, f) }
+                score.tips.forEach { tip -> TipLine(tip, f) }
             }
         }
     }
@@ -210,79 +267,6 @@ internal fun ActivityStrip(scores: List<ActivityScore>) {
     }
 }
 
-// --- Mud ---
-
-@Composable
-internal fun MudSection(days: List<DailyForecast>, f: UnitFormatter, time: TimeFormat) {
-    val upcoming = days.filter { it.mud != null && !it.date.isBefore(time.today()) }.take(7)
-    val today = upcoming.firstOrNull()?.mud ?: return
-    Column {
-        SectionTitle("Trail mud")
-        OutlookCard {
-            Column(Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    MudMeter(today, Modifier.weight(1f))
-                }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    if (today.mudSeason) "Mud season · ${today.level.label}" else today.level.label,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = mudColor(today.level),
-                )
-                val reasons = today.reasons.map { OutlookText.mudReason(it, f) }
-                if (reasons.isNotEmpty()) Muted(reasons.joinToString(" · "), Modifier.padding(top = 2.dp))
-                if (today.mudSeason) {
-                    Muted(
-                        "Higher, shaded trails stay muddy longest. Many trails ask hikers to wait until they dry.",
-                        Modifier.padding(top = 4.dp),
-                    )
-                }
-                if (upcoming.size > 1) {
-                    Spacer(Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                        upcoming.forEach { d ->
-                            val m = d.mud!!
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                                Text(time.weekday(d.date), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Spacer(Modifier.height(4.dp))
-                                Box(
-                                    Modifier.size(width = 26.dp, height = 8.dp),
-                                ) {
-                                    Canvas(Modifier.matchParentSize()) {
-                                        drawRoundRect(mudColor(m.level), cornerRadius = CornerRadius(size.height / 2, size.height / 2))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** Five-step bar from dry to very muddy (snow and frozen ground shown separately). */
-@Composable
-private fun MudMeter(mud: MudOutlook, modifier: Modifier = Modifier) {
-    val steps = listOf(MudLevel.DRY, MudLevel.DAMP, MudLevel.MUDDY, MudLevel.VERY_MUDDY)
-    val track = MaterialTheme.colorScheme.surfaceVariant
-    Canvas(modifier.height(10.dp)) {
-        val gap = 4.dp.toPx()
-        val w = (size.width - gap * (steps.size - 1)) / steps.size
-        steps.forEachIndexed { i, level ->
-            val lit = mud.level != MudLevel.SNOW_COVERED && mud.level != MudLevel.FROZEN && mud.level >= level
-            drawRoundRect(
-                if (lit) mudColor(level) else track,
-                topLeft = Offset(i * (w + gap), 0f),
-                size = Size(w, size.height),
-                cornerRadius = CornerRadius(size.height / 2, size.height / 2),
-            )
-        }
-    }
-}
-
-// --- Pollen ---
-
 @Composable
 internal fun PollenSection(
     pollen: PollenForecast?,
@@ -291,55 +275,52 @@ internal fun PollenSection(
     onOpenSources: () -> Unit,
     allergyContent: (@Composable () -> Unit)? = null,
 ) {
-    Column {
-        SectionTitle("Pollen")
-        OutlookCard {
-            Column(Modifier.padding(16.dp)) {
-                val today = pollen?.days?.firstOrNull()
-                when {
-                    !hasKey -> {
-                        Muted("Pollen forecasts need a free Google Pollen API key. No NOAA source covers pollen.")
-                        TextButton(onClick = onOpenSources) { Text("Add a key in Data sources") }
+    WeatherCard("Pollen", inset = false) {
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
+            val today = pollen?.days?.firstOrNull()
+            when {
+                !hasKey -> {
+                    Muted("Pollen forecasts need a free Google Pollen API key. No NOAA source covers pollen.")
+                    TextButton(onClick = onOpenSources) { Text("Add a key in Data sources") }
+                }
+                today == null -> Muted("Pollen forecast isn't available yet. Pull to refresh.")
+                else -> {
+                    val worst = today.worst
+                    Text(
+                        worst?.let { "${OutlookText.pollenCategory(it.index)} · ${it.name.lowercase()} pollen" } ?: "No pollen in season",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = pollenColor(worst?.index),
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    today.types.forEach { PollenBar(it) }
+                    val plants = today.topPlants.take(4)
+                    if (plants.isNotEmpty()) {
+                        Muted("Main sources: " + plants.joinToString(", ") { "${it.name} (${OutlookText.pollenCategory(it.index).lowercase()})" }, Modifier.padding(top = 6.dp))
                     }
-                    today == null -> Muted("Pollen forecast isn't available yet. Pull to refresh.")
-                    else -> {
-                        val worst = today.worst
-                        Text(
-                            worst?.let { "${OutlookText.pollenCategory(it.index)} · ${it.name.lowercase()} pollen" } ?: "No pollen in season",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = pollenColor(worst?.index),
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        today.types.forEach { PollenBar(it) }
-                        val plants = today.topPlants.take(4)
-                        if (plants.isNotEmpty()) {
-                            Muted("Main sources: " + plants.joinToString(", ") { "${it.name} (${OutlookText.pollenCategory(it.index).lowercase()})" }, Modifier.padding(top = 6.dp))
-                        }
-                        today.tips.firstOrNull()?.let { Muted(it, Modifier.padding(top = 4.dp)) }
-                        if (pollen.days.size > 1) {
-                            Spacer(Modifier.height(12.dp))
-                            Row(Modifier.fillMaxWidth()) {
-                                pollen.days.forEach { d ->
-                                    val w = d.worst
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                                        Text(time.weekday(d.date), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        Text(
-                                            OutlookText.pollenCategory(w?.index).replace("Very ", "V. "),
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = pollenColor(w?.index),
-                                            textAlign = TextAlign.Center,
-                                            maxLines = 1,
-                                        )
-                                    }
+                    today.tips.firstOrNull()?.let { Muted(it, Modifier.padding(top = 4.dp)) }
+                    if (pollen.days.size > 1) {
+                        Spacer(Modifier.height(12.dp))
+                        Row(Modifier.fillMaxWidth()) {
+                            pollen.days.forEach { d ->
+                                val w = d.worst
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                                    Text(time.weekday(d.date), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(
+                                        OutlookText.pollenCategory(w?.index).replace("Very ", "V. "),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = pollenColor(w?.index),
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
+                                    )
                                 }
                             }
                         }
-                        allergyContent?.let {
-                            HorizontalDivider(Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                            it()
-                        }
-                        Muted("Google Pollen API", Modifier.padding(top = 10.dp))
                     }
+                    allergyContent?.let {
+                        HorizontalDivider(Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                        it()
+                    }
+                    Muted("Google Pollen API", Modifier.padding(top = 10.dp))
                 }
             }
         }
@@ -376,42 +357,39 @@ private val FoliageGradient = listOf(Color(0xFF4F8F3A), Color(0xFFC9B23A), Color
 internal fun FoliageSection(report: FoliageReport, time: TimeFormat) {
     val today = report.today ?: return
     val uri = LocalUriHandler.current
-    Column {
-        SectionTitle("Fall foliage")
-        OutlookCard {
-            Column(Modifier.padding(16.dp)) {
-                Text(today.stage.label, style = MaterialTheme.typography.titleMedium)
-                val peak = report.estimatedPeak
-                val peakText = when {
-                    peak.isAfter(time.today()) -> "Estimated peak around ${time.monthDay(peak)}"
-                    peak == time.today() -> "Estimated peak is about now"
-                    else -> "Peaked around ${time.monthDay(peak)}"
-                }
-                Muted("$peakText · about ${today.colorPercent}% color")
-                Spacer(Modifier.height(12.dp))
-                FoliageBar(today.stage)
-                Spacer(Modifier.height(4.dp))
-                Row {
-                    Text("Green", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    Text("Peak", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                    Text("Bare", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
-                }
-                val drops = report.days.filter { it.leafDrop }
-                if (drops.isNotEmpty()) {
-                    Muted(
-                        "Wind or heavy rain " + drops.joinToString(" and ") { time.dayName(it.date) } + " will bring down many leaves.",
-                        Modifier.padding(top = 8.dp),
-                    )
-                }
-                report.notes.forEach { Muted(OutlookText.foliageNote(it), Modifier.padding(top = 4.dp)) }
+    WeatherCard("Fall foliage", inset = false) {
+        Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
+            Text(today.stage.label, style = MaterialTheme.typography.titleMedium)
+            val peak = report.estimatedPeak
+            val peakText = when {
+                peak.isAfter(time.today()) -> "Estimated peak around ${time.monthDay(peak)}"
+                peak == time.today() -> "Estimated peak is about now"
+                else -> "Peaked around ${time.monthDay(peak)}"
+            }
+            Muted("$peakText · about ${today.colorPercent}% color")
+            Spacer(Modifier.height(12.dp))
+            FoliageBar(today.stage)
+            Spacer(Modifier.height(4.dp))
+            Row {
+                Text("Green", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                Text("Peak", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Text("Bare", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+            }
+            val drops = report.days.filter { it.leafDrop }
+            if (drops.isNotEmpty()) {
                 Muted(
-                    "Estimated from location, elevation and recent NOAA temperatures. Check the official reports:",
+                    "Wind or heavy rain " + drops.joinToString(" and ") { time.dayName(it.date) } + " will bring down many leaves.",
                     Modifier.padding(top = 8.dp),
                 )
-                Row {
-                    TextButton(onClick = { uri.openUri("https://mainefoliage.com/") }) { Text("Maine") }
-                    TextButton(onClick = { uri.openUri("https://www.visitnh.gov/") }) { Text("New Hampshire") }
-                }
+            }
+            report.notes.forEach { Muted(OutlookText.foliageNote(it), Modifier.padding(top = 4.dp)) }
+            Muted(
+                "Estimated from location, elevation and recent NOAA temperatures. Check the official reports:",
+                Modifier.padding(top = 8.dp),
+            )
+            Row {
+                TextButton(onClick = { uri.openUri("https://mainefoliage.com/") }) { Text("Maine") }
+                TextButton(onClick = { uri.openUri("https://www.visitnh.gov/") }) { Text("New Hampshire") }
             }
         }
     }

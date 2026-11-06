@@ -1,5 +1,6 @@
 package app.northvane.weather.ui.home
 
+import app.northvane.weather.ui.components.WeatherCard
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
@@ -214,68 +215,65 @@ private fun stormScale(kp: Double): String? = when {
 internal fun AuroraSection(report: AuroraReport, time: TimeFormat) {
     val best = report.nights.filter { it.view >= AuroraView.CAMERA }.maxByOrNull { it.view.ordinal * 10 + it.maxKp }
     val southern = report.geomagneticLatitude < 0
-    Column {
-        SectionTitle("Aurora")
-        SeasonCard {
-            when {
-                report.nowView >= AuroraView.CAMERA -> {
-                    Text("Aurora possible right now", style = MaterialTheme.typography.titleMedium, color = viewColor(report.nowView))
-                    Note(horizon(report.nowView, southern) + (report.nowKp?.let { " · Kp ${"%.1f".format(it)}" } ?: ""))
-                }
-                best != null -> {
-                    val day = if (best.date == time.today()) "tonight" else "${time.weekday(best.date)} night"
-                    Text("Northern lights possible $day", style = MaterialTheme.typography.titleMedium, color = viewColor(best.view))
+    WeatherCard("Aurora") {
+        when {
+            report.nowView >= AuroraView.CAMERA -> {
+                Text("Aurora possible right now", style = MaterialTheme.typography.titleMedium, color = viewColor(report.nowView))
+                Note(horizon(report.nowView, southern) + (report.nowKp?.let { " · Kp ${"%.1f".format(it)}" } ?: ""))
+            }
+            best != null -> {
+                val day = if (best.date == time.today()) "tonight" else "${time.weekday(best.date)} night"
+                Text("Northern lights possible $day", style = MaterialTheme.typography.titleMedium, color = viewColor(best.view))
+                Note(
+                    listOfNotNull(
+                        horizon(best.view, southern),
+                        best.peakAt?.let { "best around ${time.hour(it)}" },
+                        stormScale(best.maxKp) ?: "Kp ${"%.1f".format(best.maxKp)}",
+                    ).joinToString(" · "),
+                )
+                best.cloudPercent?.let { c ->
                     Note(
-                        listOfNotNull(
-                            horizon(best.view, southern),
-                            best.peakAt?.let { "best around ${time.hour(it)}" },
-                            stormScale(best.maxKp) ?: "Kp ${"%.1f".format(best.maxKp)}",
-                        ).joinToString(" · "),
+                        when {
+                            c >= 75 -> "Clouds about $c%: likely hidden"
+                            c >= 40 -> "Clouds about $c%: look for breaks"
+                            else -> "Mostly clear (clouds about $c%)"
+                        },
+                        color = if (c >= 75) Caution else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    best.cloudPercent?.let { c ->
-                        Note(
-                            when {
-                                c >= 75 -> "Clouds about $c%: likely hidden"
-                                c >= 40 -> "Clouds about $c%: look for breaks"
-                                else -> "Mostly clear (clouds about $c%)"
-                            },
-                            color = if (c >= 75) Caution else MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                else -> Text("No aurora expected here", style = MaterialTheme.typography.titleMedium)
-            }
-            if (report.nights.size > 1) {
-                Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                    report.nights.forEach { n ->
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                            Text(
-                                if (n.date == time.today()) "Tonight" else time.weekday(n.date),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                when (n.view) {
-                                    AuroraView.NONE -> "–"
-                                    AuroraView.CAMERA -> "camera"
-                                    AuroraView.HORIZON -> "low"
-                                    AuroraView.OVERHEAD -> "high"
-                                },
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Medium,
-                                color = viewColor(n.view),
-                            )
-                            KpBar(n.maxKp, viewColor(n.view))
-                        }
-                    }
                 }
             }
-            if (report.gpsImpact) {
-                Note("Strong geomagnetic storm: GPS and satellite texting may be less reliable for a while", color = Caution)
-            }
-            Note("Get away from lights and look ${if (southern) "south" else "north"} after dark; let your eyes adjust for 15 minutes. A phone's night mode shows more than your eyes can.")
-            Note("NOAA Space Weather Prediction Center")
+            else -> Text("No aurora expected here", style = MaterialTheme.typography.titleMedium)
         }
+        if (report.nights.size > 1) {
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                report.nights.forEach { n ->
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                        Text(
+                            if (n.date == time.today()) "Tonight" else time.weekday(n.date),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            when (n.view) {
+                                AuroraView.NONE -> "–"
+                                AuroraView.CAMERA -> "camera"
+                                AuroraView.HORIZON -> "low"
+                                AuroraView.OVERHEAD -> "high"
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Medium,
+                            color = viewColor(n.view),
+                        )
+                        KpBar(n.maxKp, viewColor(n.view))
+                    }
+                }
+            }
+        }
+        if (report.gpsImpact) {
+            Note("Strong geomagnetic storm: GPS and satellite texting may be less reliable for a while", color = Caution)
+        }
+        Note("Get away from lights and look ${if (southern) "south" else "north"} after dark; let your eyes adjust for 15 minutes. A phone's night mode shows more than your eyes can.")
+        Note("NOAA Space Weather Prediction Center")
     }
 }
 
@@ -305,47 +303,44 @@ private fun sapColor(rating: SapRating): Color = when (rating) {
 @Composable
 internal fun SapSection(report: SapReport, f: UnitFormatter, time: TimeFormat) {
     val best = report.days.filter { it.rating >= SapRating.GOOD }
-    Column {
-        SectionTitle("Maple sap")
-        SeasonCard {
-            Text(
-                when {
-                    best.isEmpty() && report.days.any { it.rating == SapRating.LIGHT } -> "Light runs at best this week"
-                    best.isEmpty() -> "No sap runs in the forecast"
-                    else -> "Best runs: " + best.sortedByDescending { it.score }.take(3).sortedBy { it.date }
-                        .joinToString(", ") { if (it.date == time.today()) "today" else time.weekday(it.date) }
-                },
-                style = MaterialTheme.typography.titleMedium,
-            )
-            when (report.note) {
-                SapReport.Note.WARM_NIGHTS -> Note("Several nights above freezing: flow slows, and buds may end the season soon", color = Caution)
-                SapReport.Note.DEEP_FREEZE -> Note("Trees stay frozen: no flow until days get above freezing")
-                null -> {}
-            }
-            Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                report.days.take(7).forEach { d ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                        Text(time.weekday(d.date), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(
-                            when (d.rating) {
-                                SapRating.NONE -> "–"
-                                SapRating.LIGHT -> "light"
-                                SapRating.GOOD -> "good"
-                                SapRating.GREAT -> "great"
-                            },
-                            style = MaterialTheme.typography.labelLarge,
-                            color = sapColor(d.rating),
-                        )
-                        Text(
-                            "${f.temperature(d.nightLowC)}/${f.temperature(d.highC)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+    WeatherCard("Maple sap") {
+        Text(
+            when {
+                best.isEmpty() && report.days.any { it.rating == SapRating.LIGHT } -> "Light runs at best this week"
+                best.isEmpty() -> "No sap runs in the forecast"
+                else -> "Best runs: " + best.sortedByDescending { it.score }.take(3).sortedBy { it.date }
+                    .joinToString(", ") { if (it.date == time.today()) "today" else time.weekday(it.date) }
+            },
+            style = MaterialTheme.typography.titleMedium,
+        )
+        when (report.note) {
+            SapReport.Note.WARM_NIGHTS -> Note("Several nights above freezing: flow slows, and buds may end the season soon", color = Caution)
+            SapReport.Note.DEEP_FREEZE -> Note("Trees stay frozen: no flow until days get above freezing")
+            null -> {}
+        }
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+            report.days.take(7).forEach { d ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                    Text(time.weekday(d.date), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        when (d.rating) {
+                            SapRating.NONE -> "–"
+                            SapRating.LIGHT -> "light"
+                            SapRating.GOOD -> "good"
+                            SapRating.GREAT -> "great"
+                        },
+                        style = MaterialTheme.typography.labelLarge,
+                        color = sapColor(d.rating),
+                    )
+                    Text(
+                        "${f.temperature(d.nightLowC)}/${f.temperature(d.highC)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
-            Note("Sap runs best after a night in the 20s °F and a sunny day in the 40s. Each day shows the night before's low and the day's high.")
         }
+        Note("Sap runs best after a night in the 20s °F and a sunny day in the 40s. Each day shows the night before's low and the day's high.")
     }
 }
 
@@ -369,37 +364,34 @@ private fun describe(reason: BurnReason, f: UnitFormatter): String = when (reaso
 
 @Composable
 internal fun BurnSection(report: BurnReport, f: UnitFormatter, time: TimeFormat) {
-    Column {
-        SectionTitle("Burn days")
-        SeasonCard {
-            val today = report.days.firstOrNull()
-            if (today != null) {
-                Text(
-                    (if (today.date == time.today()) "Today: " else "${time.weekday(today.date)}: ") + today.rating.label.lowercase(),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = burnColor(today.rating),
-                )
-                if (today.rating != BurnRating.GOOD) {
-                    val next = report.days.drop(1).firstOrNull { it.rating == BurnRating.GOOD }
-                    Note(next?.let { "Next good day: ${time.dayName(it.date)}" } ?: "No good burn days in the forecast")
-                }
+    WeatherCard("Burn days") {
+        val today = report.days.firstOrNull()
+        if (today != null) {
+            Text(
+                (if (today.date == time.today()) "Today: " else "${time.weekday(today.date)}: ") + today.rating.label.lowercase(),
+                style = MaterialTheme.typography.titleMedium,
+                color = burnColor(today.rating),
+            )
+            if (today.rating != BurnRating.GOOD) {
+                val next = report.days.drop(1).firstOrNull { it.rating == BurnRating.GOOD }
+                Note(next?.let { "Next good day: ${time.dayName(it.date)}" } ?: "No good burn days in the forecast")
             }
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 2.dp)) {
-                report.days.forEach { d ->
-                    Row {
-                        StatusDot(burnColor(d.rating))
-                        Spacer(Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                "${time.dayName(d.date)} · ${d.rating.label}",
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                            if (d.reasons.isNotEmpty()) Note(d.reasons.joinToString(" · ") { describe(it, f) })
-                        }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 2.dp)) {
+            report.days.forEach { d ->
+                Row {
+                    StatusDot(burnColor(d.rating))
+                    Spacer(Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            "${time.dayName(d.date)} · ${d.rating.label}",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        if (d.reasons.isNotEmpty()) Note(d.reasons.joinToString(" · ") { describe(it, f) })
                     }
                 }
             }
-            Note("Rules vary by town and state: many need a burn permit (in New Hampshire, unless the ground is snow-covered). Keep water and a rake nearby, and never leave a fire alone.")
         }
+        Note("Rules vary by town and state: many need a burn permit (in New Hampshire, unless the ground is snow-covered). Keep water and a rake nearby, and never leave a fire alone.")
     }
 }

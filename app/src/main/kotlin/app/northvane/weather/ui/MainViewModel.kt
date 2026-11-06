@@ -21,9 +21,13 @@ import app.northvane.core.repo.attempt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import app.northvane.weather.data.SatelliteFeature
+import app.northvane.weather.data.TodayCard
+import app.northvane.weather.data.setInterest
 import app.northvane.core.garden.FrostClimate
 import app.northvane.weather.net.NetworkStatus
 import app.northvane.weather.net.isLimited
+import app.northvane.weather.net.isAllowed
+import app.northvane.core.outlook.MinutePrecip
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -56,6 +60,8 @@ data class MainUiState(
     /** Frost-date climatology for the selected place (garden and heating cards). */
     val frostClimate: FrostClimate? = null,
     val ai: AiUiState = AiUiState(),
+    /** The next two hours in 15-minute steps (empty when not downloaded). */
+    val nowcast: List<MinutePrecip> = emptyList(),
 ) {
     /**
      * Under satellite limits, cards only show data downloaded in the last 12
@@ -79,7 +85,9 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
     private val error = MutableStateFlow<String?>(null)
     private val climates = MutableStateFlow<Map<String, FrostClimate>>(emptyMap())
     private val aiJobs = AiController(container, viewModelScope)
-    private val extras = combine(climates, aiJobs.states) { c, a -> c to a }
+    /** The 15-minute rain forecast per place, for the headline's "rain in 20 minutes". */
+    private val nowcasts = MutableStateFlow<Map<String, Pair<Instant, List<MinutePrecip>>>>(emptyMap())
+    private val extras = combine(climates, aiJobs.states, nowcasts) { c, a, n -> Triple(c, a, n) }
     private var refreshJob: Job? = null
     private var refreshingId: String? = null
 
@@ -90,7 +98,7 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
     ) { locations, settings, network -> Triple(locations, settings, network) }
 
     val state: StateFlow<MainUiState> = combine(inputs, snapshots, refreshing, error, extras) { input, snaps, isRefreshing, err, extra ->
-        val (climateMap, aiMap) = extra
+        val (climateMap, aiMap, nowcastMap) = extra
         val (locations, settings, network) = input
         val selected = locations.firstOrNull { it.id == settings.selectedLocationId } ?: locations.firstOrNull()
         MainUiState(
@@ -106,6 +114,7 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
             pollenKeySet = settings.pollenEnabled && container.secrets.has(SecretStore.POLLEN_API_KEY),
             frostClimate = selected?.let { climateMap[it.id] },
             ai = selected?.let { aiMap[it.id] } ?: AiUiState(),
+            nowcast = selected?.let { nowcastMap[it.id]?.second }.orEmpty(),
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, MainUiState())
 
@@ -115,7 +124,10 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
             state.map { st -> Triple(st.selected, st.snapshot?.fetchedAt, with(st.settings) { listOf(aiEnabled, aiDiscussion, aiProvider, aiBaseUrl, aiModel) }) }
                 .distinctUntilChanged()
                 .collect { (location, fetchedAt, _) ->
-                    if (location != null && fetchedAt != null) aiJobs.loadDiscussion(location, state.value.settings, state.value.liteMode)
+                    if (location != null && fetchedAt != null) {
+                        aiJobs.loadDiscussion(location, state.value.settings, state.value.liteMode)
+                        loadNowcast(location)
+                    }
                 }
         }
         // Frost dates are only downloaded for people who use the garden or heating cards.
@@ -258,6 +270,48 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    /** About 1 KB, at most every 10 minutes per place; Backwoods mode decides as for rain notifications. */
+    private fun loadNowcast(location: SavedLocation) {
+        val last = nowcasts.value[location.id]?.first
+        if (last != null && Duration.between(last, Instant.now()) < Duration.ofMinutes(10)) return
+        if (!isAllowed(SatelliteFeature.RAIN_SOON, state.value.settings, state.value.network)) return
+        viewModelScope.launch {
+            attempt { container.nowcast.next(location.point) }.onSuccess { steps ->
+                nowcasts.update { it + (location.id to (Instant.now() to steps)) }
+            }
+        }
+    }
+
+    /** Moves a Today card one place up (-1) or down (+1) among the cards on screen. */
+    fun moveCard(card: TodayCard, by: Int, visible: Collection<TodayCard>) {
+        viewModelScope.launch { container.settings.setTodayOrder(TodayCard.move(state.value.settings.todayOrder, card, by, visible)) }
+    }
+
+    fun setCardShown(card: TodayCard, shown: Boolean) {
+        viewModelScope.launch { container.settings.setTodayCard(card, shown) }
+    }
+
+    fun setActivity(activity: app.northvane.core.model.Activity, enabled: Boolean) {
+        viewModelScope.launch { container.settings.setActivity(activity, enabled) }
+    }
+
+    fun setUnits(units: app.northvane.core.model.UnitSystem) {
+        viewModelScope.launch { container.settings.setUnits(units) }
+    }
+
+    fun setInterest(interest: app.northvane.weather.data.Interest, on: Boolean) {
+        viewModelScope.launch {
+            container.settings.setInterest(interest, on)
+            // Garden frost alerts and aurora notifications run in the background.
+            container.alertScheduler.sync()
+            app.northvane.weather.work.AuroraWatchWorker.sync(container.app, container.settings.settings.first())
+        }
+    }
+
+    fun dismissAllergyPrompt() {
+        viewModelScope.launch { container.settings.dismissAllergyPrompt() }
+    }
+
     /** Checks for a newer forecasters' discussion now. */
     fun refreshDiscussion() {
         val st = state.value
@@ -282,8 +336,8 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         state.value.selected?.let { aiJobs.clearAnswer(it.id) }
     }
 
-    fun moveLocation(id: String, offset: Int) {
-        viewModelScope.launch { container.locations.move(id, offset) }
+    fun reorderLocations(ids: List<String>) {
+        viewModelScope.launch { container.locations.reorder(ids) }
     }
 
     fun setFollowRestrictedData(follow: Boolean) {

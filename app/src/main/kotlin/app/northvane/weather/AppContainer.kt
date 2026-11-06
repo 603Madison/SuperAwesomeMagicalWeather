@@ -10,12 +10,9 @@ import app.northvane.core.history.AcisClient
 import app.northvane.core.air.AirNowClient
 import app.northvane.core.air.EpaUvClient
 import app.northvane.core.air.OpenMeteoAirClient
-import app.northvane.core.traffic.TrafficClient
-import app.northvane.core.traffic.TrafficService
 import app.northvane.weather.data.ThemeBackgroundStore
 import app.northvane.weather.data.ClimateStore
 import app.northvane.weather.data.AiStore
-import app.northvane.weather.data.TrafficCache
 import app.northvane.core.ai.AiClient
 import app.northvane.core.eccc.EcccClient
 import app.northvane.core.nws.NwsClient
@@ -69,14 +66,11 @@ class AppContainer(val app: Application) {
     val radar: RadarService by lazy { RadarService(http) }
     val pollen: PollenClient by lazy { PollenClient(http) }
     val airNow: AirNowClient by lazy { AirNowClient(http) }
-    val trafficClient: TrafficClient by lazy { TrafficClient(http) }
-    val traffic: TrafficService by lazy { TrafficService(trafficClient) }
     val themeBackground = ThemeBackgroundStore(app)
     val acis: AcisClient by lazy { AcisClient(http) }
     val climate: ClimateStore by lazy { ClimateStore(app, acis) }
     val ai: AiClient by lazy { AiClient(HttpClients.localServerClients(http)) }
     val aiReplies: AiStore by lazy { AiStore(app) }
-    val trafficCache: TrafficCache by lazy { TrafficCache(app) }
 
     val repository: WeatherRepository by lazy {
         WeatherRepository(nws, owm, weewx, weatherCache.pointCache, acis = acis, pollen = pollen,

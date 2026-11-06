@@ -31,10 +31,6 @@
         <domain includeSubdomains="true">airnowapi.org</domain>
         <domain includeSubdomains="true">epa.gov</domain>
         <domain includeSubdomains="true">open-meteo.com</domain>
-        <domain includeSubdomains="true">transportation.gov</domain>
-        <domain includeSubdomains="true">ne-compass.com</domain>
-        <domain includeSubdomains="true">newengland511.org</domain>
-        <domain includeSubdomains="true">tomtom.com</domain>
         <domain includeSubdomains="true">weather.gc.ca</domain>
         <!-- River gauges (USGS Water Data) for the rivers & tides card. -->
         <domain includeSubdomains="true">usgs.gov</domain>

@@ -47,9 +47,9 @@ data class HeatSource(
 enum class HeatingPhase(val label: String) {
     OFF("Off season"),
     PREPARE("Get ready for heating season"),
-    EARLY("Early heating season"),
+    EARLY("Heating season is starting"),
     PEAK("Heart of heating season"),
-    LATE("Late heating season"),
+    LATE("Heating season is winding down"),
 }
 
 @Serializable
@@ -215,6 +215,28 @@ object HeatingAdvisor {
     }
 
     /** Heating degree days, base 65°F, from a day's high and low (°C). */
+    /**
+     * How much heating this week needs, in words: from the average daily
+     * heating degree days (°F, base 65), and compared with the past month.
+     */
+    fun demandText(weekHdd: Double, recentHdd: Double?): String {
+        val perDay = weekHdd / 7
+        val level = when {
+            perDay < 3 -> "Barely any heating needed this week"
+            perDay < 12 -> "Light heating this week"
+            perDay < 25 -> "Steady heating this week"
+            else -> "Heavy heating this week"
+        }
+        val month = recentHdd?.let { it / 30 }
+        val compare = when {
+            month == null || perDay < 3 -> ""
+            perDay > month * 1.25 + 1 -> ", colder than the past month"
+            perDay < month * 0.75 - 1 -> ", milder than the past month"
+            else -> ", about like the past month"
+        }
+        return "$level$compare."
+    }
+
     fun hdd(highC: Double?, lowC: Double?): Double {
         val hi = highC?.let(Units::cToF) ?: return 0.0
         val lo = lowC?.let(Units::cToF) ?: hi

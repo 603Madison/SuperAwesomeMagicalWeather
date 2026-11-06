@@ -98,8 +98,9 @@ class SecretStore(context: Context) {
         const val OWM_API_KEY = "owm_api_key"
         const val POLLEN_API_KEY = "google_pollen_api_key"
         const val AIRNOW_API_KEY = "airnow_api_key"
-        const val NE511_API_KEY = "ne511_api_key"
-        const val TOMTOM_API_KEY = "tomtom_api_key"
+
+        /** Keys for features that were removed (traffic, 2.0); deleted at startup. */
+        val RETIRED = listOf("ne511_api_key", "tomtom_api_key")
         const val AI_API_KEY = "ai_api_key"
         const val CLAUDE_API_KEY = "claude_api_key"
 

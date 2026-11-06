@@ -114,6 +114,33 @@ import app.northvane.core.garden.Crop
 import java.time.Instant
 import java.time.ZoneId
 import kotlin.math.roundToInt
+import app.northvane.weather.data.TodayCard
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import app.northvane.core.outlook.TodayHeadline
+import app.northvane.core.model.UvLevel
+import app.northvane.core.outlook.OutlookText
+import app.northvane.weather.ui.components.CardMenu
+import app.northvane.weather.ui.components.LocalCardMenu
+import app.northvane.weather.ui.components.WeatherCard
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import app.northvane.core.util.Solar
+import app.northvane.core.model.SavedLocation
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import app.northvane.core.model.UnitSystem
+import app.northvane.weather.data.AppSettings
+import app.northvane.weather.data.Interest
 
 /** Everything the Today screen can ask the app to do. */
 class HomeActions(
@@ -127,6 +154,12 @@ class HomeActions(
     val laundryOut: (Boolean) -> Unit = {},
     val markPlanted: (Crop) -> Unit = {},
     val refreshDiscussion: () -> Unit = {},
+    val moveCard: (TodayCard, Int, List<TodayCard>) -> Unit = { _, _, _ -> },
+    val setCardShown: (TodayCard, Boolean) -> Unit = { _, _ -> },
+    val openCardSettings: (TodayCard) -> Unit = {},
+    val dismissAllergyPrompt: () -> Unit = {},
+    val setUnits: (UnitSystem) -> Unit = {},
+    val setInterest: (Interest, Boolean) -> Unit = { _, _ -> },
     val ask: (String) -> Unit = {},
     val clearAnswer: () -> Unit = {},
     /** Stop Backwoods mode following Android's ambiguous "restricted background data". */
@@ -197,6 +230,16 @@ private fun HomeContent(
         }
     }
     val time = remember(zone) { TimeFormat(zone, DateFormat.is24HourFormat(context)) }
+    var openGlance by rememberSaveable { mutableStateOf<Glance?>(null) }
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val hideCard: (TodayCard) -> Unit = { card ->
+        actions.setCardShown(card, false)
+        scope.launch {
+            val result = snackbar.showSnackbar("${card.label} hidden", actionLabel = "Undo", duration = SnackbarDuration.Short)
+            if (result == SnackbarResult.ActionPerformed) actions.setCardShown(card, true)
+        }
+    }
 
     val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         if (result.values.any { it }) actions.useDeviceLocation()
@@ -228,6 +271,7 @@ private fun HomeContent(
         // The theme background shows through, except during a warning (red screen).
         containerColor = if (warning) MaterialTheme.colorScheme.background else Color.Transparent,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             LocationTopBar(
                 state = state,
@@ -241,8 +285,11 @@ private fun HomeContent(
         if (state.ready && state.locations.isEmpty()) {
             Onboarding(
                 modifier = Modifier.padding(padding),
+                settings = state.settings,
                 onUseLocation = requestDeviceLocation,
                 onSearch = onOpenLocations,
+                onSetUnits = actions.setUnits,
+                onSetInterest = actions.setInterest,
                 error = state.error,
             )
         } else {
@@ -280,28 +327,99 @@ private fun HomeContent(
                         item { LoadingCard(state.refreshing) }
                     } else {
                         val settings = state.settings
-                        val showCurrent = state.shows(Section.CURRENT_CONDITIONS)
+                        val now = Instant.now()
                         val hidden = mutableListOf<String>()
+                        val showCurrent = state.shows(Section.CURRENT_CONDITIONS)
+                        val headline = if (state.shows(Section.HOURLY_FORECAST)) {
+                            TodayHeadline.write(snapshot.hourly, snapshot.daily, now, zone, formatter, time::time, time::hour, state.nowcast)
+                        } else {
+                            emptyList()
+                        }
                         if (showCurrent) {
-                            item {
-                                HeroCard(snapshot, formatter, time, warning, onEasterEgg = { showKelvin = true }, kelvin = showKelvin)
+                            item(key = "hero") {
+                                HeroCard(snapshot, formatter, time, warning, headline, onEasterEgg = { showKelvin = true }, kelvin = showKelvin)
                             }
                         } else {
                             hidden += "current conditions"
+                            if (headline.isNotEmpty()) item(key = "headline") { HeadlineCard(headline) }
                         }
                         if (snapshot.alerts.isNotEmpty() && state.shows(Section.ALERTS)) {
-                            item { AlertBanner(snapshot.alerts, time, onOpenAlerts) }
+                            item(key = "alerts") { AlertBanner(snapshot.alerts, time, onOpenAlerts) }
                         }
-                        if (settings.stormEnabled && (state.shows(Section.HOURLY_FORECAST) || state.shows(Section.DAILY_FORECAST))) {
-                            if (storm != null) item { StormSection(storm, formatter, time) }
+
+                        // At a glance: air, UV, pollen and the sun as chips, unless one of them matters today.
+                        val airFresh = state.shows(Section.AIR_QUALITY)
+                        if ((snapshot.airQuality != null || snapshot.uv != null) && !airFresh) hidden += "air quality and UV"
+                        val air = snapshot.airQuality?.takeIf { settings.airQualityEnabled && airFresh && it.current != null }
+                        val uv = snapshot.uv?.takeIf { settings.uvEnabled && airFresh && it.at(now) != null }
+                        val pollen = snapshot.pollen?.takeIf { settings.pollenEnabled && state.pollenKeySet && state.shows(Section.POLLEN) && it.days.isNotEmpty() }
+                        val aqi = air?.current?.aqi ?: 0
+                        val uvMax = uv?.let { it.todayMax ?: it.peak()?.index } ?: 0.0
+                        val pollenIndex = pollen?.days?.firstOrNull()?.worst?.index ?: 0
+                        val airNotable = aqi > 50
+                        val uvNotable = uvMax >= 6.0
+                        val pollenNotable = pollenIndex >= 4
+                        val location = state.selected
+                        val chips = buildList {
+                            air?.current?.takeIf { !airNotable }?.let { add(GlanceChip(Glance.AIR, "AQI ${it.aqi} · ${it.category.label}", aqiColor(it.category))) }
+                            uv?.takeIf { !uvNotable }?.let { u ->
+                                val nowUv = u.at(now)?.roundToInt() ?: 0
+                                add(GlanceChip(Glance.UV, "UV $nowUv · peak ${uvMax.roundToInt()}", uvColor(UvLevel.of(uvMax))))
+                            }
+                            pollen?.takeIf { !pollenNotable }?.let {
+                                add(GlanceChip(Glance.POLLEN, "Pollen " + OutlookText.pollenCategory(pollenIndex).lowercase(), pollenColor(pollenIndex)))
+                            }
+                            location?.let { add(GlanceChip(Glance.SUN, sunChipLabel(it, zone, time, now), null)) }
+                        }
+                        val pollenCard: @Composable () -> Unit = {
+                            val allergyDays = remember(snapshot, settings.allergies) {
+                                AllergyEstimator.forecast(settings.allergies, snapshot.daily, pollen, snapshot.airQuality, time.today())
+                            }
+                            val showAllergy = settings.allergyEnabled && (settings.allergies.isNotEmpty() || !settings.allergyPromptDismissed)
+                            val allergy: (@Composable () -> Unit)? = if (showAllergy) {
+                                {
+                                    AllergyBlock(
+                                        allergyDays, settings.allergies.isNotEmpty(), formatter, time, onOpenAllergies,
+                                        onDismissPrompt = actions.dismissAllergyPrompt,
+                                    )
+                                }
+                            } else {
+                                null
+                            }
+                            PollenSection(pollen, hasKey = true, time = time, onOpenSources = onOpenSources, allergyContent = allergy)
+                        }
+                        if (chips.isNotEmpty()) {
+                            item(key = "glance") { GlanceRow(chips, openGlance, onToggle = { g -> openGlance = if (openGlance == g) null else g }) }
+                            openGlance?.takeIf { g -> chips.any { it.glance == g } }?.let { g ->
+                                item(key = "glance-$g") {
+                                    when (g) {
+                                        Glance.AIR -> air?.let { AirQualitySection(it, time) }
+                                        Glance.UV -> uv?.let { UvSection(it, time) }
+                                        Glance.POLLEN -> pollenCard()
+                                        Glance.SUN -> location?.let { SunCard(it, zone, time) }
+                                    }
+                                }
+                            }
+                        }
+
+                        // The movable cards, in the user's order.
+                        val cards = linkedMapOf<TodayCard, @Composable () -> Unit>()
+                        if (settings.stormEnabled && storm != null && (state.shows(Section.HOURLY_FORECAST) || state.shows(Section.DAILY_FORECAST))) {
+                            cards[TodayCard.STORM] = { StormSection(storm, formatter, time) }
+                        }
+                        val smoke = snapshot.smoke
+                        if (settings.smokeEnabled && smoke != null && state.shows(Section.SMOKE) &&
+                            (smoke.peak?.microgramsPerM3 ?: 0.0) >= app.northvane.core.radar.SmokeLevel.LIGHT.from
+                        ) {
+                            cards[TodayCard.SMOKE] = { SmokeSection(smoke, time) }
                         }
                         if (snapshot.hourly.isNotEmpty() && state.shows(Section.HOURLY_FORECAST)) {
-                            item { HourlySection(snapshot.hourly, formatter, time, state.settings.hourlyExpanded, actions.setHourlyExpanded) }
+                            cards[TodayCard.HOURLY] = { HourlySection(snapshot.hourly, formatter, time, settings.hourlyExpanded, actions.setHourlyExpanded) }
                         } else if (snapshot.hourly.isNotEmpty() || Section.HOURLY_FORECAST in snapshot.skippedSections) {
                             hidden += "hourly forecast"
                         }
                         if (snapshot.daily.isNotEmpty() && state.shows(Section.DAILY_FORECAST)) {
-                            item {
+                            cards[TodayCard.DAILY] = {
                                 DailySection(
                                     snapshot.daily, formatter, time,
                                     showOutage = settings.outageRiskEnabled,
@@ -313,56 +431,43 @@ private fun HomeContent(
                         } else if (snapshot.daily.isNotEmpty()) {
                             hidden += "daily forecast"
                         }
-                        // AI, where it adds something: the forecasters' reasoning, and answers to the user's own questions.
-                        val aiReady = settings.aiEnabled && settings.aiModel.isNotBlank()
-                        if (aiReady && settings.aiDiscussion) {
-                            item { ForecastersNotesCard(state.ai, time, onRefresh = actions.refreshDiscussion) }
-                        }
-                        if (aiReady && settings.aiAsk && state.shows(Section.HOURLY_FORECAST)) {
-                            item { AskCard(state.ai, state.selected?.displayName ?: "this place", onAsk = actions.ask, onClear = actions.clearAnswer) }
-                        }
                         val aurora = snapshot.aurora
                         if (settings.auroraEnabled && aurora != null && state.shows(Section.AURORA)) {
-                            val lat = snapshot.latitude ?: state.selected?.latitude
-                            val lon = state.selected?.longitude
+                            val lat = snapshot.latitude ?: location?.latitude
+                            val lon = location?.longitude
                             if (lat != null && lon != null) {
                                 // Cheap: a few nights of sun positions against at most 3 days of Kp values.
-                                val report = AuroraAdvisor.report(aurora, lat, lon, snapshot.hourly, zone, Instant.now())
-                                if (report.worthShowing(state.liteMode)) item { AuroraSection(report, time) }
+                                val report = AuroraAdvisor.report(aurora, lat, lon, snapshot.hourly, zone, now)
+                                if (report.worthShowing(state.liteMode)) cards[TodayCard.AURORA] = { AuroraSection(report, time) }
                             }
                         }
-                        val air = snapshot.airQuality
-                        val airFresh = state.shows(Section.AIR_QUALITY)
-                        if (settings.airQualityEnabled && air != null && airFresh) {
-                            item { AirQualitySection(air, time) }
+                        if (air != null && airNotable) cards[TodayCard.AIR] = { AirQualitySection(air, time) }
+                        if (uv != null && uvNotable) cards[TodayCard.UV] = { UvSection(uv, time) }
+                        if (pollen != null && pollenNotable) cards[TodayCard.POLLEN] = pollenCard
+                        // AI, where it adds something: the forecasters' reasoning, and answers to the user's own questions.
+                        val aiReady = settings.aiEnabled && settings.aiModel.isNotBlank()
+                        val notes = state.ai.discussion
+                        if (aiReady && settings.aiDiscussion && state.ai.office != null && (notes.reply != null || notes.loading || notes.error != null)) {
+                            cards[TodayCard.FORECASTERS] = { ForecastersNotesCard(state.ai, time, onRefresh = actions.refreshDiscussion) }
                         }
-                        val uv = snapshot.uv
-                        if (settings.uvEnabled && uv != null && airFresh) {
-                            item { UvSection(uv, time) }
+                        if (aiReady && settings.aiAsk && state.shows(Section.HOURLY_FORECAST)) {
+                            cards[TodayCard.ASK] = { AskCard(state.ai, location?.displayName ?: "this place", onAsk = actions.ask, onClear = actions.clearAnswer) }
                         }
-                        if ((air != null || uv != null) && !airFresh) hidden += "air quality and UV"
-                        // Smoke shows up only when there's at least a light haze.
-                        val smoke = snapshot.smoke
-                        if (settings.smokeEnabled && smoke != null && state.shows(Section.SMOKE) &&
-                            (smoke.peak?.microgramsPerM3 ?: 0.0) >= app.northvane.core.radar.SmokeLevel.LIGHT.from
-                        ) {
-                            item { SmokeSection(smoke, time) }
-                        }
-                        // Pollen (with the personal allergy forecast) needs a Google Pollen key.
-                        val pollen = snapshot.pollen
-                        if (settings.pollenEnabled && state.pollenKeySet && pollen != null && state.shows(Section.POLLEN)) {
-                            item {
-                                val allergyDays = remember(snapshot, settings.allergies) {
-                                    AllergyEstimator.forecast(settings.allergies, snapshot.daily, pollen, snapshot.airQuality, time.today())
+                        val visible = settings.todayOrder.filter { it in cards }
+                        visible.forEachIndexed { index, card ->
+                            item(key = card.name) {
+                                val menu = CardMenu(
+                                    onMoveUp = if (index > 0) ({ actions.moveCard(card, -1, visible) }) else null,
+                                    onMoveDown = if (index < visible.lastIndex) ({ actions.moveCard(card, 1, visible) }) else null,
+                                    onHide = if (card.hideable) ({ hideCard(card) }) else null,
+                                    onSettings = { actions.openCardSettings(card) },
+                                )
+                                CompositionLocalProvider(LocalCardMenu provides menu) {
+                                    Box(Modifier.animateItem()) { cards.getValue(card)() }
                                 }
-                                val allergy: (@Composable () -> Unit)? = if (settings.allergyEnabled) {
-                                    { AllergyBlock(allergyDays, settings.allergies.isNotEmpty(), formatter, time, onOpenAllergies) }
-                                } else {
-                                    null
-                                }
-                                PollenSection(pollen, hasKey = true, time = time, onOpenSources = onOpenSources, allergyContent = allergy)
                             }
                         }
+
                         if (hidden.isNotEmpty()) {
                             item {
                                 HintText(
@@ -371,11 +476,7 @@ private fun HomeContent(
                                 )
                             }
                         }
-                        snapshot.current?.takeIf { showCurrent }?.let { current ->
-                            item { DetailsSection(current, formatter) }
-                        }
-                        state.selected?.let { location -> item { SunCard(location, zone, time) } }
-                        item { SourcesFooter(snapshot, time) }
+                        item(key = "sources") { SourcesFooter(snapshot, time) }
                     }
                 }
             }
@@ -412,7 +513,8 @@ private fun LocationTopBar(
                         Spacer(Modifier.width(4.dp))
                     }
                     Text(
-                        state.selected?.displayName ?: "SuperAwesomeMagicalWeather",
+                        // Before any place is saved, the welcome screen below says it all.
+                        state.selected?.displayName.orEmpty(),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.widthIn(max = 240.dp),
@@ -471,10 +573,12 @@ private fun HeroCard(
     f: UnitFormatter,
     time: TimeFormat,
     warning: Boolean,
+    headline: List<String> = emptyList(),
     onEasterEgg: () -> Unit = {},
     kelvin: Boolean = false,
 ) {
     val taps = remember { ArrayDeque<Long>() }
+    var showDetails by rememberSaveable { mutableStateOf(false) }
     val current = snapshot.current
     val today = snapshot.daily.firstOrNull { it.date == time.today() } ?: snapshot.daily.firstOrNull()
     val condition = current?.condition ?: today?.condition ?: WeatherCondition.UNKNOWN
@@ -521,31 +625,85 @@ private fun HeroCard(
                         color = onHero,
                     )
                     val line = buildList {
-                        current?.feelsLikeC?.let { add("Feels like ${f.temperature(it)}") }
+                        current?.feelsLikeC?.let { add("Feels like\u00A0${f.temperature(it)}") }
                         if (today != null && (today.highC != null || today.lowC != null)) {
-                            add("H ${f.temperature(today.highC)}  L ${f.temperature(today.lowC)}")
+                            // No-break spaces keep "H 62°" and "L 53°" whole when large text wraps.
+                            add("H\u00A0${f.temperature(today.highC)}  L\u00A0${f.temperature(today.lowC)}")
                         }
                     }.joinToString("  ·  ")
                     if (line.isNotEmpty()) {
                         Spacer(Modifier.height(4.dp))
                         Text(line, style = MaterialTheme.typography.bodyMedium, color = onHero.copy(alpha = 0.88f))
                     }
-                    val air = buildList {
-                        current?.windSpeedKph?.let { wind ->
-                            val gust = current.windGustKph?.takeIf { it - wind >= 8 }?.let { " g${f.windNumber(it)}" }.orEmpty()
-                            add("Wind ${f.wind(wind, current.windDirectionDeg)}$gust")
-                        }
-                        current?.humidityPercent?.let { add("Humidity ${f.percent(it)}") }
-                    }.joinToString("  ·  ")
-                    if (air.isNotEmpty()) {
-                        Text(air, style = MaterialTheme.typography.bodyMedium, color = onHero.copy(alpha = 0.88f))
+                    current?.windSpeedKph?.let { wind ->
+                        val gust = current.windGustKph?.takeIf { it - wind >= 8 }?.let { ", gusts ${f.windSpeed(it)}" }.orEmpty()
+                        Text("Wind ${f.wind(wind, current.windDirectionDeg)}$gust", style = MaterialTheme.typography.bodyMedium, color = onHero.copy(alpha = 0.88f))
                     }
                 }
                 WeatherIcon(condition, isDay, size = 104.dp, onDark = true)
             }
-            Spacer(Modifier.height(16.dp))
-            current?.let { SourceBadge(it, time) }
+            if (headline.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    headline.joinToString(" "),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = onHero,
+                )
+            }
+            val details = current?.let { detailPairs(it, f) }.orEmpty()
+            AnimatedVisibility(visible = showDetails && details.isNotEmpty()) {
+                Column(Modifier.padding(top = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    details.chunked(2).forEach { row ->
+                        Row {
+                            row.forEach { (label, value) ->
+                                Column(Modifier.weight(1f)) {
+                                    Text(label, style = MaterialTheme.typography.labelMedium, color = onHero.copy(alpha = 0.8f))
+                                    Text(value, style = MaterialTheme.typography.titleMedium, color = onHero, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                            }
+                            if (row.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) { current?.let { SourceBadge(it, time) } }
+                if (details.isNotEmpty()) {
+                    TextButton(
+                        onClick = { showDetails = !showDetails },
+                        colors = ButtonDefaults.textButtonColors(contentColor = onHero),
+                    ) {
+                        Text(if (showDetails) "Less" else "Details")
+                        Icon(
+                            if (showDetails) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
         }
+    }
+}
+
+/** When the top card can't show (Backwoods mode, old data): the headline on its own. */
+@Composable
+private fun HeadlineCard(headline: List<String>) {
+    WeatherCard(null) {
+        Text(headline.joinToString(" "), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 16.dp))
+    }
+}
+
+/** "Sunset 4:25 PM", or the next sunrise once the sun is down. */
+private fun sunChipLabel(location: SavedLocation, zone: ZoneId, time: TimeFormat, now: Instant): String {
+    val today = now.atZone(zone).toLocalDate()
+    val (rise, set) = Solar.sunTimes(location.latitude, location.longitude, today, zone)
+    return when {
+        rise != null && now.isBefore(rise) -> "Sunrise ${time.time(rise)}"
+        set != null && now.isBefore(set) -> "Sunset ${time.time(set)}"
+        else -> Solar.sunTimes(location.latitude, location.longitude, today.plusDays(1), zone).first?.let { "Sunrise ${time.time(it)}" } ?: "Sun"
     }
 }
 
@@ -572,7 +730,7 @@ private fun TouchGrassCard(onDismiss: () -> Unit) {
 private fun SourceBadge(current: CurrentConditions, time: TimeFormat) {
     val label = when (current.source) {
         DataSource.WEEWX -> current.stationName ?: "Local station"
-        DataSource.NWS -> current.stationName ?: "NWS observation"
+        DataSource.NWS -> current.stationName?.let(::stationLabel) ?: "NWS observation"
         DataSource.OWM -> "OpenWeatherMap"
         DataSource.NWS_FORECAST_ESTIMATE -> "Estimated from NWS forecast"
         else -> current.source.displayName
@@ -596,6 +754,13 @@ private fun SourceBadge(current: CurrentConditions, time: TimeFormat) {
             )
         }
     }
+}
+
+/** NWS names often repeat the town ("Portland, Portland International Jetport"); keep the informative part. */
+internal fun stationLabel(name: String): String {
+    val town = name.substringBefore(", ", "")
+    val rest = name.substringAfter(", ", "")
+    return if (town.isNotEmpty() && rest.contains(town, ignoreCase = true)) rest else name
 }
 
 @Composable
@@ -628,57 +793,16 @@ private fun AlertBanner(alerts: List<WeatherAlert>, time: TimeFormat, onClick: (
     }
 }
 
-@Composable
-internal fun SectionTitle(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
-    )
-}
-
-@Composable
-private fun DetailsSection(current: CurrentConditions, f: UnitFormatter) {
-    val tiles = buildList {
-        current.humidityPercent?.let { add("Humidity" to f.percent(it)) }
-        current.dewpointC?.let { add("Dew point" to f.temperature(it)) }
-        if (current.windSpeedKph != null) add("Wind" to f.wind(current.windSpeedKph, current.windDirectionDeg))
-        current.windGustKph?.let { add("Gusts" to f.windSpeed(it)) }
-        current.pressureHpa?.let { add("Pressure" to f.pressure(it)) }
-        current.visibilityKm?.let { add("Visibility" to f.visibility(it)) }
-        current.rainTodayMm?.let { add("Rain today" to f.precipitation(it)) }
-        current.rainRateMmPerHour?.takeIf { it > 0 }?.let { add("Rain rate" to f.precipitation(it) + "/h") }
-        current.uvIndex?.let { add("UV index" to "${it.roundToInt()}") }
-        current.solarRadiationWm2?.let { add("Solar" to "${it.roundToInt()} W/m²") }
-    }
-    if (tiles.isEmpty()) return
-    Column {
-        SectionTitle("Details")
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            tiles.chunked(2).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    row.forEach { (label, value) -> DetailTile(label, value, Modifier.weight(1f)) }
-                    if (row.size == 1) Spacer(Modifier.weight(1f))
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DetailTile(label: String, value: String, modifier: Modifier = Modifier) {
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        modifier = modifier,
-    ) {
-        Column(Modifier.padding(16.dp)) {
-            Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(4.dp))
-            Text(value, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
+/** The finer numbers, shown under "Details" in the top card. */
+private fun detailPairs(current: CurrentConditions, f: UnitFormatter): List<Pair<String, String>> = buildList {
+    current.humidityPercent?.let { add("Humidity" to f.percent(it)) }
+    current.dewpointC?.let { add("Dew point" to f.temperature(it)) }
+    current.pressureHpa?.let { add("Pressure" to f.pressure(it)) }
+    current.visibilityKm?.let { add("Visibility" to f.visibility(it)) }
+    current.rainTodayMm?.let { add("Rain today" to f.precipitation(it)) }
+    current.rainRateMmPerHour?.takeIf { it > 0 }?.let { add("Rain rate" to f.precipitation(it) + "/h") }
+    current.uvIndex?.let { add("UV index" to "${it.roundToInt()}") }
+    current.solarRadiationWm2?.let { add("Solar" to "${it.roundToInt()} W/m²") }
 }
 
 @Composable
@@ -820,18 +944,31 @@ private fun HintText(text: String) {
     )
 }
 
+/**
+ * First run: units, what the person cares about (which switches on the
+ * matching cards, so they never meet the long list of settings), then a place.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Onboarding(modifier: Modifier, onUseLocation: () -> Unit, onSearch: () -> Unit, error: String?) {
+private fun Onboarding(
+    modifier: Modifier,
+    settings: AppSettings,
+    onUseLocation: () -> Unit,
+    onSearch: () -> Unit,
+    onSetUnits: (UnitSystem) -> Unit,
+    onSetInterest: (Interest, Boolean) -> Unit,
+    error: String?,
+) {
     Column(
         modifier
             .fillMaxSize()
-            .padding(32.dp),
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 24.dp, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
     ) {
-        WeatherIcon(WeatherCondition.PARTLY_CLOUDY, isDay = true, size = 120.dp)
-        Spacer(Modifier.height(24.dp))
-        Text("Welcome to SuperAwesomeMagicalWeather", style = MaterialTheme.typography.headlineSmall)
+        WeatherIcon(WeatherCondition.PARTLY_CLOUDY, isDay = true, size = 96.dp)
+        Spacer(Modifier.height(16.dp))
+        Text("Welcome to SuperAwesomeMagicalWeather", style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         Text(
             "Free forecasts, radar and alerts from the National Weather Service, with optional data from your own WeeWX station.",
@@ -839,7 +976,29 @@ private fun Onboarding(modifier: Modifier, onUseLocation: () -> Unit, onSearch: 
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(24.dp))
+        Text("Units", style = MaterialTheme.typography.titleSmall, modifier = Modifier.fillMaxWidth())
+        Spacer(Modifier.height(6.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            FilterChip(selected = settings.units == UnitSystem.IMPERIAL, onClick = { onSetUnits(UnitSystem.IMPERIAL) }, label = { Text("°F, mph, inches") })
+            FilterChip(selected = settings.units == UnitSystem.METRIC, onClick = { onSetUnits(UnitSystem.METRIC) }, label = { Text("°C, km/h, mm") })
+        }
+        Spacer(Modifier.height(16.dp))
+        Text("What do you care about?", style = MaterialTheme.typography.titleSmall, modifier = Modifier.fillMaxWidth())
+        Text(
+            "Turns on the matching cards. You can change this any time in Settings.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(6.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Interest.entries.forEach { interest ->
+                val on = interest.isOn(settings)
+                FilterChip(selected = on, onClick = { onSetInterest(interest, !on) }, label = { Text(interest.label) })
+            }
+        }
+        Spacer(Modifier.height(24.dp))
         Button(onClick = onUseLocation, modifier = Modifier.fillMaxWidth()) {
             Icon(Icons.Filled.LocationOn, contentDescription = null)
             Spacer(Modifier.width(8.dp))
