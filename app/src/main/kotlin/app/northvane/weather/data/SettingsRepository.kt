@@ -88,16 +88,16 @@ data class AppSettings(
     val owmEnabled: Boolean = false,
     val notificationPromptShown: Boolean = false,
     val satelliteFeatures: Set<SatelliteFeature> = SatelliteFeature.DEFAULTS,
-    val outageRiskEnabled: Boolean = false,
-    val pipeRiskEnabled: Boolean = false,
-    val morningIceEnabled: Boolean = false,
+    val outageRiskEnabled: Boolean = true,
+    val pipeRiskEnabled: Boolean = true,
+    val morningIceEnabled: Boolean = true,
     val auroraEnabled: Boolean = true,
     /** Storm totals card on the Today screen. */
-    val stormEnabled: Boolean = false,
+    val stormEnabled: Boolean = true,
     /** Wildfire smoke card (NOAA HRRR, about 2 MB per update). */
-    val smokeEnabled: Boolean = false,
+    val smokeEnabled: Boolean = true,
     /** Rivers & tides card on the Outlook tab, which also feeds the paddling score. */
-    val waterEnabled: Boolean = false,
+    val waterEnabled: Boolean = true,
     /** A morning briefing notification at [briefingMinutes] after midnight. */
     val briefingEnabled: Boolean = false,
     val briefingMinutes: Int = 7 * 60,

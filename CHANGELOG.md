@@ -3,6 +3,11 @@
 All notable changes to SuperAwesomeMagicalWeather (called Northvane before 1.7.0). The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+- **On by default:** power outage outlook, frozen pipe risk, black ice & frost, storm totals, wildfire smoke and rivers & tides (aurora forecast and fall foliage already were). Anyone who hasn't touched these switches gets them on; a switch you've turned off stays off. Each can still be turned off in Settings, and wildfire smoke stays off in Backwoods mode unless allowed there.
+
 ## [1.8.0] - 2026-11-06
 
 Six new features, each with its own switch and off by default (the widget is on when you place it).

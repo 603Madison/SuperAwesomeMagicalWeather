@@ -88,11 +88,11 @@ Each card can be turned on or off in Settings. The last column is the default.
 | **Allergy score** | A personal daily score from your allergens, pollen, mold and air quality | On |
 | **Pollen** | Tree, grass and weed pollen by plant, from Google's Pollen API (your key) | Off |
 | **Aurora** | Shows up only when the northern lights may be visible from where you are, with optional notifications | On |
-| **Power outage risk** | A daily risk level for New England's tree-lined power lines, with prep steps when it's high | Off |
-| **Frozen pipes** | Risk on nights at or below 20°F, with steps to protect your pipes | Off |
-| **Black ice & frost** | Mornings with frost on windshields or black ice on the roads | Off |
-| **Storm totals** | When a big storm is coming: snow, ice and rain totals, its timing and heaviest hours | Off |
-| **Wildfire smoke** | Shows up only when smoke is forecast: how smoky, when, and what to do (NOAA HRRR) | Off |
+| **Power outage risk** | A daily risk level for New England's tree-lined power lines, with prep steps when it's high | On |
+| **Frozen pipes** | Risk on nights at or below 20°F, with steps to protect your pipes | On |
+| **Black ice & frost** | Mornings with frost on windshields or black ice on the roads | On |
+| **Storm totals** | When a big storm is coming: snow, ice and rain totals, its timing and heaviest hours | On |
+| **Wildfire smoke** | Shows up only when smoke is forecast: how smoky, when, and what to do (NOAA HRRR) | On |
 | **AI summary** | A 2–4 sentence briefing from your own AI server (Ollama, Open WebUI, LibreChat or any OpenAI-compatible server) | Off |
 
 When an NWS **warning** is in effect, the Today screen turns red.
@@ -111,7 +111,7 @@ Planning cards, each shown only when it's in season.
 | **Heating** | Which heat source to run each day, and chores like buying oil or stacking wood | Off |
 | **Maple sap** | Which days the sap will run, mid-January to April | Off |
 | **Burn days** | Good, caution or don't-burn days for brush piles | Off |
-| **Rivers & tides** | The nearest river gauge (flow, height, water temperature, rising or falling) and tide times; water temperature and rising rivers also feed the paddling score | Off |
+| **Rivers & tides** | The nearest river gauge (flow, height, water temperature, rising or falling) and tide times; water temperature and rising rivers also feed the paddling score | On |
 
 ### Radar
 
