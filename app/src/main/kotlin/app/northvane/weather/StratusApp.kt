@@ -23,6 +23,7 @@ class NorthvaneApp : Application() {
             AuroraWatchWorker.sync(this@NorthvaneApp, container.settings.settings.first())
             val settings = container.settings.settings.first()
             app.northvane.weather.work.BriefingWorker.schedule(this@NorthvaneApp, settings)
+            app.northvane.weather.work.TonightWorker.schedule(this@NorthvaneApp, settings)
             app.northvane.weather.work.RainSoonWorker.sync(this@NorthvaneApp, settings)
             app.northvane.weather.widget.WidgetRefreshWorker.sync(this@NorthvaneApp)
         }

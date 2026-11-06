@@ -103,6 +103,9 @@ data class AppSettings(
     /** A morning briefing notification at [briefingMinutes] after midnight. */
     val briefingEnabled: Boolean = false,
     val briefingMinutes: Int = 7 * 60,
+    /** One evening notification with everything worth doing before bed (only when there's something). */
+    val tonightEnabled: Boolean = true,
+    val tonightMinutes: Int = 19 * 60,
     /** "Rain starting soon" notifications for places with notifications on. */
     val rainSoonEnabled: Boolean = false,
     val auroraNotify: Boolean = true,
@@ -150,6 +153,11 @@ data class AppSettings(
     val aiProvider: AiProvider = AiProvider.OLLAMA,
     val aiBaseUrl: String = "",
     val aiModel: String = "",
+    /** When the user is usually out; the headline mentions the weather for these. */
+    val myTimes: List<app.northvane.core.outlook.MyTime> = emptyList(),
+    /** The "what to wear" line in the top card. */
+    val wearEnabled: Boolean = true,
+    val comfort: app.northvane.core.outlook.Comfort = app.northvane.core.outlook.Comfort.NORMAL,
     /** The order of the movable cards on Today. */
     val todayOrder: List<TodayCard> = TodayCard.DEFAULT,
     /** The pollen card's "choose your allergies" prompt was dismissed. */
@@ -197,6 +205,8 @@ class SettingsRepository(context: Context) {
         val water = booleanPreferencesKey("water_enabled")
         val briefing = booleanPreferencesKey("briefing_enabled")
         val briefingMinutes = intPreferencesKey("briefing_minutes")
+        val tonight = booleanPreferencesKey("tonight")
+        val tonightMinutes = intPreferencesKey("tonight_minutes")
         val rainSoon = booleanPreferencesKey("rain_soon_enabled")
         val auroraNotify = booleanPreferencesKey("aurora_notify")
         val auroraNotifyView = stringPreferencesKey("aurora_notify_view")
@@ -239,6 +249,9 @@ class SettingsRepository(context: Context) {
         val aiProvider = stringPreferencesKey("ai_provider")
         val aiBaseUrl = stringPreferencesKey("ai_base_url")
         val aiModel = stringPreferencesKey("ai_model")
+        val myTimes = stringPreferencesKey("my_times")
+        val wear = booleanPreferencesKey("wear")
+        val comfort = stringPreferencesKey("comfort")
         val todayOrder = stringPreferencesKey("today_order")
         val allergyPromptDismissed = booleanPreferencesKey("allergy_prompt_dismissed")
         val aiDiscussion = booleanPreferencesKey("ai_discussion")
@@ -247,6 +260,7 @@ class SettingsRepository(context: Context) {
     }
 
     private val gardenList = ListSerializer(GardenCrop.serializer())
+    private val timeList = ListSerializer(app.northvane.core.outlook.MyTime.serializer())
     private val heatList = ListSerializer(HeatSource.serializer())
 
     private inline fun <reified T : Enum<T>> String?.toEnum(default: T): T =
@@ -285,6 +299,8 @@ class SettingsRepository(context: Context) {
                 waterEnabled = p[Keys.water] ?: d.waterEnabled,
                 briefingEnabled = p[Keys.briefing] ?: d.briefingEnabled,
                 briefingMinutes = p[Keys.briefingMinutes]?.coerceIn(0, 24 * 60 - 1) ?: d.briefingMinutes,
+                tonightEnabled = p[Keys.tonight] ?: d.tonightEnabled,
+                tonightMinutes = p[Keys.tonightMinutes]?.coerceIn(0, 24 * 60 - 1) ?: d.tonightMinutes,
                 rainSoonEnabled = p[Keys.rainSoon] ?: d.rainSoonEnabled,
                 auroraNotify = p[Keys.auroraNotify] ?: d.auroraNotify,
                 auroraNotifyView = p[Keys.auroraNotifyView].toEnum(d.auroraNotifyView),
@@ -330,6 +346,9 @@ class SettingsRepository(context: Context) {
                 aiProvider = p[Keys.aiProvider].toEnum(d.aiProvider),
                 aiBaseUrl = p[Keys.aiBaseUrl] ?: d.aiBaseUrl,
                 aiModel = p[Keys.aiModel] ?: d.aiModel,
+                myTimes = p[Keys.myTimes]?.let { runCatching { NorthvaneJson.decodeFromString(timeList, it) }.getOrNull() } ?: d.myTimes,
+                wearEnabled = p[Keys.wear] ?: d.wearEnabled,
+                comfort = p[Keys.comfort].toEnum(d.comfort),
                 todayOrder = TodayCard.parse(p[Keys.todayOrder]),
                 allergyPromptDismissed = p[Keys.allergyPromptDismissed] ?: d.allergyPromptDismissed,
                 aiDiscussion = p[Keys.aiDiscussion] ?: d.aiDiscussion,
@@ -373,6 +392,8 @@ class SettingsRepository(context: Context) {
     suspend fun setWater(enabled: Boolean) = store.edit { it[Keys.water] = enabled }
     suspend fun setBriefing(enabled: Boolean) = store.edit { it[Keys.briefing] = enabled }
     suspend fun setBriefingMinutes(minutes: Int) = store.edit { it[Keys.briefingMinutes] = minutes.coerceIn(0, 24 * 60 - 1) }
+    suspend fun setTonight(enabled: Boolean) = store.edit { it[Keys.tonight] = enabled }
+    suspend fun setTonightMinutes(minutes: Int) = store.edit { it[Keys.tonightMinutes] = minutes.coerceIn(0, 24 * 60 - 1) }
     suspend fun setRainSoon(enabled: Boolean) = store.edit { it[Keys.rainSoon] = enabled }
     suspend fun setAuroraNotify(enabled: Boolean) = store.edit { it[Keys.auroraNotify] = enabled }
     suspend fun setAuroraNotifyView(view: AuroraView) = store.edit { it[Keys.auroraNotifyView] = view.name }
@@ -421,6 +442,10 @@ class SettingsRepository(context: Context) {
     suspend fun setShowStaleData(enabled: Boolean) = store.edit { it[Keys.showStale] = enabled }
     suspend fun setFollowRestrictedData(enabled: Boolean) = store.edit { it[Keys.followRestricted] = enabled }
     suspend fun setAiEnabled(enabled: Boolean) = store.edit { it[Keys.ai] = enabled }
+    suspend fun setMyTimes(times: List<app.northvane.core.outlook.MyTime>) =
+        store.edit { it[Keys.myTimes] = NorthvaneJson.encodeToString(timeList, times.take(8)) }
+    suspend fun setWear(enabled: Boolean) = store.edit { it[Keys.wear] = enabled }
+    suspend fun setComfort(comfort: app.northvane.core.outlook.Comfort) = store.edit { it[Keys.comfort] = comfort.name }
     suspend fun setTodayOrder(order: List<TodayCard>) = store.edit { it[Keys.todayOrder] = TodayCard.format(order) }
     suspend fun dismissAllergyPrompt() = store.edit { it[Keys.allergyPromptDismissed] = true }
 

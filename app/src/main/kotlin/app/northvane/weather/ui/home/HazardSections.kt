@@ -340,7 +340,9 @@ internal fun SapSection(report: SapReport, f: UnitFormatter, time: TimeFormat) {
                 }
             }
         }
-        Note("Sap runs best after a night in the 20s °F and a sunny day in the 40s. Each day shows the night before's low and the day's high.")
+        var open by rememberSaveable { mutableStateOf(false) }
+        if (open) Note("Sap runs best after a night in the 20s °F and a sunny day in the 40s. Each day shows the night before's low and the day's high.")
+        DetailsToggle(open) { open = !open }
     }
 }
 
@@ -364,34 +366,39 @@ private fun describe(reason: BurnReason, f: UnitFormatter): String = when (reaso
 
 @Composable
 internal fun BurnSection(report: BurnReport, f: UnitFormatter, time: TimeFormat) {
+    var open by rememberSaveable { mutableStateOf(false) }
     WeatherCard("Burn days") {
         val today = report.days.firstOrNull()
-        if (today != null) {
-            Text(
-                (if (today.date == time.today()) "Today: " else "${time.weekday(today.date)}: ") + today.rating.label.lowercase(),
-                style = MaterialTheme.typography.titleMedium,
-                color = burnColor(today.rating),
-            )
-            if (today.rating != BurnRating.GOOD) {
-                val next = report.days.drop(1).firstOrNull { it.rating == BurnRating.GOOD }
-                Note(next?.let { "Next good day: ${time.dayName(it.date)}" } ?: "No good burn days in the forecast")
-            }
+        val next = report.days.firstOrNull { it.rating == BurnRating.GOOD }
+        // The answer: the next good day (or that there isn't one).
+        Text(
+            when {
+                next == null -> "No good burn days this week"
+                next.date == time.today() -> "Good day to burn today"
+                else -> "Burn ${time.dayName(next.date)}"
+            },
+            style = MaterialTheme.typography.titleMedium,
+            color = if (next != null) burnColor(BurnRating.GOOD) else MaterialTheme.colorScheme.onSurface,
+        )
+        if (today != null && today.rating != BurnRating.GOOD && today.reasons.isNotEmpty()) {
+            Note("Today: ${today.rating.label.lowercase()} (${today.reasons.take(2).joinToString(", ") { describe(it, f).lowercase() }})")
         }
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 2.dp)) {
-            report.days.forEach { d ->
-                Row {
-                    StatusDot(burnColor(d.rating))
-                    Spacer(Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            "${time.dayName(d.date)} · ${d.rating.label}",
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        if (d.reasons.isNotEmpty()) Note(d.reasons.joinToString(" · ") { describe(it, f) })
+        DayDots(report.days.map { (if (it.date == time.today()) "Today" else time.weekday(it.date)) to burnColor(it.rating) })
+        if (open) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 8.dp)) {
+                report.days.forEach { d ->
+                    Row {
+                        StatusDot(burnColor(d.rating))
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text("${time.dayName(d.date)} · ${d.rating.label}", style = MaterialTheme.typography.bodyMedium)
+                            if (d.reasons.isNotEmpty()) Note(d.reasons.joinToString(" · ") { describe(it, f) })
+                        }
                     }
                 }
             }
+            Note("Rules vary by town and state: many need a burn permit (in New Hampshire, unless the ground is snow-covered). Keep water and a rake nearby, and never leave a fire alone.")
         }
-        Note("Rules vary by town and state: many need a burn permit (in New Hampshire, unless the ground is snow-covered). Keep water and a rake nearby, and never leave a fire alone.")
+        DetailsToggle(open) { open = !open }
     }
 }

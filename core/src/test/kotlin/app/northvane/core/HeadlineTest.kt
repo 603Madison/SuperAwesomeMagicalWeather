@@ -79,4 +79,37 @@ class HeadlineTest {
         val ending = (0 until 8).map { i -> MinutePrecip(now.plus(Duration.ofMinutes(15L * i)), if (i < 3) 1.0 else 0.0, 0.0) }
         assertEquals("Rain ending around 10:45 AM.", TodayHeadline.nearTerm(ending, now, clockFmt::format))
     }
+
+    @Test
+    fun yourTimesAndWhatToWear() {
+        val times = listOf(app.northvane.core.outlook.MyTime("Drive home", 17 * 60), app.northvane.core.outlook.MyTime("Walk", 7 * 60))
+        val slots = app.northvane.core.outlook.MyTimes.upcoming(times, now, zone)
+        assertEquals("Drive home", slots.first().label)
+        // Rain 4–7 PM: the drive home at 5 PM gets the warning, ahead of the general rain line.
+        val wet = hours(chance = { if (it in 6..9) 80 else 5 }, mm = { if (it in 6..9) 2.0 else 0.0 })
+        val lines = TodayHeadline.write(wet, listOf(day(today, 12.0), day(today.plusDays(1), 13.0)), now, zone, f, clockFmt::format, hourFmt::format, times = slots)
+        assertEquals("Rain likely for your drive home (5 PM).", lines.first())
+        val dry = TodayHeadline.write(hours(), emptyList(), now, zone, f, clockFmt::format, hourFmt::format, times = slots)
+        assertEquals("Dry for your drive home (5 PM).", dry.first())
+
+        val wear = app.northvane.core.outlook.WhatToWear.advise(wet, now, app.northvane.core.outlook.Comfort.NORMAL, hourFmt::format)
+        assertEquals("Jacket · umbrella after 4 PM", wear)
+        // At 13 °C (55 °F) a light jacket does; someone who runs cold gets the warmer suggestion.
+        val mild = hours(temp = { 13.0 })
+        assertEquals("Light jacket", app.northvane.core.outlook.WhatToWear.advise(mild, now, app.northvane.core.outlook.Comfort.NORMAL, hourFmt::format))
+        assertEquals("Jacket", app.northvane.core.outlook.WhatToWear.advise(mild, now, app.northvane.core.outlook.Comfort.COLD, hourFmt::format))
+    }
+
+    @Test
+    fun tonightDigestOnlyWhenThereIsSomething() {
+        // 10 AM now; frost from 10 PM to 6 AM and rain overnight.
+        val night = hours(temp = { if (it in 12..20) -1.0 else 8.0 }, chance = { if (it in 13..16) 60 else 5 })
+        val snap = app.northvane.core.model.WeatherSnapshot(locationId = "p", fetchedAt = now, timeZoneId = zone.id, hourly = night)
+        val lines = app.northvane.core.outlook.TonightDigest.write(
+            snap, now, zone, f, hourFmt::format, app.northvane.core.outlook.TonightDigest.Options(garden = true, laundryOut = true),
+        )
+        assertEquals(listOf("Frost tonight (low 30°): cover tender plants.", "Your laundry is still out, and rain is likely overnight."), lines)
+        val quiet = app.northvane.core.model.WeatherSnapshot(locationId = "p", fetchedAt = now, timeZoneId = zone.id, hourly = hours())
+        assertTrue(app.northvane.core.outlook.TonightDigest.write(quiet, now, zone, f, hourFmt::format, app.northvane.core.outlook.TonightDigest.Options()).isEmpty())
+    }
 }

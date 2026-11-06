@@ -38,7 +38,32 @@ class WeatherCache(context: Context) {
     }
 
     suspend fun write(snapshot: WeatherSnapshot) = withContext(Dispatchers.IO) {
-        mutex.withLock { writeLocked(snapshot) }
+        mutex.withLock {
+            writeLocked(snapshot)
+            recordForecast(snapshot)
+        }
+    }
+
+    private val recordList = kotlinx.serialization.builtins.ListSerializer(app.northvane.core.outlook.ForecastRecord.serializer())
+
+    private fun logFile(locationId: String) = File(dir, fileFor(locationId).nameWithoutExtension + ".forecasts.json")
+
+    /** What the forecast said about recent days, for the accuracy line (about 1 KB per place). */
+    suspend fun forecastLog(locationId: String): List<app.northvane.core.outlook.ForecastRecord> = withContext(Dispatchers.IO) {
+        mutex.withLock { readLog(locationId) }
+    }
+
+    private fun readLog(locationId: String) =
+        runCatching { NorthvaneJson.decodeFromString(recordList, logFile(locationId).readText()) }.getOrDefault(emptyList())
+
+    /** Call with [mutex] held. */
+    private fun recordForecast(snapshot: WeatherSnapshot) {
+        runCatching {
+            val zone = java.time.ZoneId.of(snapshot.timeZoneId)
+            val today = java.time.LocalDate.now(zone)
+            val log = app.northvane.core.outlook.ForecastAccuracy.record(readLog(snapshot.locationId), snapshot, zone, today)
+            logFile(snapshot.locationId).writeText(NorthvaneJson.encodeToString(recordList, log))
+        }
     }
 
     /** Call with [mutex] held. */
@@ -67,7 +92,10 @@ class WeatherCache(context: Context) {
     }
 
     suspend fun delete(locationId: String) = withContext(Dispatchers.IO) {
-        mutex.withLock { fileFor(locationId).delete() }
+        mutex.withLock {
+            fileFor(locationId).delete()
+            logFile(locationId).delete()
+        }
     }
 
     val pointCache: NwsPointCache = object : NwsPointCache {

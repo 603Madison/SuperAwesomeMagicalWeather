@@ -19,6 +19,11 @@ import app.northvane.weather.MainActivity
 import app.northvane.weather.R
 import java.time.Duration
 import java.time.Instant
+import app.northvane.core.alerts.AlertAreas
+import app.northvane.core.alerts.describe
+import app.northvane.core.model.GeoPoint
+import app.northvane.core.model.UnitSystem
+import app.northvane.core.util.UnitFormatter
 
 object AlertNotifier {
     const val CHANNEL_WARNINGS = "alerts_warnings"
@@ -92,7 +97,13 @@ object AlertNotifier {
         if (id != null && name != null) mapOf(id to name) else emptyMap()
 
     @SuppressLint("MissingPermission") // canNotify() checks POST_NOTIFICATIONS
-    fun notify(context: Context, items: List<AlertToNotify>, locationNames: Map<String, String>) {
+    fun notify(
+        context: Context,
+        items: List<AlertToNotify>,
+        locationNames: Map<String, String>,
+        points: Map<String, GeoPoint> = emptyMap(),
+        units: UnitSystem = UnitSystem.IMPERIAL,
+    ) {
         if (items.isEmpty() || !canNotify(context)) return
         val manager = NotificationManagerCompat.from(context)
         val now = Instant.now()
@@ -100,8 +111,11 @@ object AlertNotifier {
             val alert = item.alert
             val place = locationNames[item.locationId]
             val title = (if (item.isUpdateOfNotified) "Updated: " else "") + alert.event
-            val summary = alert.headline ?: alert.areaDesc ?: alert.event
-            val body = listOfNotNull(place, alert.headline, alert.instruction?.take(600)).joinToString("\n\n")
+            // For storm-based alerts: whether the place is inside the drawn area, or how far away it is.
+            val spot = points[item.locationId]?.let { AlertAreas.spot(alert, it) }
+                ?.describe(alert) { km -> UnitFormatter(units).distance(km) }
+            val summary = spot ?: alert.headline ?: alert.areaDesc ?: alert.event
+            val body = listOfNotNull(place, spot, alert.headline, alert.instruction?.take(600)).joinToString("\n\n")
 
             val intent = Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP

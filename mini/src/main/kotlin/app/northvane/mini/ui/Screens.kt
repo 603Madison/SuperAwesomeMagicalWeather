@@ -320,11 +320,33 @@ private fun NowHeader(state: MiniState, snapshot: WeatherSnapshot?, fmt: Fmt) {
                     today?.let { "H ${f.temperature(it.highC)}  L ${f.temperature(it.lowC)}" },
                 )
                 if (line1.isNotEmpty()) Text(line1.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = soft)
-                val line2 = listOfNotNull(
-                    current?.windSpeedKph?.let { "Wind ${f.windSpeed(it)}" },
-                    current?.humidityPercent?.let { "Humidity ${f.percent(it)}" },
-                )
-                if (line2.isNotEmpty()) Text(line2.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = soft)
+                // What matters next (same headline as the main app), then a big storm's totals if one is coming.
+                val headline = remember(snapshot) {
+                    app.northvane.core.outlook.TodayHeadline.write(snapshot.hourly, snapshot.daily, now, fmt.zone, f, fmt::time, fmt::hour, maxSentences = 1)
+                }.firstOrNull()
+                if (headline != null) {
+                    Text(headline, style = MaterialTheme.typography.bodySmall, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                } else {
+                    val line2 = listOfNotNull(
+                        current?.windSpeedKph?.let { "Wind ${f.windSpeed(it)}" },
+                        current?.humidityPercent?.let { "Humidity ${f.percent(it)}" },
+                    )
+                    if (line2.isNotEmpty()) Text(line2.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = soft)
+                }
+                val storm = remember(snapshot) { app.northvane.core.outlook.StormTotals.find(snapshot.hourly, snapshot.daily, snapshot.alerts, now, fmt.zone) }
+                storm?.let { st ->
+                    // "Soaking rain: 1.65 in", "Snowstorm: snow 9.4 in, ice 0.10 in": the word only when the title lacks it.
+                    fun named(word: String, amount: String) = if (st.title.contains(word, ignoreCase = true)) amount else "$word $amount"
+                    val totals = listOfNotNull(
+                        st.snowMm.takeIf { it >= 5 }?.let { named("snow", f.snow(it)) },
+                        st.iceMm.takeIf { it >= 0.5 }?.let { named("ice", f.precipitation(it)) },
+                        st.rainMm.takeIf { it >= 2 && st.snowMm < 5 }?.let { named("rain", f.precipitation(it)) },
+                    )
+                    Text(
+                        "${st.title}" + (st.start?.let { " from ${fmt.dayTime(it)}" } ?: "") + if (totals.isNotEmpty()) ": ${totals.joinToString(", ")}" else "",
+                        style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 if (warning != null) {
                     Text("⚠ ${warning.event}", style = MaterialTheme.typography.titleSmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 } else {
@@ -668,6 +690,17 @@ private fun AddPlaceScreen(state: MiniState, vm: MiniViewModel, onAdded: () -> U
             locationPermission.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
         }
     }
+    // Scan the main app's QR code (Places › Send to Mini) with the phone's camera app.
+    val photo = remember { java.io.File(context.cacheDir, "scan/places.jpg") }
+    // Made only when scanning, so this screen opens even if the camera hand-off isn't available.
+    fun photoUri() = runCatching {
+        photo.parentFile?.mkdirs()
+        androidx.core.content.FileProvider.getUriForFile(context, context.packageName + ".scan", photo)
+    }.getOrNull()
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { taken ->
+        if (taken) vm.importPlaces(QrScan.read(photo)) { ok -> if (ok) onAdded() }
+        photo.delete()
+    }
     LaunchedEffect(Unit) { vm.clearSearch(); runCatching { fieldFocus.requestFocus() } }
     ScreenKeysEffect(ScreenKeys(left = SoftKey("Search") { vm.search(query) }, center = "Select"))
     val results = state.results.orEmpty()
@@ -696,6 +729,7 @@ private fun AddPlaceScreen(state: MiniState, vm: MiniViewModel, onAdded: () -> U
         )
         val rows = buildList<Pair<String, () -> Unit>> {
             add((if (state.locating) "Finding your location…" else "Use my location (GPS)") to { useLocation() })
+            add("Scan code from the main app" to { photoUri()?.let { uri -> runCatching { camera.launch(uri) } } })
             results.forEach { r -> add("${r.name}, ${r.detail}" to { vm.addResult(r); onAdded() }) }
         }
         if (state.searching) Hint("Searching…")
@@ -798,5 +832,32 @@ private fun HelpScreen() {
                 "place search by Open-Meteo. No accounts, ads or tracking. Free software under the GNU GPL v3.",
             style = MaterialTheme.typography.bodySmall,
         )
+    }
+}
+
+/** Reads a QR code from a photo: scaled down first, so a full camera picture fits in memory. */
+internal object QrScan {
+    fun read(file: java.io.File): String? = runCatching {
+        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        android.graphics.BitmapFactory.decodeFile(file.path, bounds)
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1600) sample *= 2
+        val bitmap = android.graphics.BitmapFactory.decodeFile(file.path, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+            ?: return@runCatching null
+        decode(bitmap)
+    }.getOrNull()
+
+    fun decode(bitmap: android.graphics.Bitmap): String? {
+        val pixels = IntArray(bitmap.width * bitmap.height)
+        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        val source = com.google.zxing.RGBLuminanceSource(bitmap.width, bitmap.height, pixels)
+        val hints = mapOf(
+            com.google.zxing.DecodeHintType.POSSIBLE_FORMATS to listOf(com.google.zxing.BarcodeFormat.QR_CODE),
+            com.google.zxing.DecodeHintType.TRY_HARDER to true,
+        )
+        val reader = com.google.zxing.qrcode.QRCodeReader()
+        return listOf(com.google.zxing.common.HybridBinarizer(source), com.google.zxing.common.GlobalHistogramBinarizer(source)).firstNotNullOfOrNull { b ->
+            runCatching { reader.decode(com.google.zxing.BinaryBitmap(b), hints).text }.getOrNull()
+        }
     }
 }

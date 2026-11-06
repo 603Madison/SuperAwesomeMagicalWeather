@@ -17,6 +17,7 @@ import app.northvane.core.model.DataSource
 import app.northvane.core.model.HourlyForecast
 import app.northvane.core.model.Units
 import app.northvane.core.model.WeatherAlert
+import app.northvane.core.alerts.AlertAreas
 import app.northvane.core.model.WeatherCondition
 import app.northvane.core.net.ParseException
 import kotlinx.serialization.Serializable
@@ -294,6 +295,7 @@ object NwsParsers {
                 senderName = p.str("senderName"),
                 areaDesc = p.str("areaDesc"),
                 messageType = p.str("messageType"),
+                area = AlertAreas.parse(feature.asObj()?.get("geometry")),
             )
         }.sortedWith(AlertClassifier.displayOrder)
     }

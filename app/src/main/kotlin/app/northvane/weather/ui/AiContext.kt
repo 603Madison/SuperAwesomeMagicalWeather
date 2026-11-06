@@ -11,6 +11,8 @@ import app.northvane.core.outlook.MinutePrecip
 import app.northvane.core.outlook.OutlookText
 import app.northvane.core.outlook.SapAdvisor
 import app.northvane.core.outlook.TodayHeadline
+import app.northvane.core.outlook.MyTimes
+import app.northvane.core.outlook.WhatToWear
 import app.northvane.core.util.UnitFormatter
 import app.northvane.weather.data.AppSettings
 import java.time.Instant
@@ -45,8 +47,17 @@ object AiContext {
         val today = now.atZone(zone).toLocalDate()
         fun words(e: Enum<*>) = e.name.lowercase().replace('_', ' ')
         return buildString {
-            val headline = TodayHeadline.write(snapshot.hourly, snapshot.daily, now, zone, f, clock::format, hour::format, nowcast)
+            val slots = MyTimes.upcoming(settings.myTimes, now, zone)
+            val headline = TodayHeadline.write(snapshot.hourly, snapshot.daily, now, zone, f, clock::format, hour::format, nowcast, times = slots)
             if (headline.isNotEmpty()) appendLine("The app's headline: ${headline.joinToString(" ")}")
+            if (settings.myTimes.isNotEmpty()) {
+                appendLine("The reader is usually out at: " + settings.myTimes.joinToString("; ") { t ->
+                    "${t.label} ${"%d:%02d".format(t.minutes / 60, t.minutes % 60)} for ${t.durationMinutes} min" + if (t.weekdaysOnly) " on weekdays" else ""
+                } + ".")
+            }
+            WhatToWear.advise(snapshot.hourly, now, settings.comfort, hour::format, snapshot.uv?.todayMax)?.let {
+                appendLine("What to wear (the app's suggestion; the reader says: ${settings.comfort.label.lowercase()}): $it.")
+            }
             if (nowcast.isNotEmpty()) {
                 val wet = nowcast.filter { it.time.isAfter(now.minusSeconds(900)) && it.precipitationMm >= 0.1 }
                 appendLine(

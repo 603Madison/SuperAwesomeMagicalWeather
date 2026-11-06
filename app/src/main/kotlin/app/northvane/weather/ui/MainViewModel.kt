@@ -62,6 +62,8 @@ data class MainUiState(
     val ai: AiUiState = AiUiState(),
     /** The next two hours in 15-minute steps (empty when not downloaded). */
     val nowcast: List<MinutePrecip> = emptyList(),
+    /** How the forecast has done here lately, once there's a week to compare. */
+    val accuracy: String? = null,
 ) {
     /**
      * Under satellite limits, cards only show data downloaded in the last 12
@@ -87,7 +89,16 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
     private val aiJobs = AiController(container, viewModelScope)
     /** The 15-minute rain forecast per place, for the headline's "rain in 20 minutes". */
     private val nowcasts = MutableStateFlow<Map<String, Pair<Instant, List<MinutePrecip>>>>(emptyMap())
-    private val extras = combine(climates, aiJobs.states, nowcasts) { c, a, n -> Triple(c, a, n) }
+    /** "Forecast, last 7 days: highs ran about 3° warm…" per place. */
+    private val accuracy = MutableStateFlow<Map<String, String>>(emptyMap())
+    private val extras = combine(climates, aiJobs.states, nowcasts, accuracy) { c, a, n, acc -> Extras(c, a, n, acc) }
+
+    private data class Extras(
+        val climates: Map<String, FrostClimate>,
+        val ai: Map<String, AiUiState>,
+        val nowcasts: Map<String, Pair<Instant, List<MinutePrecip>>>,
+        val accuracy: Map<String, String>,
+    )
     private var refreshJob: Job? = null
     private var refreshingId: String? = null
 
@@ -98,7 +109,7 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
     ) { locations, settings, network -> Triple(locations, settings, network) }
 
     val state: StateFlow<MainUiState> = combine(inputs, snapshots, refreshing, error, extras) { input, snaps, isRefreshing, err, extra ->
-        val (climateMap, aiMap, nowcastMap) = extra
+        val (climateMap, aiMap, nowcastMap, accuracyMap) = extra
         val (locations, settings, network) = input
         val selected = locations.firstOrNull { it.id == settings.selectedLocationId } ?: locations.firstOrNull()
         MainUiState(
@@ -115,6 +126,7 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
             frostClimate = selected?.let { climateMap[it.id] },
             ai = selected?.let { aiMap[it.id] } ?: AiUiState(),
             nowcast = selected?.let { nowcastMap[it.id]?.second }.orEmpty(),
+            accuracy = selected?.let { accuracyMap[it.id] },
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, MainUiState())
 
@@ -127,6 +139,7 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
                     if (location != null && fetchedAt != null) {
                         aiJobs.loadDiscussion(location, state.value.settings, state.value.liteMode)
                         loadNowcast(location)
+                        loadAccuracy(location)
                     }
                 }
         }
@@ -270,6 +283,21 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
+    private fun loadAccuracy(location: SavedLocation) {
+        val snapshot = snapshots.value[location.id] ?: return
+        viewModelScope.launch {
+            val zone = runCatching { java.time.ZoneId.of(snapshot.timeZoneId) }.getOrDefault(java.time.ZoneId.systemDefault())
+            val summary = app.northvane.core.outlook.ForecastAccuracy.summarize(
+                container.weatherCache.forecastLog(location.id), snapshot.history, java.time.LocalDate.now(zone),
+            ) ?: return@launch
+            val units = state.value.settings.units
+            val text = app.northvane.core.outlook.ForecastAccuracy.describe(
+                summary, app.northvane.core.util.UnitFormatter(units), imperial = units == app.northvane.core.model.UnitSystem.IMPERIAL,
+            )
+            accuracy.update { it + (location.id to text) }
+        }
+    }
+
     /** About 1 KB, at most every 10 minutes per place; Backwoods mode decides as for rain notifications. */
     private fun loadNowcast(location: SavedLocation) {
         val last = nowcasts.value[location.id]?.first
@@ -331,7 +359,8 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         val snapshot = st.snapshot ?: return
         // Everything the app knows, not just the forecast: cards that depend on the reader's setup too.
         val extras = runCatching {
-            AiContext.extras(snapshot, st.settings, st.frostClimate, st.nowcast, snapshot.latitude ?: location.latitude, Instant.now())
+            AiContext.extras(snapshot, st.settings, st.frostClimate, st.nowcast, snapshot.latitude ?: location.latitude, Instant.now()) +
+                (st.accuracy?.let { "\nHow the forecast has done here (forecast for each day made the day before, against NOAA observations): $it" } ?: "")
         }.getOrDefault("")
         aiJobs.ask(location, question, snapshot, st.settings, st.liteMode, extras)
     }

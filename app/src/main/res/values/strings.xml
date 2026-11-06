@@ -14,4 +14,5 @@
     <string name="channel_aurora_desc">When the northern lights may be visible from your saved places, tonight or right now.</string>
     <string name="channel_laundry_desc">Warnings to bring laundry in before rain, while you have clothes on the line.</string>
     <string name="widget_description">Current conditions and the next rain for the place on your Today screen</string>
+    <string name="tile_label">Weather</string>
 </resources>

@@ -99,6 +99,12 @@ tiles are used instead.
 
 ## Alerts
 
+Many short-fuse warnings and advisories come with a drawn area (a polygon).
+For those, the app checks whether the place is inside it (ray casting) or
+finds the nearest edge for a distance and direction, and shows that on the
+banner, alert cards and notifications; the radar outlines the areas. Alerts
+for whole counties or zones have no drawn area and say nothing extra.
+
 - Background checks run every 15, 30 or 60 minutes (WorkManager) for the places
   you choose, under Locations › ⋮ › Alert notifications or in Settings.
 - **Warnings**, **watches**, **advisories** and **statements** each have their
@@ -128,6 +134,26 @@ large widgets), worked out on the phone, no AI. In order, at most three:
 - Frost or a freeze tonight, only after a day above about 39°F (in midwinter
   every night freezes, so it isn't news).
 - A change of about 11°F or more in tomorrow's high.
+
+### Your times and what to wear
+
+Your times (a label, a time, how long, weekdays or every day) turn into the
+next ~20 hours of slots. The first one the weather touches gets a sentence:
+rain or snow likely (40%+) during it, feels-like −10°F or colder, or gusts of
+35 mph+; otherwise the next one is "dry". What to wear reads the next 10 hours'
+feels-like range, shifted 3°C (about 5°F) for people who run cold or warm, and
+adds an umbrella or boots (50%+ chance; "after 3 PM" when it starts later),
+layers on a big swing, something windproof, and sunscreen at UV 6+.
+
+### Forecast accuracy
+
+Each saved forecast notes tomorrow's high, low and rain chance (the last
+refresh before the day wins; three weeks are kept, about 1 KB per place). Once
+a day has passed, it's compared with NOAA's observed high, low and
+precipitation for the spot (ACIS, already downloaded for mud and foliage).
+With three or more days, the 7-day card shows the average high and low bias
+(under about 2°F counts as on target) and how often "rain likely" (50%+)
+matched whether 1 mm+ fell.
 
 ### Storm totals
 
@@ -396,6 +422,18 @@ it and adds a caution. About 15–30 KB per update, at most hourly.
   and writes a few sentences: conditions with the high and low, when rain or
   snow is likely, strong gusts, and active alerts. Mini uses the same text,
   and its Read aloud key speaks it with Android's text-to-speech.
+- **Tonight:** one notification at the chosen evening time per place with
+  notifications on, from the last forecast (or a fresh one if over 3 hours
+  old): a storm starting before 9 AM, frost (low at or below 33°F), frozen
+  pipe risk High or worse, black ice by morning, rain likely overnight while
+  laundry is out, and northern lights visible to a camera or better with
+  clouds under 85%. Nothing to say, no notification.
+- **Quick Settings tile:** reads the last saved forecast when the shade opens
+  (never downloads): temperature, place and the headline's first sentence.
+- **Send places to Mini:** the QR code holds "SAMW1:" and a base64url list of
+  up to 12 names with latitude and longitude to 4 decimals; nothing else. Mini
+  photographs it with the camera app (no camera permission), decodes it with
+  ZXing, and skips places already saved within about 1 km.
 - **Rain starting soon:** every 15 minutes, for places with notifications on,
   Open-Meteo's 15-minute precipitation (from HRRR in the US, about 1 KB). If
   it's dry now and at least 0.1 mm per 15 minutes is due within the hour, one

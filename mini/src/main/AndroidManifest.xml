@@ -18,6 +18,10 @@
 
     <!-- Android 11+: lets "Read aloud" find the phone's text-to-speech engine. -->
     <queries>
+        <!-- The camera app, to photograph the QR code from the main app. -->
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
@@ -34,6 +38,17 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"
         android:theme="@style/Theme.NorthvaneMini">
+        <!-- Hands the camera app a file for the QR photo; nothing else is shared. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.scan"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/scan_paths" />
+        </provider>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

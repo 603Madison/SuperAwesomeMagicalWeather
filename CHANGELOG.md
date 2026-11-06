@@ -5,6 +5,25 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-06
+
+Smarter, leaner, and easier to reach.
+
+### Added
+- **Alerts for your exact spot.** Many warnings have a drawn area; the app now says "You're in the warning area" or "Warning area 6 mi east of you" on the Today banner, each alert card and the notification, and outlines the areas on the radar map.
+- **Your times.** Tell the app when you're usually out (Settings › Today screen › You), and the headline speaks to them: "Rain likely for your drive home (5 PM)", "Dry for your walk (7 AM)". The morning briefing mentions them too.
+- **What to wear:** a line in the top card such as "Light jacket · umbrella after 3 PM", with a setting for people who run cold or warm.
+- **How the forecast has done:** under the 7-day forecast, once a week of data is in: "Forecast, last 7 days: highs ran about 3° warm, lows on target; rain called right 6 of 7 days." Each refresh notes tomorrow's forecast; NOAA's observations are the reference.
+- **Smarter question suggestions** that fit the weather (during a storm: "When does the snow start?"; with aurora tonight: "Will I see the northern lights tonight?"), and a **mic button** to ask by voice with the phone's speech input.
+- **Tonight:** one evening notification (7 PM by default, only when there's something to say): frost (cover plants if you garden), frozen pipe risk, black ice by morning, a storm starting overnight, rain on laundry still out, and the northern lights.
+- **Send places to Mini:** Locations › Send to Mini shows a QR code; on the flip phone, Places › Add › Scan code from the main app takes a photo of it and adds the places (names and positions only).
+- **Quick Settings tile:** the temperature and the next thing to know, from the last forecast; tap to open.
+- **Mini** shows the headline and a big storm's totals on its home screen.
+
+### Changed
+- **Outlook cards lead with the answer:** Burn days ("Burn Tuesday" and a week of colored dots), Heating ("Run: heat pump", the most pressing chore and a week of dots), Garden (only crops with something to do now) and Maple sap; the rest is under **Details**.
+- The AI's question context includes your times, what to wear and how the forecast has done.
+
 ## [2.0.2] - 2026-11-06
 
 ### Fixed

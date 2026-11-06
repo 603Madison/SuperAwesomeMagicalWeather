@@ -65,6 +65,9 @@ import app.northvane.weather.ui.MainUiState
 import app.northvane.weather.ui.home.TaskText
 import app.northvane.weather.ui.TimeFormat
 import java.time.ZoneId
+import app.northvane.core.alerts.AlertAreas
+import app.northvane.core.alerts.describe
+import app.northvane.core.util.UnitFormatter
 
 @Composable
 fun AlertsScreen(state: MainUiState, onRefresh: () -> Unit, onOpenSettings: () -> Unit, onExplain: (WeatherAlert) -> Unit = {}) {
@@ -123,7 +126,9 @@ fun AlertsScreen(state: MainUiState, onRefresh: () -> Unit, onOpenSettings: () -
                     else -> {
                         val canExplain = state.settings.aiEnabled && state.settings.aiAlerts && state.settings.aiModel.isNotBlank()
                         items(snapshot.alerts, key = { it.id }) { alert ->
-                            AlertCard(alert, time, explanation = if (canExplain) state.ai.alerts[alert.id] ?: AiTask() else null, onExplain = { onExplain(alert) })
+                            val spot = state.selected?.point?.let { AlertAreas.spot(alert, it) }
+                                ?.describe(alert) { km -> UnitFormatter(state.settings.units).distance(km) }
+                            AlertCard(alert, time, spot, explanation = if (canExplain) state.ai.alerts[alert.id] ?: AiTask() else null, onExplain = { onExplain(alert) })
                         }
                     }
                 }
@@ -162,7 +167,7 @@ private fun NotificationStatus(enabled: Boolean, categories: Set<AlertCategory>,
 }
 
 @Composable
-private fun AlertCard(alert: WeatherAlert, time: TimeFormat, explanation: AiTask? = null, onExplain: () -> Unit = {}) {
+private fun AlertCard(alert: WeatherAlert, time: TimeFormat, spot: String? = null, explanation: AiTask? = null, onExplain: () -> Unit = {}) {
     var expanded by rememberSaveable(alert.id) { mutableStateOf(false) }
     val color = alertColor(alert.category)
     Card(
@@ -195,6 +200,9 @@ private fun AlertCard(alert: WeatherAlert, time: TimeFormat, explanation: AiTask
                 }.joinToString(" ")
                 if (window.isNotEmpty()) {
                     Text(window.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodyMedium)
+                }
+                spot?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = color, modifier = Modifier.padding(top = 2.dp))
                 }
                 alert.areaDesc?.let {
                     Text(

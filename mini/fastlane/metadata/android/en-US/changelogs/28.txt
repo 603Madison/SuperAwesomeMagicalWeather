@@ -1,0 +1,1 @@
+Scan a code from the main app to add all your places at once (Places > Add > Scan code), and the home screen shows what matters next and a big storm's totals.

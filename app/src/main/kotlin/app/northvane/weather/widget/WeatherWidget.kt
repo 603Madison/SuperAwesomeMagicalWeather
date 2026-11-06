@@ -87,6 +87,7 @@ class WeatherWidget : AppWidgetProvider() {
 
         /** Fire-and-forget [updateAll], e.g. after the app downloads a forecast. */
         fun requestUpdate(context: Context) {
+            app.northvane.weather.tile.WeatherTileService.requestUpdate(context)
             val container = (context.applicationContext as NorthvaneApp).container
             container.applicationScope.launch { runCatching { updateAll(context) } }
         }
@@ -185,7 +186,11 @@ class WeatherWidget : AppWidgetProvider() {
                 R.id.widget_condition,
                 listOf(current?.description ?: hour?.shortForecast ?: condition.label, highLow).filter { it.isNotBlank() }.joinToString(" · "),
             )
-            val headline = TodayHeadline.write(snapshot.hourly, snapshot.daily, now, zone, f, time::time, time::hour, maxSentences = if (size == Size.LARGE) 2 else 1)
+            val headline = TodayHeadline.write(
+                snapshot.hourly, snapshot.daily, now, zone, f, time::time, time::hour,
+                maxSentences = if (size == Size.LARGE) 2 else 1,
+                times = app.northvane.core.outlook.MyTimes.upcoming(settings.myTimes, now, zone),
+            )
             views.setTextViewText(
                 R.id.widget_rain,
                 when {

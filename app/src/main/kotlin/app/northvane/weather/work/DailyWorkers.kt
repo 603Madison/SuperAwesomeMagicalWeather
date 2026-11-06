@@ -95,10 +95,23 @@ class BriefingWorker(appContext: Context, params: WorkerParameters) : CoroutineW
             val zone = runCatching { ZoneId.of(snapshot.timeZoneId) }.getOrDefault(ZoneId.systemDefault())
             val f = UnitFormatter(settings.units)
             val time = TimeFormat(zone, android.text.format.DateFormat.is24HourFormat(context))
-            val briefing = BriefingWriter.write(
+            val base = BriefingWriter.write(
                 place, snapshot.daily, snapshot.hourly, snapshot.alerts, zone, Instant.now(),
                 temperature = f::temperature, wind = f::windSpeed, hour = time::hour,
             )
+            // The day's clothing and the user's own times, after the forecast sentences.
+            val now = Instant.now()
+            val extra = listOfNotNull(
+                app.northvane.core.outlook.MyTimes.sentence(
+                    app.northvane.core.outlook.MyTimes.upcoming(settings.myTimes, now, zone), snapshot.hourly, f, time::hour, now,
+                ),
+                if (settings.wearEnabled) {
+                    app.northvane.core.outlook.WhatToWear.advise(snapshot.hourly, now, settings.comfort, time::hour, snapshot.uv?.todayMax)?.let { "Wear: $it." }
+                } else {
+                    null
+                },
+            )
+            val briefing = if (extra.isEmpty()) base else base.copy(text = base.text + " " + extra.joinToString(" "))
             context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(
                 NotificationChannel(CHANNEL, "Morning briefing", NotificationManager.IMPORTANCE_DEFAULT)
                     .apply { description = "Today's forecast once a day, at the time you choose" },
@@ -117,6 +130,92 @@ class BriefingWorker(appContext: Context, params: WorkerParameters) : CoroutineW
                 .setTimeoutAfter(Duration.ofHours(14).toMillis())
                 .build()
             NotificationManagerCompat.from(context).notify("briefing", 1, notification)
+        }
+    }
+}
+
+/**
+ * The evening heads-up: one notification per place (with notifications on)
+ * listing what's worth doing before bed. Like the briefing, each run books
+ * the next. Sent only when there's something to say.
+ */
+class TonightWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
+
+    override suspend fun doWork(): Result {
+        val container = (applicationContext as NorthvaneApp).container
+        try {
+            val settings = container.settings.settings.first()
+            if (!settings.tonightEnabled || !AlertNotifier.canNotify(applicationContext)) return Result.success()
+            val now = Instant.now()
+            for (location in container.locations.locations.first().filter { it.notify }.take(5)) {
+                // The last forecast if it's recent, otherwise a fresh one (within Backwoods limits).
+                val snapshot = container.weatherCache.read(location.id)?.takeIf { Duration.between(it.fetchedAt, now) < Duration.ofHours(3) }
+                    ?: attempt { container.weather.refresh(location) }.getOrNull()
+                    ?: continue
+                val zone = runCatching { ZoneId.of(snapshot.timeZoneId) }.getOrDefault(ZoneId.systemDefault())
+                val time = TimeFormat(zone, android.text.format.DateFormat.is24HourFormat(applicationContext))
+                val lines = app.northvane.core.outlook.TonightDigest.write(
+                    snapshot, now, zone, UnitFormatter(settings.units), time::hour,
+                    app.northvane.core.outlook.TonightDigest.Options(
+                        garden = settings.gardenEnabled && settings.gardenPlan.isNotEmpty(),
+                        laundryOut = settings.laundryOutSince != null,
+                        pipes = settings.pipeRiskEnabled,
+                        ice = settings.morningIceEnabled,
+                        aurora = settings.auroraEnabled,
+                        longitude = location.longitude,
+                    ),
+                )
+                if (lines.isNotEmpty()) notify(applicationContext, location.id, location.displayName, lines)
+            }
+            return Result.success()
+        } finally {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                schedule(applicationContext, container.settings.settings.first())
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission") // checked by canNotify in doWork
+    private fun notify(context: Context, locationId: String, place: String, lines: List<String>) {
+        context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(
+            NotificationChannel(CHANNEL, "Tonight", NotificationManager.IMPORTANCE_DEFAULT)
+                .apply { description = "One evening heads-up: frost, pipes, black ice, storms, laundry and the northern lights" },
+        )
+        val intent = Intent(context, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            .putExtra(MainActivity.EXTRA_LOCATION_ID, locationId)
+        val pending = PendingIntent.getActivity(context, ("tonight$locationId").hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        val text = lines.joinToString(" ")
+        val notification = NotificationCompat.Builder(context, CHANNEL)
+            .setSmallIcon(R.drawable.ic_stat_alert)
+            .setContentTitle("Tonight in $place")
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(lines.joinToString("\n")))
+            .setContentIntent(pending)
+            .setAutoCancel(true)
+            .setTimeoutAfter(Duration.ofHours(14).toMillis())
+            .build()
+        NotificationManagerCompat.from(context).notify("tonight", locationId.hashCode(), notification)
+    }
+
+    companion object {
+        private const val WORK = "tonight"
+        private const val CHANNEL = "tonight"
+
+        fun schedule(context: Context, settings: AppSettings) {
+            val work = WorkManager.getInstance(context)
+            if (!settings.tonightEnabled) {
+                work.cancelUniqueWork(WORK)
+                return
+            }
+            val now = ZonedDateTime.now()
+            var next = now.with(LocalTime.of(settings.tonightMinutes / 60, settings.tonightMinutes % 60))
+            if (!next.isAfter(now.plusMinutes(1))) next = next.plusDays(1)
+            val request = OneTimeWorkRequestBuilder<TonightWorker>()
+                .setInitialDelay(Duration.between(now, next).toMillis(), TimeUnit.MILLISECONDS)
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.NOT_REQUIRED).build())
+                .build()
+            work.enqueueUniqueWork(WORK, ExistingWorkPolicy.REPLACE, request)
         }
     }
 }

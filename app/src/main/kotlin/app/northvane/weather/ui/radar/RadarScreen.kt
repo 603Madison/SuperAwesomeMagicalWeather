@@ -151,6 +151,9 @@ fun RadarScreen(state: MainUiState, container: AppContainer, onOpenSettings: () 
                         dark = dark,
                         modifier = Modifier.fillMaxSize(),
                         pin = location.point,
+                        alertAreas = state.snapshot?.alerts.orEmpty().mapNotNull { alert ->
+                            alert.area?.let { rings -> rings to alertHex(alert.category) }
+                        },
                         satelliteTiles = if (settings.satelliteLayer && satelliteAllowed) SatelliteImagery.tileUrl(imagery) else null,
                     )
                     SatelliteToggle(
@@ -397,4 +400,12 @@ private fun CenteredMessage(text: String) {
     ) {
         Text(text, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
+}
+
+/** Map colors for alert outlines, matching the alert cards. */
+private fun alertHex(category: app.northvane.core.model.AlertCategory): String = when (category) {
+    app.northvane.core.model.AlertCategory.WARNING -> "#E53935"
+    app.northvane.core.model.AlertCategory.WATCH -> "#FB8C00"
+    app.northvane.core.model.AlertCategory.ADVISORY -> "#FDD835"
+    else -> "#64B5F6"
 }

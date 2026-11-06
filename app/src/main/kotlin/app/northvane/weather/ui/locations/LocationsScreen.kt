@@ -82,6 +82,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import androidx.compose.ui.text.style.TextOverflow
 import app.northvane.weather.ui.components.ReorderableColumn
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
+import app.northvane.core.model.PlacesCode
 
 @Composable
 fun LocationsScreen(state: MainUiState, vm: MainViewModel, container: AppContainer, onBack: () -> Unit) {
@@ -94,6 +99,7 @@ fun LocationsScreen(state: MainUiState, vm: MainViewModel, container: AppContain
     var searching by remember { mutableStateOf(false) }
     var searchedOnce by remember { mutableStateOf(false) }
     var searchJob by remember { mutableStateOf<Job?>(null) }
+    var sendToMini by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<SavedLocation?>(null) }
     var locating by remember { mutableStateOf(false) }
     // The location callback can arrive after the user already left this screen; don't navigate then.
@@ -133,6 +139,9 @@ fun LocationsScreen(state: MainUiState, vm: MainViewModel, container: AppContain
                 title = { Text("Locations") },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                },
+                actions = {
+                    if (state.locations.isNotEmpty()) TextButton(onClick = { sendToMini = true }) { Text("Send to Mini") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
@@ -239,6 +248,23 @@ fun LocationsScreen(state: MainUiState, vm: MainViewModel, container: AppContain
                 }
             }
         }
+    }
+
+    if (sendToMini) {
+        val code = remember(state.locations) { PlacesCode.encode(state.locations) }
+        val qr = remember(code) { qrBitmap(code, 720) }
+        AlertDialog(
+            onDismissRequest = { sendToMini = false },
+            title = { Text("Send places to Mini") },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("On the flip phone: Places › Add › Scan code from the main app, and point the camera here.", style = MaterialTheme.typography.bodyMedium)
+                    Image(qr.asImageBitmap(), contentDescription = "QR code with your saved places", modifier = Modifier.size(260.dp).background(Color.White).padding(8.dp))
+                    Text("${state.locations.size.coerceAtMost(12)} places · names and positions only", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            },
+            confirmButton = { TextButton(onClick = { sendToMini = false }) { Text("Done") } },
+        )
     }
 
     renaming?.let { location ->
@@ -357,4 +383,14 @@ private fun RenameDialog(location: SavedLocation, onDismiss: () -> Unit, onSave:
             }
         },
     )
+}
+
+/** A black-on-white QR code for [text], [sizePx] square. */
+private fun qrBitmap(text: String, sizePx: Int): android.graphics.Bitmap {
+    val matrix = com.google.zxing.qrcode.QRCodeWriter().encode(
+        text, com.google.zxing.BarcodeFormat.QR_CODE, sizePx, sizePx,
+        mapOf(com.google.zxing.EncodeHintType.MARGIN to 1, com.google.zxing.EncodeHintType.ERROR_CORRECTION to com.google.zxing.qrcode.decoder.ErrorCorrectionLevel.M),
+    )
+    val pixels = IntArray(matrix.width * matrix.height) { i -> if (matrix.get(i % matrix.width, i / matrix.width)) android.graphics.Color.BLACK else android.graphics.Color.WHITE }
+    return android.graphics.Bitmap.createBitmap(pixels, matrix.width, matrix.height, android.graphics.Bitmap.Config.ARGB_8888)
 }

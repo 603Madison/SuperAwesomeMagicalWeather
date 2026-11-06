@@ -141,6 +141,12 @@ import androidx.compose.foundation.layout.FlowRow
 import app.northvane.core.model.UnitSystem
 import app.northvane.weather.data.AppSettings
 import app.northvane.weather.data.Interest
+import app.northvane.core.alerts.AlertAreas
+import app.northvane.core.alerts.describe
+import app.northvane.core.model.GeoPoint
+import app.northvane.core.outlook.WhatToWear
+import app.northvane.core.outlook.MyTimes
+import app.northvane.core.outlook.AskSuggestions
 
 /** Everything the Today screen can ask the app to do. */
 class HomeActions(
@@ -332,20 +338,28 @@ private fun HomeContent(
                         val hidden = mutableListOf<String>()
                         val showCurrent = state.shows(Section.CURRENT_CONDITIONS)
                         val headline = if (state.shows(Section.HOURLY_FORECAST)) {
-                            TodayHeadline.write(snapshot.hourly, snapshot.daily, now, zone, formatter, time::time, time::hour, state.nowcast)
+                            TodayHeadline.write(
+                                snapshot.hourly, snapshot.daily, now, zone, formatter, time::time, time::hour, state.nowcast,
+                                times = MyTimes.upcoming(settings.myTimes, now, zone),
+                            )
                         } else {
                             emptyList()
                         }
                         if (showCurrent) {
                             item(key = "hero") {
-                                HeroCard(snapshot, formatter, time, warning, headline, onEasterEgg = { showKelvin = true }, kelvin = showKelvin)
+                                val wear = if (settings.wearEnabled && state.shows(Section.HOURLY_FORECAST)) {
+                                    WhatToWear.advise(snapshot.hourly, now, settings.comfort, time::hour, snapshot.uv?.todayMax)
+                                } else {
+                                    null
+                                }
+                                HeroCard(snapshot, formatter, time, warning, headline, wear, onEasterEgg = { showKelvin = true }, kelvin = showKelvin)
                             }
                         } else {
                             hidden += "current conditions"
                             if (headline.isNotEmpty()) item(key = "headline") { HeadlineCard(headline) }
                         }
                         if (snapshot.alerts.isNotEmpty() && state.shows(Section.ALERTS)) {
-                            item(key = "alerts") { AlertBanner(snapshot.alerts, time, onOpenAlerts) }
+                            item(key = "alerts") { AlertBanner(snapshot.alerts, time, onOpenAlerts, state.selected?.point, formatter) }
                         }
 
                         // At a glance: air, UV, pollen and the sun as chips, unless one of them matters today.
@@ -427,12 +441,14 @@ private fun HomeContent(
                                     heatTypes = if (settings.heatingEnabled) settings.heatSources.map { it.type }.distinct() else emptyList(),
                                     showPipes = settings.pipeRiskEnabled,
                                     showIce = settings.morningIceEnabled,
+                                    footer = state.accuracy,
                                 )
                             }
                         } else if (snapshot.daily.isNotEmpty()) {
                             hidden += "daily forecast"
                         }
                         val aurora = snapshot.aurora
+                        val lat0 = snapshot.latitude ?: location?.latitude
                         if (settings.auroraEnabled && aurora != null && state.shows(Section.AURORA)) {
                             val lat = snapshot.latitude ?: location?.latitude
                             val lon = location?.longitude
@@ -452,7 +468,13 @@ private fun HomeContent(
                             cards[TodayCard.FORECASTERS] = { ForecastersNotesCard(state.ai, time, onRefresh = actions.refreshDiscussion) }
                         }
                         if (aiReady && settings.aiAsk && state.shows(Section.HOURLY_FORECAST)) {
-                            cards[TodayCard.ASK] = { AskCard(state.ai, location?.displayName ?: "this place", onAsk = actions.ask, onClear = actions.clearAnswer) }
+                            val frostTonight = settings.gardenEnabled &&
+                                snapshot.hourly.filter { it.time.isAfter(now) && it.time.isBefore(now.plusSeconds(16 * 3600)) }.any { (it.temperatureC ?: 9.0) <= 0.5 }
+                            val auroraTonight = aurora != null && lat0 != null && location != null &&
+                                AuroraAdvisor.report(aurora, lat0, location.longitude, snapshot.hourly, zone, now).nights.firstOrNull()
+                                    ?.let { it.view >= app.northvane.core.model.AuroraView.CAMERA && (it.cloudPercent ?: 0) < 85 } == true
+                            val suggestions = AskSuggestions.pick(snapshot, time.today(), zone, auroraTonight, frostTonight)
+                            cards[TodayCard.ASK] = { AskCard(state.ai, location?.displayName ?: "this place", onAsk = actions.ask, onClear = actions.clearAnswer, suggestions = suggestions) }
                         }
                         val visible = settings.todayOrder.filter { it in cards }
                         visible.forEachIndexed { index, card ->
@@ -575,6 +597,7 @@ private fun HeroCard(
     time: TimeFormat,
     warning: Boolean,
     headline: List<String> = emptyList(),
+    wear: String? = null,
     onEasterEgg: () -> Unit = {},
     kelvin: Boolean = false,
 ) {
@@ -651,6 +674,10 @@ private fun HeroCard(
                     fontWeight = FontWeight.Medium,
                     color = onHero,
                 )
+            }
+            wear?.let {
+                Spacer(Modifier.height(6.dp))
+                Text("Wear: $it", style = MaterialTheme.typography.bodyMedium, color = onHero.copy(alpha = 0.92f))
             }
             val details = current?.let { detailPairs(it, f) }.orEmpty()
             AnimatedVisibility(visible = showDetails && details.isNotEmpty()) {
@@ -765,7 +792,7 @@ internal fun stationLabel(name: String): String {
 }
 
 @Composable
-private fun AlertBanner(alerts: List<WeatherAlert>, time: TimeFormat, onClick: () -> Unit) {
+private fun AlertBanner(alerts: List<WeatherAlert>, time: TimeFormat, onClick: () -> Unit, place: GeoPoint? = null, f: UnitFormatter? = null) {
     val top = AlertClassifier.mostUrgent(alerts) ?: return
     val color = alertColor(top.category)
     // Warnings get a solid banner; watches, advisories and statements keep the light tint.
@@ -784,6 +811,11 @@ private fun AlertBanner(alerts: List<WeatherAlert>, time: TimeFormat, onClick: (
                 Text(top.event, style = MaterialTheme.typography.titleMedium, color = onBanner)
                 val until = (top.ends ?: top.expires)?.let { "Until ${time.smart(it)}" }
                 val more = if (alerts.size > 1) "+${alerts.size - 1} more" else null
+                // Storm-based alerts: in the drawn area, or how far away.
+                val spot = if (place != null && f != null) AlertAreas.spot(top, place)?.describe(top) { km -> f.distance(km) } else null
+                spot?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = onBanner)
+                }
                 Text(
                     listOfNotNull(until, more).joinToString(" · ").ifEmpty { "Tap for details" },
                     style = MaterialTheme.typography.bodySmall,

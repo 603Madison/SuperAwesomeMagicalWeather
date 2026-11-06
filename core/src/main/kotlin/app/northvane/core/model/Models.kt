@@ -242,6 +242,12 @@ data class WeatherAlert(
     val senderName: String? = null,
     val areaDesc: String? = null,
     val messageType: String? = null,
+    /**
+     * The storm-based area the alert covers, as outer rings of points, when
+     * the NWS drew one (most short-fuse warnings and advisories). Null when the
+     * alert covers whole counties or zones.
+     */
+    val area: List<List<GeoPoint>>? = null,
 ) {
     val isUpdate: Boolean get() = messageType.equals("Update", ignoreCase = true)
 }

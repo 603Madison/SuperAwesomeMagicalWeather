@@ -113,6 +113,26 @@ class MiniViewModel(app: Application) : AndroidViewModel(app) {
 
     fun addResult(result: PlaceSearch.Result) = addPlace(container.places.toPlace(result))
 
+    /** Places from the main app's QR code; ones already saved (within about 1 km) are skipped. */
+    fun importPlaces(text: String?, onDone: (Boolean) -> Unit) {
+        val incoming = text?.let { app.northvane.core.model.PlacesCode.decode(it) }
+        if (incoming == null) {
+            _state.update { it.copy(message = "No code found. Fill the photo with the QR code and try again.") }
+            onDone(false)
+            return
+        }
+        viewModelScope.launch {
+            var added = emptyList<app.northvane.core.model.SavedLocation>()
+            store.update { s ->
+                added = app.northvane.core.model.PlacesCode.newOnes(incoming, s.places)
+                s.copy(places = s.places + added, selectedId = s.selectedId ?: added.firstOrNull()?.id)
+            }
+            _state.update { it.copy(message = if (added.isEmpty()) "Those places are already here." else "Added ${added.size} place${if (added.size == 1) "" else "s"}.") }
+            showSelected(refreshIfOlderThan = null)
+            onDone(added.isNotEmpty())
+        }
+    }
+
     fun removePlace(id: String) {
         viewModelScope.launch {
             store.update { s ->

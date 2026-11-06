@@ -34,10 +34,13 @@ object TodayHeadline {
         hour: (Instant) -> String,
         nowcast: List<MinutePrecip> = emptyList(),
         maxSentences: Int = 3,
+        /** The user's own times ("Drive home" at 5 PM), which come right after anything in the next two hours. */
+        times: List<TimeSlot> = emptyList(),
     ): List<String> {
         val sentences = mutableListOf<String>()
         val soon = nearTerm(nowcast, now, clock)
         soon?.let { sentences += it }
+        MyTimes.sentence(times, hourly, f, hour, now)?.let { sentences += it }
         val rain = NextRain.find(hourly, now, Duration.ofHours(18))
         // The 15-minute line already covers rain that starts or stops in the next two hours.
         val coveredBySoon = soon != null && rain != null && rain.start.isBefore(now.plus(Duration.ofHours(2)))

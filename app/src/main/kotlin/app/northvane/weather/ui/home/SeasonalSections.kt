@@ -59,6 +59,10 @@ import app.northvane.weather.ui.TimeFormat
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.background
 
 @Composable
 internal fun SeasonCard(content: @Composable () -> Unit) {
@@ -96,13 +100,20 @@ internal fun GardenCard(
     val plants = GardenAdvisor.plants(report, today, planting = settings.gardenPlanting, harvest = settings.gardenHarvest)
     if (plants.isEmpty() && !report.inGrowingSeason) return
     val c = report.climate
+    var open by rememberSaveable { mutableStateOf(false) }
     WeatherCard("Garden") {
-        Note(
-            "Last spring frost usually ${time.monthDay(c.lastFrost(today.year))} (1 year in 10: ${time.monthDay(c.lastFrostLate(today.year))}); " +
-                "first fall frost ${time.monthDay(c.firstFrost(today.year))}. From 30 years of NOAA data.",
-        )
         var all by rememberSaveable { mutableStateOf(false) }
-        val shown = if (all) plants else plants.take(8)
+        // At a glance: the crops with something to do now; everything else is behind Details.
+        val urgent = plants.filter { p ->
+            p.planting?.status in setOf(StepStatus.NOW, StepStatus.GOOD_DAY, StepStatus.LATE, StepStatus.WAIT_FROST) ||
+                p.harvest?.status in setOf(HarvestStatus.READY, HarvestStatus.PICK_BEFORE_FROST, HarvestStatus.COVER_FOR_FROST)
+        }
+        val shown = when {
+            open && all -> plants
+            open -> plants.take(8)
+            urgent.isNotEmpty() -> urgent.take(3)
+            else -> plants.take(2)
+        }
         shown.forEach { p ->
             Column(Modifier.padding(top = 4.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -118,9 +129,17 @@ internal fun GardenCard(
                 p.harvest?.let { HarvestLine(it, f, time) }
             }
         }
-        if (plants.size > shown.size) TextButton(onClick = { all = true }) { Text("Show ${plants.size - shown.size} more") }
-        if (plants.any { it.harvest?.estimated == true }) Note("~ Estimated from the recommended planting date; mark crops planted for exact timing.")
-        GardenExtras(report, settings, f, time)
+        if (open) {
+            if (plants.size > shown.size) TextButton(onClick = { all = true }) { Text("Show ${plants.size - shown.size} more") }
+            if (plants.any { it.harvest?.estimated == true }) Note("~ Estimated from the recommended planting date; mark crops planted for exact timing.")
+            GardenExtras(report, settings, f, time)
+            Note(
+                "Last spring frost usually ${time.monthDay(c.lastFrost(today.year))} (1 year in 10: ${time.monthDay(c.lastFrostLate(today.year))}); " +
+                    "first fall frost ${time.monthDay(c.firstFrost(today.year))}. From 30 years of NOAA data.",
+                Modifier.padding(top = 6.dp),
+            )
+        }
+        DetailsToggle(open) { open = !open }
     }
 }
 
@@ -295,47 +314,62 @@ internal fun DryingSection(report: DryingReport, laundryOut: Boolean, f: UnitFor
 
 @Composable
 internal fun HeatingSection(report: HeatingReport, hasSources: Boolean, aggressive: Boolean, f: UnitFormatter, time: TimeFormat, onConfigure: () -> Unit) {
+    var open by rememberSaveable { mutableStateOf(false) }
     WeatherCard("Heating") {
-        Text(report.phase.label, style = MaterialTheme.typography.titleMedium)
-        val start = report.typicalStart
-        val end = report.typicalEnd
-        if (start != null && end != null) Note("Heating season here usually runs ${time.monthDay(start)} to ${time.monthDay(end)}.")
-        if (hasSources && report.phase != HeatingPhase.OFF && report.recommended.isNotEmpty() && !aggressive) {
+        val running = hasSources && report.phase != HeatingPhase.OFF && report.recommended.isNotEmpty()
+        // The answer first: what to run, and the most pressing chore.
+        if (running) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Run: ", style = MaterialTheme.typography.bodyLarge)
-                Text(report.recommended.joinToString(" + ") { shortName(it) }, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
+                Text("Run: ", style = MaterialTheme.typography.titleMedium)
+                Text(report.recommended.joinToString(" + ") { shortName(it) }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
             }
-            report.outlookMeanC?.let { Note("Based on the two-week average of about ${f.temperatureWithUnit(it)} (past week plus forecast), so it won't flip between systems day to day.") }
-            Note(HeatingAdvisor.demandText(report.weekHdd, report.recentHdd))
+        } else {
+            Text(report.phase.label, style = MaterialTheme.typography.titleMedium)
         }
-        if (hasSources && report.phase != HeatingPhase.OFF && aggressive && report.days.isNotEmpty()) {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                report.days.forEach { d ->
-                    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-                        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp).width(92.dp)) {
-                            Text(time.dayName(d.date), style = MaterialTheme.typography.labelLarge)
-                            Note("low ${f.temperature(d.lowC)}")
-                            Text(
-                                d.sources.joinToString(" + ") { shortName(it) }.ifEmpty { "–" },
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                            if (d.nightSources.isNotEmpty()) Note("night: " + d.nightSources.joinToString(" + ") { shortName(it) })
+        report.tasks.firstOrNull()?.let { task ->
+            Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(top = 4.dp)) {
+                StatusDot(Caution)
+                Spacer(Modifier.width(8.dp))
+                Text(OutlookText.heatingTask(task, f), style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        if (hasSources && report.phase != HeatingPhase.OFF && report.days.isNotEmpty()) {
+            // Each day's system as a dot: the first source's color, so a switch stands out.
+            val order = report.days.flatMap { it.sources }.distinct()
+            val palette = listOf(MaterialTheme.colorScheme.primary, Caution, Color(0xFF8E6CC8), Color(0xFF2E9D5B))
+            DayDots(report.days.map { d -> time.weekday(d.date) to (d.sources.firstOrNull()?.let { palette[order.indexOf(it) % palette.size] } ?: MaterialTheme.colorScheme.outlineVariant) })
+            if (order.size > 1) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(top = 6.dp)) {
+                    order.forEachIndexed { i, src ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(8.dp).background(palette[i % palette.size], CircleShape))
+                            Spacer(Modifier.width(4.dp))
+                            Note(shortName(src))
                         }
                     }
                 }
             }
-            Note(HeatingAdvisor.demandText(report.weekHdd, report.recentHdd))
         }
-        report.tasks.forEach { task ->
-            Row(verticalAlignment = Alignment.Top) {
-                StatusDot(Caution)
-                Spacer(Modifier.width(8.dp))
-                Text(OutlookText.heatingTask(task, f), style = MaterialTheme.typography.bodySmall)
+        if (open) {
+            Note(report.phase.label + (report.typicalStart?.let { s -> report.typicalEnd?.let { e -> ". Usually ${time.monthDay(s)} to ${time.monthDay(e)}" } } ?: "") + ".")
+            if (running && !aggressive) report.outlookMeanC?.let { Note("Based on the two-week average of about ${f.temperatureWithUnit(it)}, so it won't flip between systems day to day.") }
+            Note(HeatingAdvisor.demandText(report.weekHdd, report.recentHdd))
+            if (aggressive) report.days.filter { it.nightSources.isNotEmpty() }.forEach { d ->
+                Note("${time.dayName(d.date)} night: " + d.nightSources.joinToString(" + ") { shortName(it) })
+            }
+            report.tasks.drop(1).forEach { task ->
+                Row(verticalAlignment = Alignment.Top) {
+                    StatusDot(Caution)
+                    Spacer(Modifier.width(8.dp))
+                    Text(OutlookText.heatingTask(task, f), style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
-        if (!hasSources) Button(onClick = onConfigure) { Text("Set up my heating") } else TextButton(onClick = onConfigure) { Text("Edit my heating") }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (hasSources) DetailsToggle(open) { open = !open }
+            Spacer(Modifier.weight(1f))
+            if (!hasSources) Button(onClick = onConfigure) { Text("Set up my heating") } else TextButton(onClick = onConfigure) { Text("Edit") }
+        }
     }
 }
 
@@ -346,3 +380,22 @@ private fun inDays(n: Long) = when (n) {
 }
 
 private fun shortName(label: String) = label.substringBefore(" (").substringBefore(" /").replace("Oil furnace", "Oil").replace("Heat pump", "Heat pump")
+
+/** One dot per day with its short weekday under it: a week at a glance. */
+@Composable
+internal fun DayDots(days: List<Pair<String, Color>>, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth().padding(top = 8.dp)) {
+        days.take(7).forEach { (label, color) ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                Box(Modifier.size(12.dp).background(color, CircleShape))
+                Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+            }
+        }
+    }
+}
+
+/** "Details" / "Less" for the rest of a card. */
+@Composable
+internal fun DetailsToggle(open: Boolean, onToggle: () -> Unit) {
+    TextButton(onClick = onToggle, contentPadding = PaddingValues(horizontal = 0.dp)) { Text(if (open) "Less" else "Details") }
+}

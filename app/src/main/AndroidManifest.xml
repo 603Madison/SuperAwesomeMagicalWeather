@@ -22,6 +22,13 @@
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
+    <!-- Lets "Ask by voice" find the phone's speech recognizer (Android 11+ package visibility). -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+    </queries>
+
     <application
         android:name=".NorthvaneApp"
         android:allowBackup="false"
@@ -66,5 +73,16 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_weather_info" />
         </receiver>
+        <!-- Quick Settings tile: temperature and the next thing to know, from the last forecast. -->
+        <service
+            android:name=".tile.WeatherTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_weather"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

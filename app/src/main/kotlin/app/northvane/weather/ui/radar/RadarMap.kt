@@ -34,6 +34,9 @@ import org.maplibre.android.style.sources.RasterSource
 import org.maplibre.android.style.sources.TileSet
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.Point
+import org.maplibre.geojson.MultiPolygon
+import org.maplibre.android.style.layers.FillLayer
+import org.maplibre.android.style.layers.LineLayer
 
 // Free, keyless vector basemaps (OpenStreetMap data) — no Google/Mapbox key needed.
 private const val LIGHT_STYLE = "https://tiles.openfreemap.org/styles/positron"
@@ -61,6 +64,8 @@ fun RadarMap(
     modifier: Modifier = Modifier,
     /** Marker for the selected location. */
     pin: GeoPoint? = null,
+    /** Alert areas to outline (rings and a #RRGGBB color), drawn over the radar. */
+    alertAreas: List<Pair<List<List<GeoPoint>>, String>> = emptyList(),
     /** GOES satellite tiles drawn beneath the radar, or null for none. */
     satelliteTiles: String? = null,
 ) {
@@ -215,6 +220,26 @@ fun RadarMap(
                 PropertyFactory.circleStrokeWidth(2.5f),
             ),
         )
+    }
+
+    // Storm-based alert areas: a light fill and a solid outline, over the radar and under the pin.
+    LaunchedEffect(style, alertAreas) {
+        val s = style ?: return@LaunchedEffect
+        s.layers.filter { it.id.startsWith("alert-") }.forEach { s.removeLayer(it) }
+        s.sources.filter { it.id.startsWith("alert-") }.forEach { s.removeSource(it) }
+        alertAreas.forEachIndexed { i, (rings, color) ->
+            val polygons = rings.map { ring -> listOf(ring.map { Point.fromLngLat(it.longitude, it.latitude) }) }
+            s.addSource(GeoJsonSource("alert-src-$i", Feature.fromGeometry(MultiPolygon.fromLngLats(polygons))))
+            val fill = FillLayer("alert-fill-$i", "alert-src-$i").withProperties(PropertyFactory.fillColor(color), PropertyFactory.fillOpacity(0.12f))
+            val line = LineLayer("alert-line-$i", "alert-src-$i").withProperties(PropertyFactory.lineColor(color), PropertyFactory.lineWidth(2.5f))
+            if (s.getLayer(PIN_HALO) != null) {
+                s.addLayerBelow(fill, PIN_HALO)
+                s.addLayerBelow(line, PIN_HALO)
+            } else {
+                s.addLayer(fill)
+                s.addLayer(line)
+            }
+        }
     }
 
     LaunchedEffect(style, layerIds, index) {

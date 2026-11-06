@@ -232,6 +232,8 @@ internal fun DailySection(
     heatTypes: List<HeatType> = emptyList(),
     showPipes: Boolean = false,
     showIce: Boolean = false,
+    /** A small line under the days, e.g. how the forecast has done lately. */
+    footer: String? = null,
 ) {
     var expanded by rememberSaveable { mutableStateOf<String?>(null) }
     val temps = days.flatMap { listOfNotNull(it.lowC, it.highC) }
@@ -325,6 +327,9 @@ internal fun DailySection(
                     HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
+        }
+        footer?.let {
+            Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp))
         }
     }
 }

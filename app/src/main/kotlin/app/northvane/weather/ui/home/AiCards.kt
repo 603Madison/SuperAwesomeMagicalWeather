@@ -49,6 +49,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.remember
 import app.northvane.core.ai.AiBrief
 import app.northvane.weather.ui.components.WeatherCard
+import app.northvane.weather.ui.components.NorthvaneIcons
+import androidx.compose.ui.platform.LocalContext
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.compose.rememberLauncherForActivityResult
+import android.speech.RecognizerIntent
+import android.content.Intent
+import android.app.Activity
 
 /**
  * The National Weather Service forecasters' own discussion, rewritten in
@@ -125,13 +132,34 @@ private fun Points(points: List<String>, modifier: Modifier = Modifier) {
 
 /** A question about the forecast, answered from the forecast. */
 @Composable
-internal fun AskCard(ai: AiUiState, place: String, onAsk: (String) -> Unit, onClear: () -> Unit) {
+internal fun AskCard(
+    ai: AiUiState,
+    place: String,
+    onAsk: (String) -> Unit,
+    onClear: () -> Unit,
+    suggestions: List<String> = listOf("Will I need an umbrella today?", "Good day this week for yard work?"),
+) {
     var text by rememberSaveable { mutableStateOf("") }
     val keyboard = LocalSoftwareKeyboardController.current
+    val context = LocalContext.current
+    // Speak the question: the phone's own speech recognizer (no permission needed; nothing sent by this app).
+    val speechIntent = remember {
+        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_PROMPT, "Ask about the forecast")
+    }
+    val canSpeak = remember { speechIntent.resolveActivity(context.packageManager) != null }
     fun send(q: String = text) {
         if (q.trim().length >= 3) {
             keyboard?.hide()
             onAsk(q)
+        }
+    }
+    val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val heard = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.take(AiPrompts.MAX_QUESTION)
+        if (result.resultCode == Activity.RESULT_OK && !heard.isNullOrBlank()) {
+            text = heard
+            send(heard)
         }
     }
     AiCardFrame(title = "Ask about the forecast", subtitle = null) {
@@ -144,15 +172,21 @@ internal fun AskCard(ai: AiUiState, place: String, onAsk: (String) -> Unit, onCl
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { send() }),
                 trailingIcon = {
-                    IconButton(onClick = { send() }, enabled = text.trim().length >= 3 && !ai.answer.loading) {
-                        Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Ask")
+                    if (text.isBlank() && canSpeak) {
+                        IconButton(onClick = { runCatching { speech.launch(speechIntent) } }) {
+                            Icon(NorthvaneIcons.Mic, contentDescription = "Ask by voice")
+                        }
+                    } else {
+                        IconButton(onClick = { send() }, enabled = text.trim().length >= 3 && !ai.answer.loading) {
+                            Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Ask")
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth().padding(end = 12.dp),
             )
             if (ai.question == null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
-                    listOf("Will I need an umbrella today?", "Good day this week for yard work?").forEach { example ->
+                    suggestions.take(2).forEach { example ->
                         AssistChip(onClick = { text = example; send(example) }, label = { Text(example, style = MaterialTheme.typography.labelSmall, maxLines = 2) }, modifier = Modifier.weight(1f))
                     }
                 }

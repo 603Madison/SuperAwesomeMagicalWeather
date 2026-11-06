@@ -69,7 +69,10 @@ class AlertCheckWorker(appContext: Context, params: WorkerParameters) : Coroutin
             toNotify += items
         }
         if (canNotify) {
-            AlertNotifier.notify(applicationContext, toNotify, locations.associate { it.id to it.displayName })
+            AlertNotifier.notify(
+                applicationContext, toNotify, locations.associate { it.id to it.displayName },
+                points = locations.associate { it.id to it.point }, units = container.settings.settings.first().units,
+            )
             container.alertState.write(state)
         }
         return if (failures == locations.size) Result.retry() else Result.success()

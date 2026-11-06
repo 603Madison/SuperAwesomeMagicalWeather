@@ -85,6 +85,11 @@ import androidx.compose.material3.Switch
 import app.northvane.weather.data.TodayCard
 import app.northvane.weather.data.isOn
 import app.northvane.weather.ui.components.ReorderableColumn
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.AlertDialog
+import app.northvane.core.outlook.Comfort
+import app.northvane.core.outlook.MyTime
 
 /** Literal so lint doesn't flag the API 33 constant; only requested on API 33+. */
 private const val POST_NOTIFICATIONS = "android.permission.POST_NOTIFICATIONS"
@@ -269,6 +274,16 @@ private fun TodayPage(state: MainUiState, container: AppContainer, onBack: () ->
                 }
             }
         }
+        SectionCard("You") {
+            LabeledSwitch("What to wear", s.wearEnabled, { on -> update { setWear(on) } },
+                subtitle = "A line in the top card, like \"Light jacket · umbrella after 3 PM\"")
+            if (s.wearEnabled) {
+                ChoiceDropdown("Comfort", Comfort.entries, s.comfort, { it.label }, { c -> update { setComfort(c) } })
+            }
+            Text("Your times", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 8.dp))
+            Hint("When you're usually out. The headline tells you about the weather for them, like \"Rain likely for your drive home (5 PM)\".")
+            MyTimesEditor(s.myTimes) { times -> update { setMyTimes(times) } }
+        }
         SectionCard("In each day's details") {
             LabeledSwitch("Power outage outlook", s.outageRiskEnabled, { on -> update { setOutageRisk(on) } },
                 subtitle = "Tap High risk for preparation steps")
@@ -381,6 +396,7 @@ private fun AlertsPage(state: MainUiState, container: AppContainer, onBack: () -
             container.settings.block()
             val now = container.settings.settings.first()
             BriefingWorker.schedule(context, now)
+            app.northvane.weather.work.TonightWorker.schedule(context, now)
             RainSoonWorker.sync(context, now)
         }
     }
@@ -413,6 +429,17 @@ private fun AlertsPage(state: MainUiState, container: AppContainer, onBack: () -
                     val t = java.time.LocalTime.of(m / 60, m % 60)
                     java.time.format.DateTimeFormatter.ofPattern(if (android.text.format.DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm a").format(t)
                 }, { m -> updateDaily { setBriefingMinutes(m) } })
+            }
+            LabeledSwitch("Tonight", s.tonightEnabled, { on ->
+                if (on) askIfNeeded()
+                updateDaily { setTonight(on) }
+            }, subtitle = "One evening heads-up, only when there's something to do: frost, pipes, black ice by morning, a storm overnight, laundry out, northern lights")
+            if (s.tonightEnabled) {
+                val evening = (17 * 60..21 * 60 step 30).toList()
+                ChoiceDropdown("At", (evening + s.tonightMinutes).distinct().sorted(), s.tonightMinutes, { m ->
+                    val t = java.time.LocalTime.of(m / 60, m % 60)
+                    java.time.format.DateTimeFormatter.ofPattern(if (android.text.format.DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm a").format(t)
+                }, { m -> updateDaily { setTonightMinutes(m) } })
             }
             LabeledSwitch("Rain starting soon", s.rainSoonEnabled, { on ->
                 if (on) askIfNeeded()
@@ -615,3 +642,52 @@ private fun Label(text: String) {
 private fun CategoryRow(category: AlertCategory, title: String, subtitle: String, enabled: Set<AlertCategory>, onChange: (AlertCategory, Boolean) -> Unit) =
     CheckRow(title, subtitle, category in enabled) { onChange(category, it) }
 
+/** The list of the user's times, with add, change and remove. */
+@Composable
+private fun MyTimesEditor(times: List<MyTime>, onChange: (List<MyTime>) -> Unit) {
+    val context = LocalContext.current
+    val is24 = android.text.format.DateFormat.is24HourFormat(context)
+    fun clock(m: Int) = java.time.format.DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "h:mm a").format(java.time.LocalTime.of(m / 60, m % 60))
+    var editing by remember { mutableStateOf<Int?>(null) }
+    times.forEachIndexed { i, t ->
+        NavRow(t.label, "${clock(t.minutes)} · ${t.durationMinutes} min" + if (t.weekdaysOnly) " · weekdays" else "") { editing = i }
+    }
+    if (times.size < 8) TextButton(onClick = { editing = -1 }) { Text("Add a time") }
+    editing?.let { index ->
+        val existing = times.getOrNull(index)
+        var label by remember(index) { mutableStateOf(existing?.label ?: "") }
+        var minutes by remember(index) { mutableStateOf(existing?.minutes ?: (17 * 60)) }
+        var duration by remember(index) { mutableStateOf(existing?.durationMinutes ?: 60) }
+        var weekdays by remember(index) { mutableStateOf(existing?.weekdaysOnly ?: true) }
+        AlertDialog(
+            onDismissRequest = { editing = null },
+            title = { Text(if (existing == null) "Add a time" else "Change time") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(label, { label = it.take(24) }, singleLine = true, label = { Text("Name") }, placeholder = { Text("Drive home") }, modifier = Modifier.fillMaxWidth())
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("Commute", "Drive home", "Walk", "Run").forEach { name ->
+                            FilterChip(selected = label == name, onClick = { label = name }, label = { Text(name, style = MaterialTheme.typography.labelSmall) })
+                        }
+                    }
+                    ChoiceDropdown("At", (5 * 60..22 * 60 step 15).toList().let { if (minutes in it) it else (it + minutes).sorted() }, minutes, ::clock, { minutes = it })
+                    ChoiceDropdown("For", listOf(15, 30, 45, 60, 90, 120, 180), duration, { if (it < 60) "$it min" else "${it / 60}${if (it % 60 == 30) ".5" else ""} h" }, { duration = it })
+                    LabeledSwitch("Weekdays only", weekdays, { weekdays = it })
+                }
+            },
+            confirmButton = {
+                TextButton(enabled = label.isNotBlank(), onClick = {
+                    val t = MyTime(label.trim(), minutes, duration, weekdays)
+                    onChange(if (existing == null) times + t else times.mapIndexed { i, old -> if (i == index) t else old })
+                    editing = null
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                Row {
+                    if (existing != null) TextButton(onClick = { onChange(times.filterIndexed { i, _ -> i != index }); editing = null }) { Text("Remove") }
+                    TextButton(onClick = { editing = null }) { Text("Cancel") }
+                }
+            },
+        )
+    }
+}

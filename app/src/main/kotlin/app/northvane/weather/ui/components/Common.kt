@@ -78,6 +78,11 @@ object NorthvaneIcons {
         )
     }
 
+    /** A microphone, for asking by voice. */
+    val Mic: ImageVector by lazy {
+        icon("mic", "M12,3 a3,3 0 0,1 3,3 v5 a3,3 0 0,1 -6,0 v-5 a3,3 0 0,1 3,-3 z M6,11 a6,6 0 0,0 12,0 M12,17 v4 M9,21 h6", stroked = true)
+    }
+
     /** Two bars: grab here to drag a row. */
     val DragHandle: ImageVector by lazy { icon("drag", "M5,9.5 h14 M5,14.5 h14", stroked = true) }
 

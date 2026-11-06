@@ -81,6 +81,10 @@ Each card can be turned on or off in Settings. The last column is the default.
 | Feature | What it shows | Default |
 |---|---|---|
 | **Current conditions** | From your WeeWX station if one is nearby, otherwise the nearest NWS observation; tap **Details** for humidity, dew point, pressure and more | On |
+| **Your spot in alerts** | For warnings with a drawn area: whether you're in it, or how far away it is, and the areas outlined on the radar | On |
+| **Your times** | When you're usually out (a drive home, a walk); the headline says "Rain likely for your drive home (5 PM)" | Set in Settings |
+| **What to wear** | "Light jacket · umbrella after 3 PM", adjusted if you run cold or warm | On |
+| **Forecast accuracy** | Under the 7-day: how the forecast has done here over the last week, against NOAA observations | On |
 | **Headline** | One or two sentences under the temperature on what matters next: "Rain in about 20 min", "Snow from 3 PM, about 4 in", gusts, frost after a mild day, a big change tomorrow | On |
 | **At a glance** | Air quality, UV, pollen and sunset as small chips; tap one for its full card. Each becomes a full card by itself when it matters (AQI over 50, UV 6 or more, high pollen) | On |
 | **Hourly** | Temperature and rain chance at a glance; tap for wind, gusts, humidity, dew point and clouds over 36 hours | On |
@@ -143,6 +147,8 @@ Planning cards in three groups (Outdoors, Home and Seasonal), each shown only wh
 | Feature | What it does | Default |
 |---|---|---|
 | **Morning briefing** | Today's forecast in a few sentences, once a day at the time you pick | Off |
+| **Tonight** | One evening heads-up, only when there's something to do: frost, pipes, black ice by morning, an overnight storm, laundry out, the northern lights | On |
+| **Quick Settings tile** | Temperature and the next thing to know in the pull-down shade | Add it from the shade |
 | **Rain starting soon** | A heads-up up to an hour before rain or snow starts, from a 15-minute forecast (never 10 PM–6 AM) | Off |
 | **Home-screen widget** | Three sizes: small (temperature), medium (conditions, high and low, the headline) and large (plus the next five hours). Sky colors, or your wallpaper's colors with a dynamic theme | Add it from your home screen |
 
