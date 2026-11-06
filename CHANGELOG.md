@@ -5,6 +5,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-11-06
+
+### Fixed
+- **Dark mode text:** the Outlook group headings, the radar's time and playback panel, the map legend and the satellite button showed dark text on a dark background. Screens drawn over the theme backdrop now use the theme's text color throughout.
+- **Map labels are readable over radar:** town and state names are light with a dark outline in dark mode (dark with a light outline in light mode), so they stand out over any radar color.
+
 ## [2.0.1] - 2026-11-06
 
 ### Changed

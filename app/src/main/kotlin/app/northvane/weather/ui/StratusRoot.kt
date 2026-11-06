@@ -190,10 +190,15 @@ fun NorthvaneRoot(
     ThemeBackdrop(container, state.settings.customPhotoVersion)
     Scaffold(
         containerColor = Color.Transparent,
+        // Text on the theme backdrop needs the theme's color, not the black default for transparent containers.
+        contentColor = MaterialTheme.colorScheme.onBackground,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             if (route == null || visibleTabs.any { it.route == route }) {
-                NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.97f)) {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.97f),
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ) {
                     visibleTabs.forEach { tab ->
                         NavigationBarItem(
                             selected = route == tab.route,

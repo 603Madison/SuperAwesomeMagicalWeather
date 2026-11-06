@@ -98,6 +98,8 @@ fun RadarScreen(state: MainUiState, container: AppContainer, onOpenSettings: () 
 
     Scaffold(
         containerColor = Color.Transparent,
+        // Text on the theme backdrop needs the theme's color, not the black default for transparent containers.
+        contentColor = MaterialTheme.colorScheme.onBackground,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
@@ -220,7 +222,11 @@ private fun Controls(
 ) {
     Card(
         shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.95f)),
+        // A see-through container isn't a theme color, so say which text color goes on it.
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.95f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
         modifier = modifier.fillMaxWidth(),
     ) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
@@ -282,6 +288,7 @@ private fun SatelliteToggle(on: Boolean, allowed: Boolean, label: String, onTogg
     Surface(
         shape = RoundedCornerShape(50),
         color = if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f),
+        contentColor = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
         onClick = onToggle,
         modifier = modifier,
     ) {
@@ -328,6 +335,7 @@ private fun Legend(modifier: Modifier = Modifier) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
         modifier = modifier,
     ) {
         Column(Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {

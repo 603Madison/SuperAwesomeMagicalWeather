@@ -113,7 +113,18 @@ fun RadarMap(
     LaunchedEffect(map, dark) {
         val m = map ?: return@LaunchedEffect
         style = null
-        m.setStyle(Style.Builder().fromUri(if (dark) DARK_STYLE else LIGHT_STYLE)) { loaded -> style = loaded }
+        m.setStyle(Style.Builder().fromUri(if (dark) DARK_STYLE else LIGHT_STYLE)) { loaded ->
+            // The basemaps' labels are tuned for an empty map; over bright radar they need more contrast.
+            loaded.layers.filterIsInstance<SymbolLayer>().forEach { label ->
+                label.setProperties(
+                    PropertyFactory.textColor(if (dark) "#F2FFFFFF" else "#FF1F2328"),
+                    PropertyFactory.textHaloColor(if (dark) "#E6000000" else "#F2FFFFFF"),
+                    PropertyFactory.textHaloWidth(1.6f),
+                    PropertyFactory.textHaloBlur(0.4f),
+                )
+            }
+            style = loaded
+        }
     }
 
     LaunchedEffect(map, center) {

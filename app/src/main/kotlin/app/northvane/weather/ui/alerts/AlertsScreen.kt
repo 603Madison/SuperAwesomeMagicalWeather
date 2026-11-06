@@ -78,6 +78,8 @@ fun AlertsScreen(state: MainUiState, onRefresh: () -> Unit, onOpenSettings: () -
 
     Scaffold(
         containerColor = Color.Transparent,
+        // Text on the theme backdrop needs the theme's color, not the black default for transparent containers.
+        contentColor = MaterialTheme.colorScheme.onBackground,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(

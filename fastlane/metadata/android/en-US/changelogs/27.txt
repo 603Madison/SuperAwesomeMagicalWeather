@@ -1,0 +1,1 @@
+Fixed dark text on dark backgrounds (Outlook headings, the radar time panel, legend) and made map town names readable over radar.

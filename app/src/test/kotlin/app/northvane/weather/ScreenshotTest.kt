@@ -591,6 +591,15 @@ class ScreenshotTest {
         save("sap_burn_cards")
     }
 
+    /** Dark theme: group headings and card text must stay light on the dark backdrop. */
+    @Test
+    @Config(qualifiers = "w400dp-h2200dp-xxhdpi")
+    fun outlookDark() {
+        val st = state()
+        render(dark = true) { OutlookScreen(st.copy(settings = st.settings.copy(dryingEnabled = true, burnEnabled = true)), {}, {}, {}, {}) }
+        save("outlook_dark")
+    }
+
     @Test
     @Config(qualifiers = "w400dp-h3000dp-xxhdpi")
     fun outlookTab() {

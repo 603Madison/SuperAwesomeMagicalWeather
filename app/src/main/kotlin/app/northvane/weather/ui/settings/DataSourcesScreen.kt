@@ -123,6 +123,8 @@ fun DataSourcesScreen(
 
     Scaffold(
         containerColor = Color.Transparent,
+        // Text on the theme backdrop needs the theme's color, not the black default for transparent containers.
+        contentColor = MaterialTheme.colorScheme.onBackground,
         topBar = {
             TopAppBar(
                 title = { Text("Data sources") },
