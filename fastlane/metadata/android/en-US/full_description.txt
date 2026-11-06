@@ -16,6 +16,13 @@ A private, ad-free weather app built on free NOAA and National Weather Service d
 <li>Power outage risk, frozen pipes, black ice and frost.</li>
 <li>Outdoor activity scores, fall foliage, trail mud, clothes drying, garden, heating, maple sap runs and burn days.</li>
 <li>Traffic: work zones, crashes and closures.</li>
+<li>Storm totals, wildfire smoke, and rivers &amp; tides for paddling.</li>
+</ul>
+
+<b>Notifications and widget</b>
+<ul>
+<li>A home-screen widget with the temperature, conditions and the next rain.</li>
+<li>"Rain starting soon" heads-ups and a morning briefing at the time you choose.</li>
 </ul>
 
 <b>Backwoods mode</b>

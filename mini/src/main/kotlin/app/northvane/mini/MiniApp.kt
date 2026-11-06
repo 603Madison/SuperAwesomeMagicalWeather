@@ -36,6 +36,7 @@ class MiniApp : Application() {
         container.scope.launch {
             container.store.load()
             runCatching { MiniAlertWorker.sync(this@MiniApp, container.store.settings.value) }
+            runCatching { app.northvane.mini.work.MiniBriefingWorker.schedule(this@MiniApp, container.store.settings.value) }
         }
     }
 }

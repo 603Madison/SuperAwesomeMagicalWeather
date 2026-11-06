@@ -1,0 +1,1 @@
+New: a morning briefing notification at the time you pick (Settings), and Read aloud (key 7 on Home) speaks it with the phone's own voice.

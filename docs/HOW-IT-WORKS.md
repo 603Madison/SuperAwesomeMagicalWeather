@@ -8,6 +8,9 @@ app does, see the [README](../README.md).
 - [Alerts](#alerts)
 - [Estimates](#estimates)
 - [Optional services](#optional-services)
+- [Wildfire smoke](#wildfire-smoke)
+- [Rivers and tides](#rivers-and-tides)
+- [Notifications and widget](#notifications-and-widget)
 - [Backwoods mode](#backwoods-mode)
 - [Screenshots](#screenshots)
 
@@ -109,6 +112,17 @@ tiles are used instead.
 
 These are the app's own estimates from the forecast and recent observations,
 not official forecasts.
+
+### Storm totals
+
+From the NWS gridpoint forecast's hourly rain, snow and ice amounts: wet
+hours with dry gaps of up to six hours count as one storm, and the first one
+with at least 2" of snow, 0.1" of ice or 1" of rain gets a card. It shows the
+totals (rain counted only in hours without snow or ice), start and end, and
+the six hours with the most precipitation. An active NWS storm alert (Winter
+Storm Warning, Blizzard, Ice Storm, Flood…) names it; otherwise it's a
+snowstorm, ice storm (a quarter inch of ice or more), winter storm (mixed) or
+soaking rain. Beyond the hourly forecast's reach, daily totals stand in.
 
 ### Power outage risk
 
@@ -302,6 +316,48 @@ Weather Watches. Rules vary by town and state, and many need a burn permit.
   tiles a day, and one look at the map uses about 20–60.
 - **NWS contact email** (optional) goes only into the User-Agent sent to
   weather.gov, as NWS asks.
+
+## Wildfire smoke
+
+NOAA's HRRR model carries a smoke tracer: near-surface smoke (MASSDEN, 8 m
+above ground). The app finds the newest run that goes out 48 hours (00, 06, 12
+or 18 UTC), downloads only that field for 3, 9, 15 and 24 hours ahead (about
+480 KB each, by byte range, as for the future cast), decodes it on the phone
+and reads the value at the place, between the four nearest grid points. The
+level uses the EPA's PM2.5 scale, since smoke is mostly fine particles; the
+card appears only from a light haze (5 µg/m³) up. Updated at most every 6
+hours. The decoder was checked against ECMWF's eccodes on a real smoke field.
+
+## Rivers and tides
+
+- **Rivers:** the USGS Water Data API (the OGC service replacing the old
+  WaterServices). The nearest stream gauge within about 30 km that reported
+  flow or height in the last two days, with water temperature if it measures
+  it, and its height change over the last six hours. Rising half a foot in six
+  hours counts as rising fast.
+- **Tides:** NOAA Tides & Currents. The nearest tide-prediction station within
+  40 km, its next highs and lows, and water temperature at stations with
+  sensors.
+
+A measured water temperature replaces the paddling score's seasonal guess
+(below 60 °F lowers it more the colder it is), and a fast-rising river lowers
+it and adds a caution. About 15–30 KB per update, at most hourly.
+
+## Notifications and widget
+
+- **Morning briefing:** a one-off job booked for the chosen time and rebooked
+  each day. It refreshes the forecast for the place on the Today screen
+  (within Backwoods limits, otherwise the last forecast if under 12 hours old)
+  and writes a few sentences: conditions with the high and low, when rain or
+  snow is likely, strong gusts, and active alerts. Mini uses the same text,
+  and its Read aloud key speaks it with Android's text-to-speech.
+- **Rain starting soon:** every 15 minutes, for places with notifications on,
+  Open-Meteo's 15-minute precipitation (from HRRR in the US, about 1 KB). If
+  it's dry now and at least 0.1 mm per 15 minutes is due within the hour, one
+  notification per event (a new one only three hours after the last). Silent
+  from 10 PM to 6 AM.
+- **Widget:** drawn from the last downloaded forecast whenever the app saves
+  one, and refreshed in the background about hourly while a widget is placed.
 
 ## Backwoods mode
 

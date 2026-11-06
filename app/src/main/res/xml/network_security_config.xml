@@ -36,6 +36,8 @@
         <domain includeSubdomains="true">newengland511.org</domain>
         <domain includeSubdomains="true">tomtom.com</domain>
         <domain includeSubdomains="true">weather.gc.ca</domain>
+        <!-- River gauges (USGS Water Data) for the rivers & tides card. -->
+        <domain includeSubdomains="true">usgs.gov</domain>
         <!-- NOAA's HRRR model on AWS Open Data (future cast). -->
         <domain includeSubdomains="false">noaa-hrrr-bdp-pds.s3.amazonaws.com</domain>
         <trust-anchors>

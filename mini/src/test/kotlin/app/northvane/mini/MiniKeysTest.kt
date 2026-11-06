@@ -194,6 +194,20 @@ class MiniKeysTest {
         save("mini_days_light")
     }
 
+    /** 7 reads the briefing aloud; the briefing time is set from Settings with OK. */
+    @Test
+    fun briefingFromTheKeypad() {
+        press(KeyEvent.KEYCODE_7)
+        compose.onNodeWithText("Light rain").assertExists() // still on Home
+        press(KeyEvent.KEYCODE_6)
+        repeat(4) { press(KeyEvent.KEYCODE_DPAD_DOWN) }
+        compose.onNodeWithText("Morning briefing: Off").assertExists()
+        press(KeyEvent.KEYCODE_DPAD_CENTER)
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodesWithText("Morning briefing: 6:00", substring = true, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        }
+    }
+
     @Test
     fun leftSoftKeyCanBeTheMenuKey() {
         // Many Android flip phones send MENU for the left soft key.

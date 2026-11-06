@@ -1,6 +1,9 @@
 package app.northvane.weather
 
 import app.northvane.core.aurora.AuroraClient
+import app.northvane.core.nowcast.NowcastClient
+import app.northvane.core.radar.HrrrSmoke
+import app.northvane.core.water.WaterClient
 import android.app.Application
 import app.northvane.core.net.HttpClients
 import app.northvane.core.history.AcisClient
@@ -79,6 +82,7 @@ class AppContainer(val app: Application) {
         WeatherRepository(nws, owm, weewx, weatherCache.pointCache, acis = acis, pollen = pollen,
             airNow = airNow, epaUv = EpaUvClient(http), openMeteoAir = OpenMeteoAirClient(http),
             eccc = EcccClient(http), aurora = aurora,
+            smoke = HrrrSmoke(http), water = WaterClient(http),
         )
     }
 
@@ -90,6 +94,7 @@ class AppContainer(val app: Application) {
 
     val alertScheduler: AlertScheduler by lazy { AlertScheduler(app, settings) }
     val aurora: AuroraClient by lazy { AuroraClient(http) }
+    val nowcast: NowcastClient by lazy { NowcastClient(http) }
 
     init {
         applicationScope.launch {

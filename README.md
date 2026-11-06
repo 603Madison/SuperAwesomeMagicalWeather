@@ -59,7 +59,9 @@ CAT S22 Flip. It installs alongside the main app.
 - **Works entirely from the keypad**, touchscreen or not: ▲▼ to move, OK to
   select, the soft keys for the actions shown at the bottom.
 - **Number shortcuts** on the home screen: 1 Hourly, 2 7-day, 3 Alerts,
-  4 Radar, 5 Places, 6 Settings, 0 Keys & help.
+  4 Radar, 5 Places, 6 Settings, 7 Read aloud, 0 Keys & help.
+- **Morning briefing** as a notification at the time you pick, and **Read
+  aloud** (key 7) speaks it with the phone's own voice.
 - Current conditions, 48 hours, 7 days, alerts with notifications, several
   places (search by town or ZIP, or use GPS), °F/°C, light and dark themes.
 - **Radar** as one map picture per frame: ◀▶ steps through time, `*` `#` zoom,
@@ -89,6 +91,8 @@ Each card can be turned on or off in Settings. The last column is the default.
 | **Power outage risk** | A daily risk level for New England's tree-lined power lines, with prep steps when it's high | Off |
 | **Frozen pipes** | Risk on nights at or below 20°F, with steps to protect your pipes | Off |
 | **Black ice & frost** | Mornings with frost on windshields or black ice on the roads | Off |
+| **Storm totals** | When a big storm is coming: snow, ice and rain totals, its timing and heaviest hours | Off |
+| **Wildfire smoke** | Shows up only when smoke is forecast: how smoky, when, and what to do (NOAA HRRR) | Off |
 | **AI summary** | A 2–4 sentence briefing from your own AI server (Ollama, Open WebUI, LibreChat or any OpenAI-compatible server) | Off |
 
 When an NWS **warning** is in effect, the Today screen turns red.
@@ -107,13 +111,16 @@ Planning cards, each shown only when it's in season.
 | **Heating** | Which heat source to run each day, and chores like buying oil or stacking wood | Off |
 | **Maple sap** | Which days the sap will run, mid-January to April | Off |
 | **Burn days** | Good, caution or don't-burn days for brush piles | Off |
+| **Rivers & tides** | The nearest river gauge (flow, height, water temperature, rising or falling) and tide times; water temperature and rising rivers also feed the paddling score | Off |
 
 ### Radar
 
 - The **past hour** from NOAA's official radar mosaic (or the IEM NEXRAD
   composite), on a free OpenStreetMap basemap.
 - A **future cast** for the next few hours from NOAA's HRRR weather model,
-  adjusted to match the latest radar.
+  adjusted to match the latest radar. The first frames carry the latest radar
+  along its own motion and hand over to the model by two hours, so rain doesn't
+  jump or vanish where the forecast begins.
 - Optional **satellite imagery** under the radar: visible by day, infrared at night.
 
 ### Alerts
@@ -123,6 +130,14 @@ Planning cards, each shown only when it's in season.
   and **statements**. An updated alert replaces its old notification, and
   notifications go away when the alert ends.
 - **Send test notification** shows exactly how a warning will look and sound.
+
+### Notifications and widget
+
+| Feature | What it does | Default |
+|---|---|---|
+| **Morning briefing** | Today's forecast in a few sentences, once a day at the time you pick | Off |
+| **Rain starting soon** | A heads-up up to an hour before rain or snow starts, from a 15-minute forecast (never 10 PM–6 AM) | Off |
+| **Home-screen widget** | Temperature, conditions, high and low and the next rain for the place on your Today screen, on its sky colors | Add it from your home screen |
 
 ### Traffic tab
 
@@ -228,7 +243,9 @@ keyPassword=…
   Environmental Mesonet, Iowa State University.
 - Recent observed weather: NOAA Regional Climate Centers, ACIS (public domain).
 - Aurora: NOAA Space Weather Prediction Center (public domain).
-- UV and AirNow air quality: US EPA. Air quality model: Open-Meteo (CC BY 4.0, CAMS).
+- UV and AirNow air quality: US EPA. Air quality model and the 15-minute precipitation forecast: Open-Meteo (CC BY 4.0).
+- Wildfire smoke: NOAA HRRR smoke model via NOAA Open Data on AWS (public domain).
+- Rivers: USGS Water Data (public domain). Tides and coastal water temperature: NOAA Tides & Currents (public domain).
 - Satellite imagery: NOAA nowCOAST (GOES-East/West).
 - Work zones: state DOT WZDx feeds via the USDOT registry. Incidents: New England 511.
 - Basemap: OpenFreeMap; © OpenMapTiles; © OpenStreetMap contributors.

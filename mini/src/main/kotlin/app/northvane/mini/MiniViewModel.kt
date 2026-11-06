@@ -193,7 +193,7 @@ class MiniViewModel(app: Application) : AndroidViewModel(app) {
     fun setAlerts(enabled: Boolean, minutes: Int = store.settings.value.alertCheckMinutes) {
         viewModelScope.launch {
             store.update { it.copy(alertsEnabled = enabled, alertCheckMinutes = minutes) }
-            MiniAlertWorker.sync(getApplication(), store.settings.value)
+            runCatching { MiniAlertWorker.sync(getApplication(), store.settings.value) }
         }
     }
 
@@ -201,8 +201,18 @@ class MiniViewModel(app: Application) : AndroidViewModel(app) {
 
     fun markNotifyAsked() = viewModelScope.launch { store.update { it.copy(notifyAsked = true) } }
 
+    /** Off, then a few morning times, round and round with OK. */
+    fun cycleBriefing() = viewModelScope.launch {
+        store.update { s ->
+            val i = BRIEFING_TIMES.indexOf(s.briefingMinutes)
+            s.copy(briefingMinutes = BRIEFING_TIMES[(i + 1) % BRIEFING_TIMES.size])
+        }
+        runCatching { app.northvane.mini.work.MiniBriefingWorker.schedule(getApplication(), store.settings.value) }
+    }
+
     companion object {
         const val MY_LOCATION = "My location"
+        val BRIEFING_TIMES: List<Int?> = listOf(null, 6 * 60, 6 * 60 + 30, 7 * 60, 7 * 60 + 30, 8 * 60, 9 * 60)
 
         /** Mini downloads only what it shows: about 25 KB per refresh. */
         val PLAN = FetchPlan(

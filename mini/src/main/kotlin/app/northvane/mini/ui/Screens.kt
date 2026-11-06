@@ -98,6 +98,8 @@ import java.util.Locale
 /** Screen routes; the back stack is a list of these. */
 object Route {
     const val HOME = "home"
+    /** Not a screen: Home's "Read aloud" item. */
+    const val SPEAK = "speak"
     const val HOURLY = "hourly"
     const val DAYS = "days"
     const val ALERTS = "alerts"
@@ -141,6 +143,8 @@ fun MiniRoot(vm: MiniViewModel, openAlerts: Boolean, onExit: () -> Unit, hub: Ke
         mutableStateListOf(Route.HOME).apply { if (openAlerts) add(Route.ALERTS) }
     }
     val memory = remember { FocusMemory() }
+    val speaker = remember { Speaker(context) }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { speaker.shutdown() } }
     val zone = remember(state.snapshot?.timeZoneId) {
         state.snapshot?.timeZoneId?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: ZoneId.systemDefault()
     }
@@ -184,7 +188,7 @@ fun MiniRoot(vm: MiniViewModel, openAlerts: Boolean, onExit: () -> Unit, hub: Ke
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     androidx.compose.runtime.key(route) {
                         when {
-                            route == Route.HOME -> HomeScreen(state, fmt, ::go, vm::refresh)
+                            route == Route.HOME -> HomeScreen(state, fmt, ::go, vm::refresh, speaker)
                             route == Route.HOURLY -> HourlyScreen(state, fmt, vm::refresh)
                             route == Route.DAYS -> DaysScreen(state, fmt, ::go, vm::refresh)
                             route.startsWith("day:") -> DayScreen(state.snapshot?.daily?.firstOrNull { it.date.toString() == route.substringAfter(':') }, fmt)
@@ -229,7 +233,15 @@ private fun refreshKey(state: MiniState, refresh: () -> Unit) = SoftKey(if (stat
 private data class MenuItem(val key: Int, val label: String, val route: String, val detail: String? = null, val color: Color? = null)
 
 @Composable
-private fun HomeScreen(state: MiniState, fmt: Fmt, go: (String) -> Unit, refresh: () -> Unit) {
+private fun HomeScreen(state: MiniState, fmt: Fmt, go: (String) -> Unit, refresh: () -> Unit, speaker: Speaker) {
+    val context = LocalContext.current
+    // 7 reads today's briefing aloud (or stops it).
+    fun open(route: String) {
+        if (route != Route.SPEAK) return go(route)
+        val snapshot = state.snapshot ?: return
+        val b = app.northvane.mini.work.MiniBriefingWorker.briefing(context, snapshot, state.place?.displayName ?: "", state.settings)
+        speaker.toggle("${b.title}. ${b.text}")
+    }
     val snapshot = state.snapshot
     val alerts = snapshot?.alerts.orEmpty()
     val warning = alerts.any { it.category == AlertCategory.WARNING }
@@ -240,17 +252,25 @@ private fun HomeScreen(state: MiniState, fmt: Fmt, go: (String) -> Unit, refresh
         MenuItem(4, "Radar", Route.RADAR),
         MenuItem(5, "Places", Route.PLACES),
         MenuItem(6, "Settings", Route.SETTINGS),
+        MenuItem(
+            7, "Read aloud", Route.SPEAK,
+            when {
+                speaker.available == false -> "No voice on this phone"
+                speaker.speaking -> "OK stops"
+                else -> null
+            },
+        ),
         MenuItem(0, "Keys & help", Route.HELP),
     )
     ScreenKeysEffect(
         ScreenKeys(left = refreshKey(state, refresh), center = "Open", right = "Exit", onKey = { code ->
             val digit = digitOf(code)
-            menu.firstOrNull { it.key == digit }?.let { go(it.route); true } ?: false
+            menu.firstOrNull { it.key == digit }?.let { open(it.route); true } ?: false
         }),
     )
     MiniList(screen = Route.HOME, count = menu.size, header = { NowHeader(state, snapshot, fmt) }) { i, focus, onFocused ->
         val item = menu[i]
-        MiniRow({ go(item.route) }, focusRequester = focus, onFocused = onFocused) {
+        MiniRow({ open(item.route) }, focusRequester = focus, onFocused = onFocused) {
             KeyBadge("${item.key}")
             Spacer(Modifier.width(10.dp))
             Text(item.label, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium), modifier = Modifier.weight(1f))
@@ -743,6 +763,11 @@ private fun SettingsScreen(state: MiniState, vm: MiniViewModel, go: (String) -> 
         "Check for alerts every ${s.alertCheckMinutes} min" to {
             vm.setAlerts(s.alertsEnabled, intervals[(intervals.indexOf(s.alertCheckMinutes) + 1).mod(intervals.size)])
         },
+        "Morning briefing: ${s.briefingMinutes?.let { m ->
+            java.time.LocalTime.of(m / 60, m % 60).format(
+                java.time.format.DateTimeFormatter.ofPattern(if (android.text.format.DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm a"),
+            )
+        } ?: "Off"}" to { vm.cycleBriefing() },
         "Keys & help" to { go(Route.HELP) },
     )
     MiniList(screen = Route.SETTINGS, count = rows.size) { i, focus, onFocused ->
@@ -761,7 +786,7 @@ private fun HelpScreen() {
             "▲▼ move · OK select",
             "Right soft key or Back: go back",
             "Left soft key: the action shown at bottom left (Refresh, Add, Search…)",
-            "Home: 1 Hourly · 2 7-day · 3 Alerts · 4 Radar · 5 Places · 6 Settings · 0 Help",
+            "Home: 1 Hourly · 2 7-day · 3 Alerts · 4 Radar · 5 Places · 6 Settings · 7 Read aloud · 0 Help",
             "Radar: ◀▶ time · ▲▼ or * # zoom · 2 4 6 8 move · 5 or OK play · 0 recenter",
             "Long text: ▲▼ scrolls a screenful",
             "Touch works everywhere too: tap rows, soft-key labels and the radar.",

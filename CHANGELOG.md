@@ -3,6 +3,22 @@
 All notable changes to SuperAwesomeMagicalWeather (called Northvane before 1.7.0). The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.8.0] - 2026-11-06
+
+Six new features, each with its own switch and off by default (the widget is on when you place it).
+
+### Added
+- **Home-screen widget:** temperature, conditions, high and low and the next rain for the place on your Today screen, on its sky colors (red during a warning). Updates with the app and about hourly in the background.
+- **Rain starting soon:** a heads-up up to an hour before rain or snow starts, from Open-Meteo's 15-minute forecast (about 1 KB every 15 minutes), for places with notifications on. One per event, never 10 PM–6 AM. Settings › Alerts & notifications.
+- **Morning briefing** in both apps: today's forecast in a few sentences at the time you pick. Mini can also **read it aloud** (key 7) with the phone's own voice.
+- **Wildfire smoke** card from NOAA's HRRR smoke model, shown only when there's smoke in the forecast, with what to do (about 2 MB at most every 6 hours). Settings › Today screen.
+- **Rivers & tides** card on the Outlook tab: the nearest USGS river gauge (flow, height, water temperature, rising or falling) and NOAA tide times. A measured water temperature replaces the paddling score's seasonal guess, and a fast-rising river lowers it. Settings › Outlook.
+- **Storm totals** card when a big storm is coming: snow, ice and rain totals, start and end, and the heaviest hours, from the NWS forecast. Settings › Today screen.
+- Each download has its own item in Backwoods mode.
+
+### Improved
+- **Future cast handover:** the model often has rain in the wrong place where the forecast begins, so rain jumped or vanished after the last radar frame. The latest radar is now carried along its measured motion and handed over to the model over two hours.
+
 ## [1.7.3] - 2026-11-06
 
 Fixes from a full review of the code.

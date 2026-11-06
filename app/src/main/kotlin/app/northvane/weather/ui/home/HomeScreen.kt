@@ -188,6 +188,12 @@ private fun HomeContent(
     val zone = remember(snapshot?.timeZoneId) {
         snapshot?.timeZoneId?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: ZoneId.systemDefault()
     }
+    // The next big storm, worked out once per forecast.
+    val storm = remember(snapshot, zone, state.settings.stormEnabled) {
+        snapshot?.takeIf { state.settings.stormEnabled }?.let {
+            app.northvane.core.outlook.StormTotals.find(it.hourly, it.daily, it.alerts, Instant.now(), zone)
+        }
+    }
     val time = remember(zone) { TimeFormat(zone, DateFormat.is24HourFormat(context)) }
 
     val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
@@ -289,6 +295,9 @@ private fun HomeContent(
                         if (snapshot.alerts.isNotEmpty() && state.shows(Section.ALERTS)) {
                             item { AlertBanner(snapshot.alerts, time, onOpenAlerts) }
                         }
+                        if (settings.stormEnabled && (state.shows(Section.HOURLY_FORECAST) || state.shows(Section.DAILY_FORECAST))) {
+                            if (storm != null) item { StormSection(storm, formatter, time) }
+                        }
                         if (snapshot.hourly.isNotEmpty() && state.shows(Section.HOURLY_FORECAST)) {
                             item { HourlySection(snapshot.hourly, formatter, time, state.settings.hourlyExpanded, actions.setHourlyExpanded) }
                         } else if (snapshot.hourly.isNotEmpty() || Section.HOURLY_FORECAST in snapshot.skippedSections) {
@@ -327,6 +336,13 @@ private fun HomeContent(
                             item { UvSection(uv, time) }
                         }
                         if ((air != null || uv != null) && !airFresh) hidden += "air quality and UV"
+                        // Smoke shows up only when there's at least a light haze.
+                        val smoke = snapshot.smoke
+                        if (settings.smokeEnabled && smoke != null && state.shows(Section.SMOKE) &&
+                            (smoke.peak?.microgramsPerM3 ?: 0.0) >= app.northvane.core.radar.SmokeLevel.LIGHT.from
+                        ) {
+                            item { SmokeSection(smoke, time) }
+                        }
                         // Pollen (with the personal allergy forecast) needs a Google Pollen key.
                         val pollen = snapshot.pollen
                         if (settings.pollenEnabled && state.pollenKeySet && pollen != null && state.shows(Section.POLLEN)) {

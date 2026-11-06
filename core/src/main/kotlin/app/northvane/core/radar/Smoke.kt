@@ -38,14 +38,14 @@ data class SmokeOutlook(
  * How smoky the air is, on the EPA's PM2.5 scale (2024 breakpoints), since
  * smoke is mostly fine particles. Smoke adds to whatever else is in the air.
  */
-enum class SmokeLevel(val label: String, val from: Double) {
-    NONE("None", 0.0),
-    LIGHT("Light haze", 5.0),
-    MODERATE("Moderate", 9.1),
-    SENSITIVE("Unhealthy for sensitive groups", 35.5),
-    UNHEALTHY("Unhealthy", 55.5),
-    VERY_UNHEALTHY("Very unhealthy", 125.5),
-    HAZARDOUS("Hazardous", 225.5),
+enum class SmokeLevel(val label: String, val short: String, val from: Double) {
+    NONE("None", "None", 0.0),
+    LIGHT("Light haze", "Light haze", 5.0),
+    MODERATE("Moderate", "Moderate", 9.1),
+    SENSITIVE("Unhealthy for sensitive groups", "Sensitive groups", 35.5),
+    UNHEALTHY("Unhealthy", "Unhealthy", 55.5),
+    VERY_UNHEALTHY("Very unhealthy", "Very unhealthy", 125.5),
+    HAZARDOUS("Hazardous", "Hazardous", 225.5),
     ;
 
     companion object {

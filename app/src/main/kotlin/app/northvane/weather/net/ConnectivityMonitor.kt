@@ -173,6 +173,8 @@ fun fetchPlanFor(settings: AppSettings, status: NetworkStatus): FetchPlan {
         if (SatelliteFeature.FORECAST_DETAILS in features) add(Section.FORECAST_DETAILS)
         if (SatelliteFeature.OWM_FALLBACK in features) add(Section.OWM_FALLBACK)
         if (SatelliteFeature.HISTORY in features) add(Section.HISTORY)
+        if (SatelliteFeature.SMOKE in features) add(Section.SMOKE)
+        if (SatelliteFeature.WATER in features) add(Section.WATER)
         if (SatelliteFeature.POLLEN in features) add(Section.POLLEN)
         if (SatelliteFeature.AIR_QUALITY in features) add(Section.AIR_QUALITY)
         if (SatelliteFeature.AURORA in features) add(Section.AURORA)

@@ -90,6 +90,9 @@ weather services described below.
 - Notification `PendingIntent`s are `FLAG_IMMUTABLE` and target an explicit
   component. Extras received by `MainActivity` are validated (location IDs
   must be short alphanumeric strings).
+- The home-screen widget's `AppWidgetProvider` is exported, as Android
+  requires for launchers to reach it. It only redraws from the app's own cached
+  forecast and reads nothing from the broadcasts it receives.
 
 ## Third parties and privacy
 
@@ -105,6 +108,12 @@ weather services described below.
   per place), tiles.openfreemap.org (basemap), the user's WeeWX server,
   pollen.googleapis.com (only with the user's key; coordinates rounded to
   about 1 km) and api.openweathermap.org (only if enabled with the user's key).
+- Opt-in extras: noaa-hrrr-bdp-pds.s3.amazonaws.com also serves the wildfire
+  smoke field (same file for everyone; the place is read on the device);
+  api.waterdata.usgs.gov and api.tidesandcurrents.noaa.gov get a box or point
+  around the place for the nearest river gauge and tide station; api.open-meteo.com
+  gets rounded coordinates for "rain starting soon" checks, every 15 minutes
+  while that's on, for places with notifications on.
 - Air quality and UV: data.epa.gov (UV by ZIP code; the ZIP is derived on the
   device), air-quality-api.open-meteo.com (rounded coordinates), and
   www.airnowapi.org only with the user's key (the key must go in the URL, so

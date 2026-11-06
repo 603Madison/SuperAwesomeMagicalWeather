@@ -431,13 +431,78 @@ class ScreenshotTest {
             }
         }
         save("settings_index")
-        for (p in listOf(SettingsPage.SATELLITE, SettingsPage.OUTLOOK, SettingsPage.TODAY, SettingsPage.AI)) {
+        for (p in listOf(SettingsPage.SATELLITE, SettingsPage.OUTLOOK, SettingsPage.TODAY, SettingsPage.AI, SettingsPage.ALERTS)) {
             page = p
             save("settings_${p.route}")
         }
         page = SettingsPage.SATELLITE
         compose.onAllNodesWithText("Forecast & alerts")[0].performClick()
         save("settings_satellite_expanded")
+    }
+
+    /** Demo: a nor'easter in the hourly forecast, wildfire smoke, and the water card. */
+    private fun withStormSmokeAndWater(s: WeatherSnapshot): WeatherSnapshot {
+        val now = Instant.now()
+        // The recorded forecast is from late October: start its hours now so the storm is ahead.
+        val start = now.truncatedTo(java.time.temporal.ChronoUnit.HOURS)
+        val hourly = s.hourly.mapIndexed { i, h0 ->
+            val h = h0.copy(time = start.plusSeconds(i * 3600L))
+            when (i) {
+                in 8..15 -> h.copy(condition = app.northvane.core.model.WeatherCondition.SNOW, precipitationChance = 95, precipitationMm = 2.5, snowMm = 25.0)
+                in 16..20 -> h.copy(condition = app.northvane.core.model.WeatherCondition.SNOW, precipitationChance = 80, precipitationMm = 1.0, snowMm = 8.0)
+                else -> h
+            }
+        }
+        val smoke = app.northvane.core.radar.SmokeOutlook(
+            now, now.minusSeconds(4 * 3600),
+            listOf(3L, 9L, 15L, 24L).zip(listOf(14.0, 42.0, 28.0, 8.0)).map { (h, v) -> app.northvane.core.radar.SmokeHour(now.plusSeconds(h * 3600), v) },
+        )
+        val water = app.northvane.core.water.WaterReport(
+            now,
+            app.northvane.core.water.RiverGauge("USGS-01064140", "Presumpscot River near West Falmouth, Maine", 8.0, 448.0, 2.75, 7.5, now.minusSeconds(900), 0.6),
+            app.northvane.core.water.TideOutlook(
+                "8418150", "Portland", 1.3,
+                listOf(2L, 8L, 14L, 20L).mapIndexed { i, h -> app.northvane.core.water.TideEvent(now.plusSeconds(h * 3600), i % 2 == 0, if (i % 2 == 0) 2.9 else 0.1) },
+                waterTempC = 11.5,
+            ),
+        )
+        return s.copy(hourly = hourly, smoke = smoke, water = water)
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h2600dp-xxhdpi")
+    fun stormSmokeAndWater() {
+        val st = state(withStormSmokeAndWater(snapshot()))
+        val settings = st.settings.copy(stormEnabled = true, smokeEnabled = true, waterEnabled = true)
+        render(dark = false) { HomeScreen(st.copy(settings = settings), noActions, {}, {}, {}) }
+        save("today_storm_smoke")
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h3200dp-xxhdpi")
+    fun outlookWithWater() {
+        val st = state(withStormSmokeAndWater(snapshot()))
+        render(dark = false) { OutlookScreen(st.copy(settings = st.settings.copy(waterEnabled = true)), {}, {}, {}, {}) }
+        save("outlook_water")
+    }
+
+    /** The home-screen widget, drawn by Android from its RemoteViews at its default size. */
+    @Test
+    fun homeScreenWidget() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val st = state(withStormSmokeAndWater(snapshot()))
+        val views = app.northvane.weather.widget.WeatherWidget.render(context, 250, 140, location, st.snapshot, st.settings)
+        val parent = android.widget.FrameLayout(context)
+        val view = views.apply(context, parent)
+        val density = context.resources.displayMetrics.density
+        val w = (250 * density).toInt()
+        val h = (140 * density).toInt()
+        view.measure(android.view.View.MeasureSpec.makeMeasureSpec(w, android.view.View.MeasureSpec.EXACTLY), android.view.View.MeasureSpec.makeMeasureSpec(h, android.view.View.MeasureSpec.EXACTLY))
+        view.layout(0, 0, w, h)
+        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        view.draw(android.graphics.Canvas(bitmap))
+        val dir = File("build/outputs/screenshots").apply { mkdirs() }
+        File(dir, "widget.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
     /** Demo only: a cold snap on the second day with black ice that morning and a hard freeze that night. */

@@ -57,6 +57,8 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import app.northvane.core.model.Activity
 import app.northvane.core.model.AuroraView
 import app.northvane.weather.work.AuroraWatchWorker
+import app.northvane.weather.work.BriefingWorker
+import app.northvane.weather.work.RainSoonWorker
 import app.northvane.core.model.AlertCategory
 import app.northvane.core.model.UnitSystem
 import app.northvane.core.radar.RadarSource
@@ -200,6 +202,9 @@ private fun AppearancePage(state: MainUiState, container: AppContainer, onBack: 
                 onSelect = { units -> update { setUnits(units) } },
             )
         }
+        SectionCard("Home-screen widget") {
+            Hint("Long-press your home screen, tap Widgets and pick SuperAwesomeMagicalWeather. It shows the place on your Today screen and updates about every hour.")
+        }
     }
 }
 
@@ -237,6 +242,10 @@ private fun TodayPage(state: MainUiState, container: AppContainer, onBack: () ->
                 subtitle = "In each day's details on nights near 20°F or colder, with steps to protect your pipes")
             LabeledSwitch("Black ice & frost", s.morningIceEnabled, { on -> update { setMorningIce(on) } },
                 subtitle = "In each day's details: icy roads and frosty windshields that morning")
+            LabeledSwitch("Storm totals", s.stormEnabled, { on -> update { setStorm(on) } },
+                subtitle = "When a big storm is coming: snow, ice and rain totals, timing and the heaviest hours")
+            LabeledSwitch("Wildfire smoke", s.smokeEnabled, { on -> update { setSmoke(on) } },
+                subtitle = "Only when smoke is in the forecast (NOAA HRRR, about 2 MB every 6 hours, continental US)")
             LabeledSwitch("Aurora forecast", s.auroraEnabled, { on -> syncAurora { setAurora(on) } },
                 subtitle = "Shows up only when the northern lights may be visible from here (NOAA, free)")
             if (s.auroraEnabled) {
@@ -297,6 +306,8 @@ private fun OutlookPage(state: MainUiState, container: AppContainer, onBack: () 
                 }
             }
             LabeledSwitch("Trail mud", s.mudEnabled, { on -> update { setMud(on) } }, subtitle = "Rain, snowmelt and spring thaw (NOAA observed data)")
+            LabeledSwitch("Rivers & tides", s.waterEnabled, { on -> update { setWater(on) } },
+                subtitle = "Nearest river gauge (USGS) and tide times (NOAA); water temperature and rising rivers also feed paddling")
             LabeledSwitch("Fall foliage", s.foliageEnabled, { on -> update { setFoliage(on) } }, subtitle = "Only while leaves are changing")
         }
         SectionCard("Home") {
@@ -350,6 +361,18 @@ private fun AlertsPage(state: MainUiState, container: AppContainer, onBack: () -
     fun needsRuntimePermission() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
         ContextCompat.checkSelfPermission(context, POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
 
+    fun updateDaily(block: suspend SettingsRepository.() -> Unit) {
+        scope.launch {
+            container.settings.block()
+            val now = container.settings.settings.first()
+            BriefingWorker.schedule(context, now)
+            RainSoonWorker.sync(context, now)
+        }
+    }
+    fun askIfNeeded() {
+        if (needsRuntimePermission()) notificationPermission.launch(POST_NOTIFICATIONS)
+    }
+
     SettingsScaffold("Alerts & notifications", onBack) {
         SectionCard(null) {
             LabeledSwitch("Alert notifications", s.alertsEnabled, { enabled -> updateAlerts { setAlertsEnabled(enabled) } },
@@ -363,6 +386,23 @@ private fun AlertsPage(state: MainUiState, container: AppContainer, onBack: () -
             if (s.alertsEnabled) {
                 ChoiceDropdown("Check every", listOf(15, 30, 60), s.alertCheckMinutes, { "$it minutes" }, { m -> updateAlerts { setAlertInterval(m) } })
             }
+        }
+        SectionCard("Daily & rain") {
+            LabeledSwitch("Morning briefing", s.briefingEnabled, { on ->
+                if (on) askIfNeeded()
+                updateDaily { setBriefing(on) }
+            }, subtitle = "Today's forecast for the place on your Today screen, once a day")
+            if (s.briefingEnabled) {
+                val times = (5 * 60..10 * 60 step 30).toList()
+                ChoiceDropdown("At", (times + s.briefingMinutes).distinct().sorted(), s.briefingMinutes, { m ->
+                    val t = java.time.LocalTime.of(m / 60, m % 60)
+                    java.time.format.DateTimeFormatter.ofPattern(if (android.text.format.DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm a").format(t)
+                }, { m -> updateDaily { setBriefingMinutes(m) } })
+            }
+            LabeledSwitch("Rain starting soon", s.rainSoonEnabled, { on ->
+                if (on) askIfNeeded()
+                updateDaily { setRainSoon(on) }
+            }, subtitle = "A heads-up up to an hour before rain or snow starts, for places with notifications on. Never 10 PM–6 AM")
         }
         if (s.alertsEnabled) {
             SectionCard("Notify me about") {

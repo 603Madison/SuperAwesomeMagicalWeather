@@ -44,6 +44,21 @@ class UnitFormatter(val system: UnitSystem) {
 
     fun percent(value: Double?): String = value?.let { "${it.roundToInt()}%" } ?: "--"
 
+    /** A distance between places: whole miles or kilometres. */
+    fun distance(km: Double?): String = km?.let {
+        if (system == UnitSystem.IMPERIAL) "${(it * 0.621371).roundToInt().coerceAtLeast(1)} mi" else "${it.roundToInt().coerceAtLeast(1)} km"
+    } ?: "--"
+
+    /** A water level (tides, river gauges), from metres. */
+    fun height(m: Double?): String = m?.let {
+        if (system == UnitSystem.IMPERIAL) "%.1f ft".format(java.util.Locale.ROOT, it * 3.28084) else "%.1f m".format(java.util.Locale.ROOT, it)
+    } ?: "--"
+
+    /** River flow, from cubic feet per second (USGS's unit). */
+    fun discharge(cfs: Double?): String = cfs?.let {
+        if (system == UnitSystem.IMPERIAL) "${it.roundToInt()} ft³/s" else "%.1f m³/s".format(java.util.Locale.ROOT, it * 0.0283168)
+    } ?: "--"
+
     /** Speed as a bare number in the user's unit (for compact hourly cells). */
     fun windNumber(kph: Double?): String = kph?.let {
         (if (system == UnitSystem.IMPERIAL) Units.kphToMph(it) else it).roundToInt().toString()

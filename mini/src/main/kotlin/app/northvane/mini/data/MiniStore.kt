@@ -38,6 +38,8 @@ data class MiniSettings(
     val notified: NotifiedAlerts = NotifiedAlerts(),
     /** Android 13+: whether Mini has asked for permission to post notifications yet. */
     val notifyAsked: Boolean = false,
+    /** Morning briefing time, in minutes after midnight; null when off. */
+    val briefingMinutes: Int? = null,
 ) {
     val selected: SavedLocation? get() = places.firstOrNull { it.id == selectedId } ?: places.firstOrNull()
 }

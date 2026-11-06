@@ -1,0 +1,1 @@
+New: a home-screen widget, "rain starting soon" notifications, a morning briefing, and wildfire smoke, rivers & tides and storm totals cards, each with its own switch. The future cast now hands over smoothly from the latest radar instead of jumping where the forecast begins.

@@ -143,6 +143,11 @@ fun OutlookScreen(
                         BurnSection(burn, f, time)
                     }
                 }
+                val water = snapshot.water
+                if (settings.waterEnabled && water != null && (water.river != null || water.tide != null) && state.shows(Section.WATER)) {
+                    shown++
+                    item { app.northvane.weather.ui.home.WaterSection(water, f, time) }
+                }
                 val foliage = snapshot.foliage
                 if (settings.foliageEnabled && foliage != null && foliage.inSeason && dailyFresh) {
                     shown++

@@ -60,6 +60,9 @@ enum class SatelliteFeature(val title: String, val description: String, val appr
     TRAFFIC("Traffic events", "Work zones, closures and incidents from state DOT feeds", "50–700 KB per view", false),
     GARDEN_CLIMATE("Garden & heating frost dates", "30 years of NOAA lows, downloaded once per place", "~40 KB once", true),
     AURORA("Aurora forecast", "NOAA's geomagnetic forecast for the aurora card; at most every 3 hours", "~7 KB", false),
+    SMOKE("Wildfire smoke", "NOAA HRRR smoke forecast for the next day; at most every 6 hours", "~2 MB", false),
+    WATER("Rivers & tides", "Nearest USGS river gauge and NOAA tide station; at most every hour", "~20 KB", true),
+    RAIN_SOON("Rain-starting checks", "15-minute rain forecast for \"rain starting soon\" notifications", "~1 KB per check", true),
     AI_SUMMARY("AI weather summary", "Sends the forecast to your AI server and gets a short summary back", "~2–4 KB", false),
     TRAFFIC_FLOW("Traffic speed map", "TomTom flow tiles on the traffic map, if you've added a key", "0.3–1 MB per view", false),
     OWM_FALLBACK("OpenWeatherMap fallback", "Only if enabled in Data sources", "~5 KB", false);
@@ -89,6 +92,17 @@ data class AppSettings(
     val pipeRiskEnabled: Boolean = false,
     val morningIceEnabled: Boolean = false,
     val auroraEnabled: Boolean = true,
+    /** Storm totals card on the Today screen. */
+    val stormEnabled: Boolean = false,
+    /** Wildfire smoke card (NOAA HRRR, about 2 MB per update). */
+    val smokeEnabled: Boolean = false,
+    /** Rivers & tides card on the Outlook tab, which also feeds the paddling score. */
+    val waterEnabled: Boolean = false,
+    /** A morning briefing notification at [briefingMinutes] after midnight. */
+    val briefingEnabled: Boolean = false,
+    val briefingMinutes: Int = 7 * 60,
+    /** "Rain starting soon" notifications for places with notifications on. */
+    val rainSoonEnabled: Boolean = false,
     val auroraNotify: Boolean = true,
     /** The least you'd want a notification for. */
     val auroraNotifyView: AuroraView = AuroraView.HORIZON,
@@ -170,6 +184,12 @@ class SettingsRepository(context: Context) {
         val pipeRisk = booleanPreferencesKey("pipe_risk")
         val morningIce = booleanPreferencesKey("morning_ice")
         val aurora = booleanPreferencesKey("aurora")
+        val storm = booleanPreferencesKey("storm_enabled")
+        val smoke = booleanPreferencesKey("smoke_enabled")
+        val water = booleanPreferencesKey("water_enabled")
+        val briefing = booleanPreferencesKey("briefing_enabled")
+        val briefingMinutes = intPreferencesKey("briefing_minutes")
+        val rainSoon = booleanPreferencesKey("rain_soon_enabled")
         val auroraNotify = booleanPreferencesKey("aurora_notify")
         val auroraNotifyView = stringPreferencesKey("aurora_notify_view")
         val sap = booleanPreferencesKey("sap_run")
@@ -251,6 +271,12 @@ class SettingsRepository(context: Context) {
                 pipeRiskEnabled = p[Keys.pipeRisk] ?: d.pipeRiskEnabled,
                 morningIceEnabled = p[Keys.morningIce] ?: d.morningIceEnabled,
                 auroraEnabled = p[Keys.aurora] ?: d.auroraEnabled,
+                stormEnabled = p[Keys.storm] ?: d.stormEnabled,
+                smokeEnabled = p[Keys.smoke] ?: d.smokeEnabled,
+                waterEnabled = p[Keys.water] ?: d.waterEnabled,
+                briefingEnabled = p[Keys.briefing] ?: d.briefingEnabled,
+                briefingMinutes = p[Keys.briefingMinutes]?.coerceIn(0, 24 * 60 - 1) ?: d.briefingMinutes,
+                rainSoonEnabled = p[Keys.rainSoon] ?: d.rainSoonEnabled,
                 auroraNotify = p[Keys.auroraNotify] ?: d.auroraNotify,
                 auroraNotifyView = p[Keys.auroraNotifyView].toEnum(d.auroraNotifyView),
                 sapEnabled = p[Keys.sap] ?: d.sapEnabled,
@@ -332,6 +358,12 @@ class SettingsRepository(context: Context) {
     suspend fun setPipeRisk(enabled: Boolean) = store.edit { it[Keys.pipeRisk] = enabled }
     suspend fun setMorningIce(enabled: Boolean) = store.edit { it[Keys.morningIce] = enabled }
     suspend fun setAurora(enabled: Boolean) = store.edit { it[Keys.aurora] = enabled }
+    suspend fun setStorm(enabled: Boolean) = store.edit { it[Keys.storm] = enabled }
+    suspend fun setSmoke(enabled: Boolean) = store.edit { it[Keys.smoke] = enabled }
+    suspend fun setWater(enabled: Boolean) = store.edit { it[Keys.water] = enabled }
+    suspend fun setBriefing(enabled: Boolean) = store.edit { it[Keys.briefing] = enabled }
+    suspend fun setBriefingMinutes(minutes: Int) = store.edit { it[Keys.briefingMinutes] = minutes.coerceIn(0, 24 * 60 - 1) }
+    suspend fun setRainSoon(enabled: Boolean) = store.edit { it[Keys.rainSoon] = enabled }
     suspend fun setAuroraNotify(enabled: Boolean) = store.edit { it[Keys.auroraNotify] = enabled }
     suspend fun setAuroraNotifyView(view: AuroraView) = store.edit { it[Keys.auroraNotifyView] = view.name }
     suspend fun setSap(enabled: Boolean) = store.edit { it[Keys.sap] = enabled }
@@ -427,9 +459,10 @@ enum class SatelliteGroup(val title: String, val description: String, val featur
             SatelliteFeature.HOURLY_FORECAST, SatelliteFeature.FORECAST_DETAILS, SatelliteFeature.LOCAL_STATION),
     ),
     EXTRAS(
-        "Extras", "Air quality, pollen, recent weather and frost dates for the outlooks, aurora, AI summary, OpenWeatherMap.",
+        "Extras", "Air quality, pollen, recent weather and frost dates, aurora, smoke, rivers & tides, rain notifications, AI summary, OpenWeatherMap.",
         listOf(SatelliteFeature.AIR_QUALITY, SatelliteFeature.POLLEN, SatelliteFeature.HISTORY, SatelliteFeature.GARDEN_CLIMATE,
-            SatelliteFeature.AURORA, SatelliteFeature.AI_SUMMARY, SatelliteFeature.OWM_FALLBACK),
+            SatelliteFeature.AURORA, SatelliteFeature.SMOKE, SatelliteFeature.WATER, SatelliteFeature.RAIN_SOON,
+            SatelliteFeature.AI_SUMMARY, SatelliteFeature.OWM_FALLBACK),
     ),
     MAPS(
         "Maps", "Radar, future cast, satellite imagery and traffic. These download the most.",

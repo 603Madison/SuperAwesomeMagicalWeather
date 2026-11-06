@@ -6,6 +6,7 @@ A small weather app for Android flip phones such as the Kyocera DuraXV, Sonim XP
 <li>Current conditions, 48 hours, 7 days with the full forecast text, and severe weather alerts with notifications.</li>
 <li>Several places: search by town or ZIP code with the keypad, or use GPS.</li>
 <li>Radar as one map picture per frame, with zoom and pan from the keypad.</li>
+<li>A morning briefing notification, and Read aloud (key 7) speaks it with the phone's own voice.</li>
 <li>Light on data and memory (about 25 KB per forecast refresh), so it suits Android Go phones.</li>
 </ul>
 

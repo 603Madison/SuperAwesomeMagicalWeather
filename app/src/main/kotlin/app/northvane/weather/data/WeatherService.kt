@@ -68,6 +68,8 @@ class WeatherService(
                 pollenRestriction = AppSignature.restriction(context),
                 airNowApiKey = secrets.get(SecretStore.AIRNOW_API_KEY),
                 aurora = appSettings.auroraEnabled,
+                smoke = appSettings.smokeEnabled,
+                water = appSettings.waterEnabled,
                 // Fail fast with an explanation rather than waiting out a blocked connection.
                 weewxBlockedReason = if (station != null && LocalNetworkAccess.needsPermissionFor(context, station.url)) {
                     LocalNetworkAccess.DENIED_MESSAGE
@@ -87,6 +89,7 @@ class WeatherService(
             location.longitude,
         )
         cache.write(merged)
+        app.northvane.weather.widget.WeatherWidget.requestUpdate(context)
         return merged
     }
 
@@ -105,6 +108,9 @@ class WeatherService(
         if (recent(previous.pollen?.fetchedAt)) sections = sections - Section.POLLEN
         // NOAA updates the geomagnetic forecast every few hours.
         previous.aurora?.fetchedAt?.let { if (Duration.between(it, now) < Duration.ofHours(3)) sections = sections - Section.AURORA }
+        // HRRR's long runs come every 6 hours, and each smoke update is about 2 MB.
+        previous.smoke?.fetchedAt?.let { if (Duration.between(it, now) < Duration.ofHours(6)) sections = sections - Section.SMOKE }
+        previous.water?.fetchedAt?.let { if (Duration.between(it, now) < Duration.ofHours(1)) sections = sections - Section.WATER }
         val air = previous.airQuality?.fetchedAt ?: previous.uv?.fetchedAt
         if (air != null && Duration.between(air, now) < Duration.ofMinutes(30)) sections = sections - Section.AIR_QUALITY
         return plan.copy(sections = sections)
@@ -126,11 +132,13 @@ class WeatherService(
         val uv = fresh.uv ?: previous.uv?.takeIf { Duration.between(it.fetchedAt, now) < airAge }
         // The K-index forecast reaches three days ahead, so an older one still says something.
         val aurora = fresh.aurora ?: previous.aurora?.takeIf { Duration.between(it.fetchedAt, now) < Duration.ofDays(2) }
-        val throttled = setOf(Section.HISTORY, Section.POLLEN, Section.AIR_QUALITY, Section.AURORA)
+        val smoke = fresh.smoke ?: previous.smoke?.takeIf { Duration.between(it.fetchedAt, now) < Duration.ofHours(12) }
+        val water = fresh.water ?: previous.water?.takeIf { Duration.between(it.fetchedAt, now) < Duration.ofHours(6) }
+        val throttled = setOf(Section.HISTORY, Section.POLLEN, Section.AIR_QUALITY, Section.AURORA, Section.SMOKE, Section.WATER)
         // Sections kept from the previous download keep their original download time.
         val times = previous.sectionTimes.filterKeys { it !in fresh.sectionTimes } + fresh.sectionTimes
         return fresh.copy(
-            history = history, pollen = pollen, airQuality = airQuality, uv = uv, aurora = aurora,
+            history = history, pollen = pollen, airQuality = airQuality, uv = uv, aurora = aurora, smoke = smoke, water = water,
             skippedSections = fresh.skippedSections - throttled,
             sectionTimes = times,
         )

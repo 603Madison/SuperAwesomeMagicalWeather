@@ -196,7 +196,11 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     fun selectLocation(id: String) {
-        viewModelScope.launch { container.settings.setSelectedLocation(id) }
+        viewModelScope.launch {
+            container.settings.setSelectedLocation(id)
+            // The widget follows the place on the Today screen.
+            app.northvane.weather.widget.WeatherWidget.updateAll(container.app)
+        }
     }
 
     fun addPlace(place: PlaceResult) {
