@@ -11,6 +11,7 @@ import app.northvane.core.net.fetch
 import kotlinx.coroutines.delay
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.time.Instant
 import java.time.ZoneId
 
 /**
@@ -46,6 +47,19 @@ class NwsClient(
 
     suspend fun alerts(point: GeoPoint): List<WeatherAlert> =
         NwsParsers.parseAlerts(get("$baseUrl/alerts/active?point=${point.nwsKey()}"))
+
+    /** The discussion with this ID; reused when the newest one is already known. */
+    suspend fun discussion(gridId: String, id: String): ForecastDiscussion {
+        val office = requireNotNull(Discussions.office(gridId)) { "Not an NWS office" }
+        require(id.matches(Regex("^[A-Za-z0-9-]{8,64}$"))) { "Not a product ID" }
+        return Discussions.parseProduct(get("$baseUrl/products/$id"), office)
+    }
+
+    /** Just the newest discussion's ID and time (about 1 KB), to tell whether a new one is out. */
+    suspend fun latestDiscussionId(gridId: String): Pair<String, Instant>? {
+        val office = Discussions.office(gridId) ?: return null
+        return Discussions.parseLatest(get("$baseUrl/products/types/AFD/locations/$office"))
+    }
 
     /**
      * The points response contains follow-up URLs. Only follow ones on the

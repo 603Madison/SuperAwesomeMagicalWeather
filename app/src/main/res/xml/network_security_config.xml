@@ -38,6 +38,8 @@
         <domain includeSubdomains="true">weather.gc.ca</domain>
         <!-- River gauges (USGS Water Data) for the rivers & tides card. -->
         <domain includeSubdomains="true">usgs.gov</domain>
+        <!-- Claude, only when chosen as the AI provider -->
+        <domain includeSubdomains="false">api.anthropic.com</domain>
         <!-- NOAA's HRRR model on AWS Open Data (future cast). -->
         <domain includeSubdomains="false">noaa-hrrr-bdp-pds.s3.amazonaws.com</domain>
         <trust-anchors>

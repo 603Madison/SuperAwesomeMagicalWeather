@@ -63,7 +63,8 @@ enum class SatelliteFeature(val title: String, val description: String, val appr
     SMOKE("Wildfire smoke", "NOAA HRRR smoke forecast for the next day; at most every 6 hours", "~2 MB", false),
     WATER("Rivers & tides", "Nearest USGS river gauge and NOAA tide station; at most every hour", "~20 KB", true),
     RAIN_SOON("Rain-starting checks", "15-minute rain forecast for \"rain starting soon\" notifications", "~1 KB per check", true),
-    AI_SUMMARY("AI weather summary", "Sends the forecast to your AI server and gets a short summary back", "~2–4 KB", false),
+    // Stored by name, so the original name stays.
+    AI_SUMMARY("AI features", "Forecasters' notes, alert explanations and questions, sent to your AI provider", "~3–20 KB each", false),
     TRAFFIC_FLOW("Traffic speed map", "TomTom flow tiles on the traffic map, if you've added a key", "0.3–1 MB per view", false),
     OWM_FALLBACK("OpenWeatherMap fallback", "Only if enabled in Data sources", "~5 KB", false);
 
@@ -152,6 +153,12 @@ data class AppSettings(
     val aiProvider: AiProvider = AiProvider.OLLAMA,
     val aiBaseUrl: String = "",
     val aiModel: String = "",
+    /** The forecasters' discussion in plain words, on Today. */
+    val aiDiscussion: Boolean = true,
+    /** "Explain" on each alert. */
+    val aiAlerts: Boolean = true,
+    /** The question box on Today. */
+    val aiAsk: Boolean = true,
 ) {
     companion object {
         private fun defaultUnits(): UnitSystem =
@@ -235,6 +242,9 @@ class SettingsRepository(context: Context) {
         val aiProvider = stringPreferencesKey("ai_provider")
         val aiBaseUrl = stringPreferencesKey("ai_base_url")
         val aiModel = stringPreferencesKey("ai_model")
+        val aiDiscussion = booleanPreferencesKey("ai_discussion")
+        val aiAlerts = booleanPreferencesKey("ai_alerts")
+        val aiAsk = booleanPreferencesKey("ai_ask")
     }
 
     private val gardenList = ListSerializer(GardenCrop.serializer())
@@ -325,6 +335,9 @@ class SettingsRepository(context: Context) {
                 aiProvider = p[Keys.aiProvider].toEnum(d.aiProvider),
                 aiBaseUrl = p[Keys.aiBaseUrl] ?: d.aiBaseUrl,
                 aiModel = p[Keys.aiModel] ?: d.aiModel,
+                aiDiscussion = p[Keys.aiDiscussion] ?: d.aiDiscussion,
+                aiAlerts = p[Keys.aiAlerts] ?: d.aiAlerts,
+                aiAsk = p[Keys.aiAsk] ?: d.aiAsk,
             )
         }
 
@@ -414,6 +427,9 @@ class SettingsRepository(context: Context) {
     suspend fun setShowStaleData(enabled: Boolean) = store.edit { it[Keys.showStale] = enabled }
     suspend fun setFollowRestrictedData(enabled: Boolean) = store.edit { it[Keys.followRestricted] = enabled }
     suspend fun setAiEnabled(enabled: Boolean) = store.edit { it[Keys.ai] = enabled }
+    suspend fun setAiDiscussion(enabled: Boolean) = store.edit { it[Keys.aiDiscussion] = enabled }
+    suspend fun setAiAlerts(enabled: Boolean) = store.edit { it[Keys.aiAlerts] = enabled }
+    suspend fun setAiAsk(enabled: Boolean) = store.edit { it[Keys.aiAsk] = enabled }
     suspend fun setAiServer(provider: AiProvider, baseUrl: String, model: String) = store.edit {
         it[Keys.aiProvider] = provider.name
         it[Keys.aiBaseUrl] = baseUrl.trim().take(500)

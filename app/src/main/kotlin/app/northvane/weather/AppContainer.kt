@@ -14,7 +14,7 @@ import app.northvane.core.traffic.TrafficClient
 import app.northvane.core.traffic.TrafficService
 import app.northvane.weather.data.ThemeBackgroundStore
 import app.northvane.weather.data.ClimateStore
-import app.northvane.weather.data.AiSummaryStore
+import app.northvane.weather.data.AiStore
 import app.northvane.weather.data.TrafficCache
 import app.northvane.core.ai.AiClient
 import app.northvane.core.eccc.EcccClient
@@ -75,7 +75,7 @@ class AppContainer(val app: Application) {
     val acis: AcisClient by lazy { AcisClient(http) }
     val climate: ClimateStore by lazy { ClimateStore(app, acis) }
     val ai: AiClient by lazy { AiClient(HttpClients.localServerClients(http)) }
-    val aiSummaries: AiSummaryStore by lazy { AiSummaryStore(app) }
+    val aiReplies: AiStore by lazy { AiStore(app) }
     val trafficCache: TrafficCache by lazy { TrafficCache(app) }
 
     val repository: WeatherRepository by lazy {

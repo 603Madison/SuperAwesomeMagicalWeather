@@ -88,6 +88,9 @@ android {
     }
 }
 
+// Mini has no AI features, so it leaves out the Claude SDK that :core brings (about 10 MB).
+configurations.configureEach { exclude(group = "com.anthropic") }
+
 dependencies {
     implementation(project(":core"))
     implementation(project(":ui"))

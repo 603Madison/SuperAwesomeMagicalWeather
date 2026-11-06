@@ -11,7 +11,7 @@ Weather Service data. No accounts, no analytics, no built-in API keys.
 <img src="docs/screenshots/today.png" width="200" alt="Today screen, Portland, ME">
 <img src="docs/screenshots/warning.png" width="200" alt="Today screen turned red during a Winter Storm Warning">
 <img src="docs/screenshots/outlook.png" width="200" alt="Outlook tab with outdoor activity scores and garden">
-<img src="docs/screenshots/ai_summary.png" width="200" alt="AI summary on the Today screen">
+<img src="docs/screenshots/ai_cards.png" width="200" alt="Forecasters' notes and a forecast question, written by AI">
 </p>
 
 - **Forecasts with real numbers**: hourly and 7-day, with gusts, rain and snow
@@ -93,7 +93,10 @@ Each card can be turned on or off in Settings. The last column is the default.
 | **Black ice & frost** | Mornings with frost on windshields or black ice on the roads | On |
 | **Storm totals** | When a big storm is coming: snow, ice and rain totals, its timing and heaviest hours | On |
 | **Wildfire smoke** | Shows up only when smoke is forecast: how smoky, when, and what to do (NOAA HRRR) | On |
-| **AI summary** | A 2–4 sentence briefing from your own AI server (Ollama, Open WebUI, LibreChat or any OpenAI-compatible server) | Off |
+| **Forecasters' notes (AI)** | The National Weather Service forecasters' discussion in plain words: what they expect, how confident they are and what could change | Off |
+| **Ask about the forecast (AI)** | Type a question ("Can I paint the deck Saturday?") and get an answer from your 48-hour and 7-day forecast | Off |
+
+On the Alerts tab, **Explain** rewrites an alert in plain words for your place (also AI, only when you tap it). The AI features use Claude (Anthropic's API, with your own key) or your own Ollama, Open WebUI, LibreChat or OpenAI-compatible server. They are off until you set one up in Settings › AI, and each has its own switch there.
 
 When an NWS **warning** is in effect, the Today screen turns red.
 
@@ -179,7 +182,7 @@ stored encrypted on the phone.
 | New England 511 | Crashes and closures | Free key |
 | TomTom | Live traffic speeds | Free tier |
 | OpenWeatherMap | A fallback where NWS and Environment Canada don't reach | Free tier |
-| Your AI server | The AI summary | Your own server |
+| Claude (Anthropic) or your own AI server | Forecasters' notes, alert explanations and questions | Claude: billed per use to your Anthropic account. Your own server: free |
 
 ## Privacy
 

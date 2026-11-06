@@ -47,6 +47,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import app.northvane.weather.ui.TimeFormat
+import java.time.ZoneId
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.getValue
@@ -76,7 +80,11 @@ import app.northvane.weather.ui.settings.SettingsNav
 import app.northvane.weather.ui.settings.SettingsPage
 import app.northvane.weather.ui.outlook.OutlookScreen
 import app.northvane.weather.ui.AiUiState
-import app.northvane.weather.data.AiSummary
+import app.northvane.weather.data.AiReply
+import app.northvane.weather.ui.AiTask
+import app.northvane.weather.ui.home.AskCard
+import app.northvane.weather.ui.home.ForecastersNotesCard
+import app.northvane.core.ai.AiProvider
 import app.northvane.core.eccc.EcccClient
 import app.northvane.weather.ui.theme.NorthvaneTheme
 import org.junit.Rule
@@ -594,18 +602,69 @@ class ScreenshotTest {
     }
 
     @Test
-    @Config(qualifiers = "w400dp-h1100dp-xxhdpi")
-    fun todayWithAiSummary() {
-        val st = state()
-        val settings = st.settings.copy(aiEnabled = true, aiBaseUrl = "http://192.168.1.20:11434", aiModel = "llama3.2:3b")
-        val summary = AiSummary(
-            "home",
-            "A mild, mostly sunny afternoon in the low 60s with a light west breeze. Clouds thicken Friday and showers are possible " +
-                "by Wednesday, but the weekend looks dry and cooler, with lows near freezing Saturday night.",
-            "llama3.2:3b", Instant.now(), Instant.now().minusSeconds(600),
+    @Config(qualifiers = "w400dp-h900dp-xxhdpi")
+    fun aiCards() {
+        val now = Instant.now()
+        val ai = AiUiState(
+            office = "GYX",
+            discussion = AiTask(
+                AiReply(
+                    "Steady rain spreads inland tonight, heaviest near the coast, where 1.5 to 2 inches is likely by Saturday night; " +
+                        "inland about an inch. Thunder is possible near the coast this evening. Colder air arrives Sunday, " +
+                        "enough for some snow on the highest peaks. Next week stays cool with only light showers, mostly in the mountains.\n" +
+                        "Confidence: high on the rain totals, lower on how much snow reaches the peaks.",
+                    "claude-opus-5-5", now.minusSeconds(900), "afd-1", now.minusSeconds(3 * 3600),
+                ),
+            ),
+            question = "Can I paint the deck Saturday afternoon?",
+            answer = AiTask(
+                AiReply(
+                    "Not Saturday: showers continue most of the afternoon (60 to 70% chance) and it stays damp. " +
+                        "Monday afternoon looks better, dry and 54°F with a light breeze.",
+                    "claude-opus-5-5", now.minusSeconds(30), "question",
+                ),
+            ),
         )
-        render(dark = false) { HomeScreen(st.copy(settings = settings, ai = AiUiState(summary)), noActions, {}, {}, {}) }
-        save("today_ai_summary")
+        render(dark = false) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                val time = TimeFormat(ZoneId.of("America/New_York"), false)
+                ForecastersNotesCard(ai, time, onRefresh = {})
+                AskCard(ai, "Portland, ME", onAsk = {}, onClear = {})
+            }
+        }
+        compose.onNodeWithText("Forecasters' notes", substring = true).assertExists()
+        compose.onNodeWithText("Read the original").assertExists()
+        save("today_ai_cards")
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1000dp-xxhdpi")
+    fun alertExplained() {
+        val withAlerts = snapshot().copy(alerts = NwsParsers.parseAlerts(resource("nws_alerts_tx.json")))
+        val alert = withAlerts.alerts.first()
+        val st = state(withAlerts).let {
+            it.copy(
+                settings = it.settings.copy(aiEnabled = true, aiProvider = AiProvider.CLAUDE, aiModel = "claude-opus-5-5"),
+                ai = AiUiState(alerts = mapOf(alert.id to AiTask(AiReply(
+                    "Heavy rain could cause flooding from Thursday 11 AM until Friday afternoon, across southeast New Mexico and West Texas. " +
+                        "Avoid low spots and flooded roads, and turn around if water covers the road.",
+                    "claude-opus-5-5", Instant.now(), alert.id,
+                )))),
+            )
+        }
+        render(dark = false) { AlertsScreen(st, onRefresh = {}, onOpenSettings = {}) }
+        compose.onAllNodesWithText(alert.event)[0].performClick()
+        compose.onNodeWithText("Heavy rain could cause flooding", substring = true).assertExists()
+        save("alert_explained")
+    }
+
+    @Test
+    fun noExplainButtonWithoutAi() {
+        val withAlerts = snapshot().copy(alerts = NwsParsers.parseAlerts(resource("nws_alerts_tx.json")))
+        val alert = withAlerts.alerts.first()
+        render(dark = false) { AlertsScreen(state(withAlerts), onRefresh = {}, onOpenSettings = {}) }
+        compose.onAllNodesWithText(alert.event)[0].performClick()
+        compose.onNodeWithText("Explain in plain words", substring = true).assertDoesNotExist()
     }
 
     @Test

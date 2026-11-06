@@ -127,7 +127,9 @@ fun NorthvaneRoot(
             setHourlyExpanded = vm::setHourlyExpanded,
             laundryOut = vm::laundryOut,
             markPlanted = vm::markPlanted,
-            refreshSummary = { vm.summarize() },
+            refreshDiscussion = vm::refreshDiscussion,
+            ask = vm::ask,
+            clearAnswer = vm::clearAnswer,
             ignoreRestrictedData = { vm.setFollowRestrictedData(false) },
         )
     }
@@ -266,6 +268,7 @@ fun NorthvaneRoot(
                 AlertsScreen(
                     state = state,
                     onRefresh = { vm.refresh() },
+                    onExplain = vm::explainAlert,
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 )
             }

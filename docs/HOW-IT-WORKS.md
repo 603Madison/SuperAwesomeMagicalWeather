@@ -302,11 +302,29 @@ Weather Watches. Rules vary by town and state, and many need a burn permit.
   is sent in a header, never in the URL. Coordinates are rounded to about 1 km,
   and requests carry the app's package name and certificate so you can restrict
   the key to this app.
-- **AI summary**: connect your own Ollama, Open WebUI, LibreChat (Agents API)
-  or any OpenAI-compatible server (LM Studio, vLLM, llama.cpp, LiteLLM, OpenAI
-  and others) in Settings › AI summary. Only the place name and the forecast
-  numbers are sent. Reasoning tags (`<think>…</think>`) are removed, and a
-  summary is written at most once per forecast download.
+- **AI**: used only where the app's own rules can't do the job. A summary
+  that restated the forecast numbers (1.4–1.8) was removed: the screen already
+  shows them. What's left:
+  - *Forecasters' notes*: each NWS office's Area Forecast Discussion (the
+    forecasters' reasoning: confidence, model disagreement, what could change)
+    rewritten in plain words for your place. The app checks for a new
+    discussion (about 1 KB) when the forecast updates, at most every 30
+    minutes, and asks the AI only when the office has issued a new one, so a
+    place costs 2–4 AI requests a day. The aviation section is dropped before
+    sending. US places only.
+  - *Explain* on each alert: the alert rewritten for your place, keeping its
+    times and numbers, and saying when it covers only part of the area (the
+    coast, higher elevations). Only when tapped; cached until the alert changes.
+  - *Ask about the forecast*: your question answered from the next 48 hours
+    and 7 days of your forecast (about 4 KB of compact lines). Not stored.
+
+  Providers: **Claude** (Anthropic's API, called through Anthropic's official
+  Java SDK; the default model is Claude Opus 5.5 and any model on your account
+  can be picked; low effort for discussions and alerts, medium for questions;
+  refusals fall back server-side on models that support it), or your own
+  **Ollama, Open WebUI, LibreChat** (Agents API) or **OpenAI-compatible**
+  server (LM Studio, vLLM, llama.cpp, LiteLLM, OpenAI and others). Reasoning
+  tags (`<think>…</think>`) and markdown are removed from replies.
 - **Traffic**: work zones come from state DOT feeds in the USDOT **Work Zone
   Data Exchange (WZDx)** standard, found in USDOT's public feed registry (New
   Hampshire, Vermont and Maine publish one together). Crashes, closures and
@@ -388,6 +406,6 @@ on (even if the app has "Unrestricted data"). You can also set it to always or n
 ## Screenshots
 
 The screenshots in the README are rendered by the app's `ScreenshotTest` from
-real NWS and NOAA ACIS responses for Portland, ME. The warning and AI summary
+real NWS and NOAA ACIS responses for Portland, ME. The warning and AI
 examples use sample data. Run `./gradlew :app:testDebugUnitTest` to
 render them into `app/build/outputs/screenshots`.

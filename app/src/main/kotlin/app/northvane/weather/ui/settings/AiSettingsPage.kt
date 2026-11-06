@@ -26,6 +26,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import app.northvane.core.ai.AiConfig
 import app.northvane.core.ai.AiProvider
+import app.northvane.core.ai.AiRequest
+import app.northvane.core.ai.ClaudeModels
 import app.northvane.core.net.UrlPolicy
 import app.northvane.core.net.toUserMessage
 import app.northvane.core.repo.attempt
@@ -41,7 +43,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Connect an Ollama, Open WebUI, LibreChat or OpenAI-compatible server for the Today summary. */
+/**
+ * AI: which jobs it does, and which provider does them (Claude, or an
+ * Ollama, Open WebUI, LibreChat or OpenAI-compatible server).
+ */
 @Composable
 internal fun AiSettingsPage(state: MainUiState, container: AppContainer, onBack: () -> Unit) {
     SecureWindow()
@@ -61,23 +66,26 @@ internal fun AiSettingsPage(state: MainUiState, container: AppContainer, onBack:
         if (granted) afterPermission?.invoke() else status = "✗ ${LocalNetworkAccess.DENIED_MESSAGE}"
         afterPermission = null
     }
-    LaunchedEffect(Unit) { hasKey = withContext(Dispatchers.IO) { container.secrets.has(SecretStore.AI_API_KEY) } }
+    val hosted = provider.hostedUrl != null
+    LaunchedEffect(provider) { hasKey = withContext(Dispatchers.IO) { container.secrets.has(SecretStore.aiKeyName(provider)) } }
 
     suspend fun config(): AiConfig {
-        val key = newKey.ifBlank { withContext(Dispatchers.IO) { container.secrets.get(SecretStore.AI_API_KEY) }.orEmpty() }
+        val key = newKey.ifBlank { withContext(Dispatchers.IO) { container.secrets.get(SecretStore.aiKeyName(provider)) }.orEmpty() }
         return AiConfig(provider, baseUrl, model, key.ifBlank { null })
     }
 
     fun problem(): String? {
-        if (baseUrl.isBlank()) return "Enter your server's address"
         val sendsKey = newKey.isNotBlank() || hasKey
+        if (provider.keyRequired && !sendsKey) return "Enter your API key"
+        if (hosted) return null
+        if (baseUrl.isBlank()) return "Enter your server's address"
         return (UrlPolicy.validateUserServerUrl(baseUrl.trim().trimEnd('/') + provider.chatPath, sendsKey) as? UrlPolicy.Validation.Invalid)?.reason
     }
 
     /** Runs [action] after local network permission, if the server is on the LAN (Android 17+). */
     fun withNetwork(action: () -> Unit) {
         scope.launch {
-            if (LocalNetworkAccess.needsPermissionFor(context, baseUrl)) {
+            if (!hosted && LocalNetworkAccess.needsPermissionFor(context, baseUrl)) {
                 afterPermission = action
                 permission.launch(LocalNetworkAccess.PERMISSION)
             } else {
@@ -89,31 +97,40 @@ internal fun AiSettingsPage(state: MainUiState, container: AppContainer, onBack:
     fun save(enable: Boolean? = null) = scope.launch {
         container.settings.setAiServer(provider, baseUrl, model)
         if (newKey.isNotBlank()) {
-            withContext(Dispatchers.IO) { container.secrets.put(SecretStore.AI_API_KEY, newKey.trim()) }
+            withContext(Dispatchers.IO) { container.secrets.put(SecretStore.aiKeyName(provider), newKey.trim()) }
             newKey = ""
             hasKey = true
         }
         enable?.let { container.settings.setAiEnabled(it) }
     }
 
-    SettingsScaffoldPublic("AI summary", onBack) {
+    SettingsScaffoldPublic("AI", onBack) {
         SectionCard(null) {
             Hint(
-                "A short summary of the forecast, written by your own AI server, at the top of the Today screen. " +
-                    "SuperAwesomeMagicalWeather sends only the place name and the forecast numbers. Summaries are refreshed at most every 45 minutes.",
+                "AI only where it adds something the forecast can't show by itself. Everything is sent to the provider you choose below, " +
+                    "and only weather text and the place's name are sent: never your location coordinates, other places or keys.",
             )
             LabeledSwitch(
-                "AI summary on Today", s.aiEnabled,
+                "Use AI", s.aiEnabled,
                 { on ->
                     val issue = if (on) problem() ?: if (model.isBlank()) "Choose a model first" else null else null
                     if (issue != null) status = "✗ $issue" else save(on)
                 },
             )
+            if (s.aiEnabled) {
+                LabeledSwitch("Forecasters' notes", s.aiDiscussion, { on -> scope.launch { container.settings.setAiDiscussion(on) } },
+                    subtitle = "The National Weather Service forecasters' discussion in plain words: their confidence and what could change. " +
+                        "Rewritten only when they issue a new one (2–4 times a day).")
+                LabeledSwitch("Explain alerts", s.aiAlerts, { on -> scope.launch { container.settings.setAiAlerts(on) } },
+                    subtitle = "A button on each alert that rewrites it for your place. Only when you tap it.")
+                LabeledSwitch("Ask about the forecast", s.aiAsk, { on -> scope.launch { container.settings.setAiAsk(on) } },
+                    subtitle = "A question box on Today, answered from the next 48 hours and 7 days of your forecast.")
+            }
         }
-        SectionCard("Server") {
-            ChoiceDropdown("Server type", AiProvider.entries, provider, { it.label }, { provider = it; models = emptyList() })
+        SectionCard("Provider") {
+            ChoiceDropdown("Provider", AiProvider.entries, provider, { it.label }, { provider = it; models = emptyList(); newKey = ""; status = null })
             Hint(provider.note)
-            OutlinedTextField(
+            if (!hosted) OutlinedTextField(
                 value = baseUrl,
                 onValueChange = { baseUrl = it.take(500); status = null },
                 singleLine = true,
@@ -140,7 +157,7 @@ internal fun AiSettingsPage(state: MainUiState, container: AppContainer, onBack:
                     onValueChange = { model = it.take(200) },
                     singleLine = true,
                     label = { Text(if (provider == AiProvider.LIBRECHAT) "Agent ID" else "Model") },
-                    placeholder = { Text(if (provider == AiProvider.LIBRECHAT) "agent_…" else "llama3.2") },
+                    placeholder = { Text(when (provider) { AiProvider.LIBRECHAT -> "agent_…"; AiProvider.CLAUDE -> ClaudeModels.DEFAULT; else -> "llama3.2" }) },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -154,7 +171,7 @@ internal fun AiSettingsPage(state: MainUiState, container: AppContainer, onBack:
                                 val result = attempt { container.ai.models(config()) }
                                 result.onSuccess { list ->
                                     models = list
-                                    if (model.isBlank()) model = list.firstOrNull().orEmpty()
+                                    if (model !in list) model = list.firstOrNull { it == ClaudeModels.DEFAULT } ?: list.firstOrNull().orEmpty()
                                     status = if (list.isEmpty()) "No models found on the server" else "✓ ${list.size} models"
                                 }.onFailure { status = "✗ ${it.toUserMessage()}" }
                                 busy = false
@@ -168,7 +185,9 @@ internal fun AiSettingsPage(state: MainUiState, container: AppContainer, onBack:
                         busy = true
                         status = "Asking the server…"
                         scope.launch {
-                            val result = attempt { container.ai.complete(config(), listOf("user" to "Reply with one short friendly sentence confirming you can write weather summaries."), maxTokens = 60) }
+                            val result = attempt {
+                                container.ai.complete(config(), AiRequest("Reply in one short sentence.", "Confirm you can help explain weather forecasts.", replyTokens = 60))
+                            }
                             result.onSuccess { text -> status = "✓ $text"; save() }.onFailure { status = "✗ ${it.toUserMessage()}" }
                             busy = false
                         }
@@ -177,7 +196,7 @@ internal fun AiSettingsPage(state: MainUiState, container: AppContainer, onBack:
                 if (hasKey) {
                     TextButton(onClick = {
                         scope.launch {
-                            withContext(Dispatchers.IO) { container.secrets.remove(SecretStore.AI_API_KEY) }
+                            withContext(Dispatchers.IO) { container.secrets.remove(SecretStore.aiKeyName(provider)) }
                             hasKey = false
                         }
                     }) { Text("Remove key") }

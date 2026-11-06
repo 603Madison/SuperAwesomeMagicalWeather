@@ -101,6 +101,11 @@ class SecretStore(context: Context) {
         const val NE511_API_KEY = "ne511_api_key"
         const val TOMTOM_API_KEY = "tomtom_api_key"
         const val AI_API_KEY = "ai_api_key"
+        const val CLAUDE_API_KEY = "claude_api_key"
+
+        /** Each AI provider keeps its own key, so switching between them doesn't lose one. */
+        fun aiKeyName(provider: app.northvane.core.ai.AiProvider): String =
+            if (provider == app.northvane.core.ai.AiProvider.CLAUDE) CLAUDE_API_KEY else AI_API_KEY
         fun weewxSecret(stationId: String) = "weewx_secret_$stationId"
     }
 }

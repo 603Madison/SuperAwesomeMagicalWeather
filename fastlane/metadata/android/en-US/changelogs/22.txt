@@ -1,0 +1,1 @@
+AI where it helps, and Claude as a provider: Forecasters' notes (the NWS forecasters' discussion in plain words), Explain on alerts, and Ask about the forecast. The AI summary is gone. Outage, pipes, ice, storm, smoke and rivers & tides are now on by default.

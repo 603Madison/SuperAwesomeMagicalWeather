@@ -5,6 +5,20 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-06
+
+AI where it's useful, and Claude as a provider.
+
+### Added
+- **Claude** as an AI provider: add an Anthropic API key in Settings › AI and pick any model on your account (Claude Opus 5.5 is suggested; Haiku costs a small fraction as much). Uses Anthropic's official SDK.
+- **Forecasters' notes:** the National Weather Service forecasters' own discussion for your area, in plain words: what they expect, how confident they are and what could change. Rewritten only when they issue a new one (2–4 times a day), with a link to the original.
+- **Explain** on each alert: the alert rewritten for your place, keeping its times and numbers. Only when you tap it.
+- **Ask about the forecast:** a question box on Today ("Can I paint the deck Saturday?"), answered from your 48-hour and 7-day forecast.
+- Each AI use has its own switch in Settings › AI, and all of them stay off until AI is set up.
+
+### Removed
+- The AI summary at the top of Today. It only restated numbers already on the screen.
+
 ### Changed
 - **On by default:** power outage outlook, frozen pipe risk, black ice & frost, storm totals, wildfire smoke and rivers & tides (aurora forecast and fall foliage already were). Anyone who hasn't touched these switches gets them on; a switch you've turned off stays off. Each can still be turned off in Settings, and wildfire smoke stays off in Backwoods mode unless allowed there.
 

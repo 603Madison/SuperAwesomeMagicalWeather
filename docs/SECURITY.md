@@ -134,11 +134,15 @@ weather services described below.
   the system photo picker and holds no media permission.
 - Canada: api.weather.gc.ca (Environment Canada city pages; nearest page looked
   up with an id-only query).
-- AI summary (only if configured): the user's own server. The request holds
-  the place name and forecast numbers. The URL follows the same rules as WeeWX:
-  http only for private/LAN hosts (with LAN-only DNS) and never with an API key.
-  The key is stored encrypted, sent as a Bearer header, and requests are
-  `no-store`. The settings page sets `FLAG_SECURE`.
+- AI features (only if configured): Claude at api.anthropic.com (through
+  Anthropic's official Java SDK), or the user's own server. Requests hold the
+  place name and weather text only: an NWS forecast discussion, an alert, or
+  the forecast plus the user's question. Never coordinates, other places or
+  keys. A user server's URL follows the same rules as WeeWX: http only for
+  private/LAN hosts (with LAN-only DNS) and never with an API key; requests are
+  `no-store`. Each provider's key is stored encrypted on its own and sent only
+  to that provider. The settings page sets `FLAG_SECURE`. Discussion and alert
+  rewrites are cached in `noBackupFilesDir` for four days.
 - All of these hosts are HTTPS-only with system CAs in the network security config.
 - Place search uses the platform `Geocoder` (on most devices this is backed
   by the system location provider) and OpenWeatherMap geocoding only if the
@@ -153,7 +157,7 @@ weather services described below.
   group counts and bit widths, and turns any damaged file into a parse error
   (tested with truncated and corrupted files). Radar pictures are checked for
   their pixel size before they are decoded, in both apps.
-- Text from services (alerts, AI summaries) is only ever shown as plain text;
+- Text from services (alerts, forecast discussions, AI replies) is only ever shown as plain text;
   there are no WebViews.
 
 ## Supply chain and build

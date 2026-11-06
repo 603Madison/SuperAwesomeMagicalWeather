@@ -160,7 +160,7 @@ private fun SettingsIndex(state: MainUiState, onBack: () -> Unit, nav: SettingsN
                 DataSaverMode.OFF -> "Off"
             } + if (s.showStaleData) " · showing stale data" else "") { nav.openPage(SettingsPage.SATELLITE) }
             NavRow("Data sources & API keys", "NWS, Environment Canada, WeeWX, pollen, air quality, traffic, OpenWeatherMap", nav.openSources)
-            NavRow("AI summary", if (s.aiEnabled) "${s.aiProvider.label} · ${s.aiModel.ifBlank { "no model" }}" else "Off") { nav.openPage(SettingsPage.AI) }
+            NavRow("AI", if (s.aiEnabled) "${s.aiProvider.label} · ${s.aiModel.ifBlank { "no model" }}" else "Off. Forecasters' notes, alert explanations and questions") { nav.openPage(SettingsPage.AI) }
             NavRow("About & privacy", "SuperAwesomeMagicalWeather ${BuildConfig.VERSION_NAME}") { nav.openPage(SettingsPage.ABOUT) }
         }
     }
@@ -271,11 +271,6 @@ private fun TodayPage(state: MainUiState, container: AppContainer, onBack: () ->
                 LabeledSwitch("Personal allergy score", s.allergyEnabled, { on -> update { setAllergy(on) } },
                     subtitle = "Inside the pollen card")
                 NavRow("My allergies", if (s.allergies.isEmpty()) "Choose allergens" else s.allergies.keys.joinToString(", ") { it.label.lowercase() }, nav.openAllergies)
-            }
-        }
-        SectionCard("AI summary") {
-            NavRow("AI weather summary", if (s.aiEnabled) "On · ${s.aiProvider.label}" else "Off. Connect Ollama, Open WebUI, LibreChat or an OpenAI-compatible server") {
-                nav.openPage(SettingsPage.AI)
             }
         }
     }

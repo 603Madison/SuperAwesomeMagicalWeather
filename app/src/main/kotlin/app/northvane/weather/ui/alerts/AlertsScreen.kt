@@ -35,6 +35,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -59,12 +60,14 @@ import app.northvane.core.model.AlertCategory
 import app.northvane.core.model.AlertSeverity
 import app.northvane.core.model.WeatherAlert
 import app.northvane.weather.notify.AlertNotifier
+import app.northvane.weather.ui.AiTask
 import app.northvane.weather.ui.MainUiState
+import app.northvane.weather.ui.home.TaskText
 import app.northvane.weather.ui.TimeFormat
 import java.time.ZoneId
 
 @Composable
-fun AlertsScreen(state: MainUiState, onRefresh: () -> Unit, onOpenSettings: () -> Unit) {
+fun AlertsScreen(state: MainUiState, onRefresh: () -> Unit, onOpenSettings: () -> Unit, onExplain: (WeatherAlert) -> Unit = {}) {
     val context = LocalContext.current
     val snapshot = state.snapshot
     val zone = remember(snapshot?.timeZoneId) {
@@ -115,7 +118,12 @@ fun AlertsScreen(state: MainUiState, onRefresh: () -> Unit, onOpenSettings: () -
                         InfoCard("Weather alerts come from the National Weather Service and are available for the US and its territories.")
                     }
                     snapshot.alerts.isEmpty() -> item { NoAlerts(snapshot.placeName ?: state.selected?.name) }
-                    else -> items(snapshot.alerts, key = { it.id }) { alert -> AlertCard(alert, time) }
+                    else -> {
+                        val canExplain = state.settings.aiEnabled && state.settings.aiAlerts && state.settings.aiModel.isNotBlank()
+                        items(snapshot.alerts, key = { it.id }) { alert ->
+                            AlertCard(alert, time, explanation = if (canExplain) state.ai.alerts[alert.id] ?: AiTask() else null, onExplain = { onExplain(alert) })
+                        }
+                    }
                 }
             }
         }
@@ -152,7 +160,7 @@ private fun NotificationStatus(enabled: Boolean, categories: Set<AlertCategory>,
 }
 
 @Composable
-private fun AlertCard(alert: WeatherAlert, time: TimeFormat) {
+private fun AlertCard(alert: WeatherAlert, time: TimeFormat, explanation: AiTask? = null, onExplain: () -> Unit = {}) {
     var expanded by rememberSaveable(alert.id) { mutableStateOf(false) }
     val color = alertColor(alert.category)
     Card(
@@ -194,6 +202,17 @@ private fun AlertCard(alert: WeatherAlert, time: TimeFormat) {
                         maxLines = if (expanded) Int.MAX_VALUE else 2,
                         overflow = TextOverflow.Ellipsis,
                     )
+                }
+                if (expanded && explanation != null) {
+                    Spacer(Modifier.height(8.dp))
+                    if (explanation.reply == null && !explanation.loading) {
+                        OutlinedButton(onClick = onExplain) { Text("✦ Explain in plain words") }
+                    }
+                    if (explanation.reply != null || explanation.loading || explanation.error != null) {
+                        Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f), modifier = Modifier.fillMaxWidth()) {
+                            Box(Modifier.padding(start = 12.dp, top = 10.dp, bottom = 10.dp)) { TaskText(explanation, waiting = "Reading the alert…") }
+                        }
+                    }
                 }
                 if (expanded) {
                     alert.headline?.let {

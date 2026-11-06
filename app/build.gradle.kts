@@ -27,8 +27,8 @@ android {
         applicationId = "app.northvane.weather"
         minSdk = 26
         targetSdk = 37
-        versionCode = 21
-        versionName = "1.8.0"
+        versionCode = 22
+        versionName = "1.9.0"
     }
 
     signingConfigs {

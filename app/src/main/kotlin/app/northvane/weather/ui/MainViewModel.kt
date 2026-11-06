@@ -14,10 +14,8 @@ import app.northvane.weather.AppContainer
 import app.northvane.weather.data.AppSettings
 import app.northvane.weather.data.LocationStore
 import app.northvane.weather.data.SecretStore
-import app.northvane.weather.data.AiSummary
 import app.northvane.weather.net.LocalNetworkAccess
-import app.northvane.core.ai.AiConfig
-import app.northvane.core.ai.WeatherBrief
+import app.northvane.core.model.WeatherAlert
 import app.northvane.core.model.Section
 import app.northvane.core.repo.attempt
 import kotlinx.coroutines.Dispatchers
@@ -74,16 +72,14 @@ data class MainUiState(
     }
 }
 
-data class AiUiState(val summary: AiSummary? = null, val loading: Boolean = false, val error: String? = null)
-
 /** Activity-scoped state shared by the Today, Radar and Alerts tabs. */
 class MainViewModel(private val container: AppContainer) : ViewModel() {
     private val snapshots = MutableStateFlow<Map<String, WeatherSnapshot>>(emptyMap())
     private val refreshing = MutableStateFlow(false)
     private val error = MutableStateFlow<String?>(null)
     private val climates = MutableStateFlow<Map<String, FrostClimate>>(emptyMap())
-    private val aiStates = MutableStateFlow<Map<String, AiUiState>>(emptyMap())
-    private val extras = combine(climates, aiStates) { c, a -> c to a }
+    private val aiJobs = AiController(container, viewModelScope)
+    private val extras = combine(climates, aiJobs.states) { c, a -> c to a }
     private var refreshJob: Job? = null
     private var refreshingId: String? = null
 
@@ -114,11 +110,13 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
     }.stateIn(viewModelScope, SharingStarted.Eagerly, MainUiState())
 
     init {
-        // AI summary: written once per forecast download (at most every 45 minutes), on the user's own server.
+        // Forecasters' notes: checked when the place or forecast changes, rewritten only when the office issues a new discussion.
         viewModelScope.launch {
-            state.map { st -> Triple(st.selected, st.snapshot?.fetchedAt, with(st.settings) { listOf(aiEnabled, aiProvider, aiBaseUrl, aiModel, units) }) }
+            state.map { st -> Triple(st.selected, st.snapshot?.fetchedAt, with(st.settings) { listOf(aiEnabled, aiDiscussion, aiProvider, aiBaseUrl, aiModel) }) }
                 .distinctUntilChanged()
-                .collect { (location, fetchedAt, _) -> if (location != null && fetchedAt != null) summarize(location, force = false) }
+                .collect { (location, fetchedAt, _) ->
+                    if (location != null && fetchedAt != null) aiJobs.loadDiscussion(location, state.value.settings, state.value.liteMode)
+                }
         }
         // Frost dates are only downloaded for people who use the garden or heating cards.
         viewModelScope.launch {
@@ -260,39 +258,28 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
-    /** Asks the user's AI server for a short summary of the selected place's forecast. */
-    fun summarize(location: SavedLocation? = state.value.selected, force: Boolean = true) {
-        location ?: return
+    /** Checks for a newer forecasters' discussion now. */
+    fun refreshDiscussion() {
         val st = state.value
-        val settings = st.settings
-        val snapshot = snapshots.value[location.id] ?: return
-        if (!settings.aiEnabled || settings.aiBaseUrl.isBlank() || settings.aiModel.isBlank()) return
-        if (st.liteMode && SatelliteFeature.AI_SUMMARY !in settings.satelliteFeatures) return
-        viewModelScope.launch {
-            val existing = aiStates.value[location.id]?.summary ?: container.aiSummaries.read(location.id)
-            val now = Instant.now()
-            val recent = existing != null && existing.model == settings.aiModel &&
-                (existing.forecastTime == snapshot.fetchedAt || Duration.between(existing.createdAt, now) < Duration.ofMinutes(45))
-            if (!force && recent) {
-                aiStates.update { it + (location.id to AiUiState(existing)) }
-                return@launch
-            }
-            if (LocalNetworkAccess.needsPermissionFor(container.app, settings.aiBaseUrl)) {
-                aiStates.update { it + (location.id to AiUiState(existing, error = "Allow local network access for your AI server in Settings › AI summary")) }
-                return@launch
-            }
-            aiStates.update { it + (location.id to AiUiState(existing, loading = true)) }
-            val key = withContext(Dispatchers.IO) { container.secrets.get(SecretStore.AI_API_KEY) }
-            val config = AiConfig(settings.aiProvider, settings.aiBaseUrl, settings.aiModel, key)
-            val result = attempt { container.ai.complete(config, WeatherBrief.messages(snapshot, location.displayName, settings.units, now)) }
-            result.onSuccess { text ->
-                val summary = AiSummary(location.id, text, settings.aiModel, snapshot.fetchedAt, Instant.now())
-                container.aiSummaries.write(summary)
-                aiStates.update { it + (location.id to AiUiState(summary)) }
-            }.onFailure { e ->
-                aiStates.update { it + (location.id to AiUiState(existing, error = e.toUserMessage())) }
-            }
-        }
+        st.selected?.let { aiJobs.loadDiscussion(it, st.settings, st.liteMode, force = true) }
+    }
+
+    fun explainAlert(alert: WeatherAlert) {
+        val st = state.value
+        val location = st.selected ?: return
+        val snapshot = st.snapshot ?: return
+        aiJobs.explainAlert(location, alert, snapshot, st.settings, st.liteMode)
+    }
+
+    fun ask(question: String) {
+        val st = state.value
+        val location = st.selected ?: return
+        val snapshot = st.snapshot ?: return
+        aiJobs.ask(location, question, snapshot, st.settings, st.liteMode)
+    }
+
+    fun clearAnswer() {
+        state.value.selected?.let { aiJobs.clearAnswer(it.id) }
     }
 
     fun moveLocation(id: String, offset: Int) {

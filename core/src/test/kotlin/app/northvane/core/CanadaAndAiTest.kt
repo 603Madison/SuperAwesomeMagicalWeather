@@ -3,7 +3,8 @@ package app.northvane.core
 import app.northvane.core.ai.AiClient
 import app.northvane.core.ai.AiConfig
 import app.northvane.core.ai.AiProvider
-import app.northvane.core.ai.WeatherBrief
+import app.northvane.core.ai.AiPrompts
+import app.northvane.core.ai.AiRequest
 import app.northvane.core.eccc.EcccClient
 import app.northvane.core.model.AlertCategory
 import app.northvane.core.model.AlertSeverity
@@ -134,7 +135,7 @@ class CanadaAndAiTest {
         assertTrue(fake.requests.last().url.encodedPath.endsWith("/items/nb-29"))
     }
 
-    // --- AI summary ---
+    // --- AI providers ---
 
     @Test
     fun parsesCompletionsAndStripsReasoning() {
@@ -153,30 +154,34 @@ class CanadaAndAiTest {
         }
         val base = HttpClients.create("t", null).newBuilder().addInterceptor(fake).build()
         val ai = AiClient(HttpClients.localServerClients(base))
-        val text = ai.complete(AiConfig(AiProvider.OPEN_WEBUI, "https://ai.example.com/", "llama3.2", "sk-test"), listOf("user" to "hi"))
+        val text = ai.complete(AiConfig(AiProvider.OPEN_WEBUI, "https://ai.example.com/", "llama3.2", "sk-test"), AiRequest("Be brief.", "hi"))
         assertEquals("Sunny and cool.", text)
         val request = fake.requests.single()
+        val sent = okio.Buffer().also { request.body!!.writeTo(it) }.readUtf8()
+        assertTrue(sent.contains("\"role\":\"system\"") && sent.contains("Be brief."), sent)
         assertEquals("Bearer sk-test", request.header("Authorization"))
         assertEquals("POST", request.method)
         // A key is never sent over plain HTTP, even on the LAN.
         assertFailsWith<InsecureConfigurationException> {
-            ai.complete(AiConfig(AiProvider.OLLAMA, "http://192.168.1.20:11434", "llama3.2", "secret"), listOf("user" to "hi"))
+            ai.complete(AiConfig(AiProvider.OLLAMA, "http://192.168.1.20:11434", "llama3.2", "secret"), AiRequest("Be brief.", "hi"))
         }
         // Plain HTTP to a public address is refused.
         assertFailsWith<InsecureConfigurationException> {
-            ai.complete(AiConfig(AiProvider.OLLAMA, "http://8.8.8.8:11434", "llama3.2", null), listOf("user" to "hi"))
+            ai.complete(AiConfig(AiProvider.OLLAMA, "http://8.8.8.8:11434", "llama3.2", null), AiRequest("Be brief.", "hi"))
         }
     }
 
     @Test
-    fun briefIncludesTheEssentials() {
+    fun forecastDataIncludesTheEssentials() {
         val f = EcccClient.parse(resource("/eccc/site_nb29.json"), captured)
         val snapshot = app.northvane.core.model.WeatherSnapshot(
             locationId = "fr", fetchedAt = captured, timeZoneId = f.zone.id, current = f.current, hourly = f.hourly, daily = f.daily,
         )
-        val prompt = WeatherBrief.prompt(snapshot, "Fredericton, NB", UnitSystem.METRIC, captured)
-        assertTrue(prompt.contains("Fredericton, NB") && prompt.contains("Now:") && prompt.contains("Next 18 hours") && prompt.contains("°C"), prompt)
-        assertTrue(prompt.lines().size in 4..12, prompt)
-        assertTrue(WeatherBrief.messages(snapshot, "x", UnitSystem.IMPERIAL, captured).first().first == "system")
+        val data = AiPrompts.forecastData(snapshot, "Fredericton, NB", UnitSystem.METRIC, captured)
+        assertTrue(data.contains("Fredericton, NB") && data.contains("Current:") && data.contains("Hourly") && data.contains("Daily:") && data.contains("°C"), data)
+        assertTrue(data.length < 6000, "${data.length} chars")
+        val ask = AiPrompts.question("Can I mow the lawn tomorrow afternoon?" + "x".repeat(500), snapshot, "Fredericton, NB", UnitSystem.METRIC, captured)
+        assertTrue(ask.user.endsWith("x") && ask.user.substringAfter("Question: ").length == AiPrompts.MAX_QUESTION)
+        assertTrue(ask.user.startsWith("<forecast>"))
     }
 }

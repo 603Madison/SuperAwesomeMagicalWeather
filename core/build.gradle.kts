@@ -23,6 +23,7 @@ dependencies {
     api(libs.kotlinx.coroutines.core)
     api(libs.kotlinx.serialization.json)
     api(libs.okhttp)
+    implementation(libs.anthropic.java)
 
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.junit)
