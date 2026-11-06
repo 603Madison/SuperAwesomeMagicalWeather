@@ -34,9 +34,11 @@ unsigned or debug-signed APK.
    `mini/fastlane/metadata/android/en-US/changelogs/` (up to 500 characters;
    the release workflow checks for both).
 4. Commit and push to `main`.
-5. Start **Actions › Release › Run workflow** with the version (for example
+5. Start **Actions › Release › Run workflow** on `main` with the version (for example
    `v1.4.3`), or `gh workflow run release.yml -f version=v1.4.3`. Pushing a
-   `v*` tag also works.
+   `v*` tag also works, but then the F-Droid repository isn't updated (GitHub
+   Pages only deploys from `main`). The last job of the run updates the F-Droid
+   repository ([docs/FDROID.md](FDROID.md)).
 
 The workflow checks that the version matches `versionName`, runs the tests and
 lint, builds the signed APK, writes `SHA256SUMS.txt` and publishes the release.

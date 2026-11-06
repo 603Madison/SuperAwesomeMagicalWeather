@@ -1,0 +1,14 @@
+# fdroidserver settings for this project's own F-Droid repository, published on
+# GitHub Pages by .github/workflows/fdroid-repo.yml (see docs/FDROID.md).
+# The workflow appends repo_url, keystore and repo_keyalias at build time;
+# passwords come from environment variables and are never stored here.
+repo_name: SuperAwesomeMagicalWeather
+repo_description: >-
+  SuperAwesomeMagicalWeather and SuperAwesomeMagicalWeather Mini, the same
+  developer-signed APKs as on the project's GitHub releases.
+repo_icon: icon.png
+# Only the versions downloaded from the newest releases; no archive repository.
+archive_older: 0
+keystorepass: {env: FDROID_KEYSTORE_PASS}
+keypass: {env: FDROID_KEY_PASS}
+keydname: CN=SuperAwesomeMagicalWeather

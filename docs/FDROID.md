@@ -1,48 +1,63 @@
-# F-Droid
+# F-Droid repository
 
-The repository is set up so [F-Droid](https://f-droid.org) can build both apps
-from source:
+The project publishes its own F-Droid repository, so both apps can be installed
+and kept up to date from the F-Droid app (or another F-Droid client such as
+Droid-ify or Neo Store). It serves the same developer-signed APKs as the GitHub
+releases, so a copy installed from either one updates from the other.
 
-- Everything is free software, built only from Google Maven and Maven Central.
-  No Google Play Services, Firebase, trackers or prebuilt binaries.
-- Release builds don't embed AGP's dependency list, which is encrypted with
-  Google's key (`dependenciesInfo` in both `build.gradle.kts` files).
-- Without a signing key, `assembleRelease` makes an unsigned APK, which F-Droid
-  then signs.
-- Store listings are in the fastlane layout: `fastlane/` for the main app and
-  `mini/fastlane/` for Mini (title, descriptions, icon, screenshots and a
-  changelog per version code).
-- Build recipes ready for fdroiddata are in [`fdroid/`](../fdroid).
+| | |
+|---|---|
+| Repository | `https://603madison.github.io/SuperAwesomeMagicalWeather/repo` |
+| Fingerprint | `959FA8D3634E3CF7409BA1D5BD1C438FD68B9FC169C47E429E16800FD076DBBF` |
+| One-tap link | [Add to F-Droid](https://fdroid.link/#https://603madison.github.io/SuperAwesomeMagicalWeather/repo?fingerprint=959FA8D3634E3CF7409BA1D5BD1C438FD68B9FC169C47E429E16800FD076DBBF) |
 
-## Submitting
+## Adding it on your phone
 
-F-Droid's catalog lives in the [fdroiddata](https://gitlab.com/fdroid/fdroiddata)
-repository on GitLab. You need a GitLab account.
+Open the one-tap link above on the phone, or:
 
-1. Fork fdroiddata on GitLab.
-2. Copy `fdroid/app.northvane.weather.yml` and `fdroid/app.northvane.mini.yml`
-   into `metadata/` in your fork, on a new branch.
-3. Optional: check them with `fdroid lint` and `fdroid build -v -l app.northvane.weather`
-   (see F-Droid's [quick start guide](https://f-droid.org/docs/Submitting_to_F-Droid_Quick_Start_Guide/)).
-4. Open a merge request. F-Droid's reviewers may adjust the recipes.
+1. In F-Droid, open **Settings › Repositories** and tap **+**.
+2. Enter the repository address and the fingerprint above (or scan the QR code
+   on the [repository page](https://603madison.github.io/SuperAwesomeMagicalWeather/repo/)).
+3. Search for SuperAwesomeMagicalWeather. Both apps are in the repository.
 
-After that, F-Droid picks up new versions by itself from new `v*` tags.
+The fingerprint is the SHA-256 of the key that signs the APKs. F-Droid checks
+that the repository is signed with it, so nobody else can publish to it.
 
-## Signing
+## How it's built
 
-F-Droid signs the apps with its own key. Android won't update an app across
-different keys, so a copy installed from GitHub can't be updated from F-Droid
-(or the other way round) without uninstalling first, which loses places and
-settings.
+`.github/workflows/fdroid-repo.yml` runs after every release (as the last job
+of the Release workflow) and can be started by hand from the Actions tab
+(**F-Droid repository › Run workflow**). It:
 
-F-Droid can instead ship the GitHub-signed APKs if its build of the same tag
-matches them byte for byte ("reproducible builds"). That means adding
-`Binaries:` and `AllowedAPKSigningKeys: 959fa8d3634e3cf7409ba1d5bd1c438fd68b9fc169c47e429e16800fd076dbbf`
-to the recipes once a release has been confirmed to build reproducibly.
+1. downloads the APKs from the three newest GitHub releases and checks that
+   each is signed with the release key;
+2. adds the store listings from `fastlane/` and `mini/fastlane/` (descriptions,
+   icon, screenshots, changelogs) and the settings in `fdroid/`;
+3. builds and signs the index with [fdroidserver](https://gitlab.com/fdroid/fdroidserver),
+   using the release key from the repository secrets;
+4. publishes it to GitHub Pages.
 
-## Every release
+### One-time setup
 
-The release needs a changelog for its version code in both
-`fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` and
-`mini/fastlane/metadata/android/en-US/changelogs/<versionCode>.txt` (up to 500
-characters each). The release workflow stops if one is missing.
+GitHub Pages has to be turned on once: **Settings › Pages › Build and
+deployment › Source: GitHub Actions**. Then run **Actions › F-Droid repository
+› Run workflow** on `main` to publish the current release. Until Pages is on,
+the F-Droid job at the end of each release fails (the release itself is still
+published).
+
+Pages deployments are allowed from `main`, so start releases from `main` as
+usual; a run started by pushing a tag can't deploy the repository.
+
+### Every release
+
+Each release needs an F-Droid changelog for its `versionCode` in
+`fastlane/metadata/android/en-US/changelogs/` and
+`mini/fastlane/metadata/android/en-US/changelogs/` (up to 500 characters). The
+release workflow stops if one is missing.
+
+## Building from source
+
+The apps also meet F-Droid's rules for building from source: everything is free
+software from Google Maven and Maven Central (no Google Play Services, Firebase
+or trackers), the APKs don't embed AGP's dependency list encrypted with Google's
+key, and `assembleRelease` makes an unsigned APK when there's no signing key.

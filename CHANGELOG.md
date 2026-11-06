@@ -3,6 +3,11 @@
 All notable changes to SuperAwesomeMagicalWeather (called Northvane before 1.7.0). The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **Own F-Droid repository** on GitHub Pages, updated after every release with the same signed APKs as the GitHub releases. Add it in F-Droid with the address and fingerprint in the README (`docs/FDROID.md`).
+
 ## [1.7.1] - 2026-11-06
 
 ### Fixed

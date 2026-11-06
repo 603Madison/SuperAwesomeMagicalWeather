@@ -11,3 +11,10 @@ build/
 *.keystore
 *.jks
 keystore.properties
+
+# F-Droid repository build output (made by .github/workflows/fdroid-repo.yml)
+/fdroid/repo/
+/fdroid/tmp/
+/fdroid/icon.png
+/fdroid/metadata/*/
+/site/

@@ -36,7 +36,13 @@ Weather Service data. No accounts, no analytics, no built-in API keys.
 Needs Android 8.0 or newer. The satellite features need Android 16+ and a
 carrier with satellite data.
 
-The repository is ready for F-Droid; see [docs/FDROID.md](docs/FDROID.md).
+**Or get updates through F-Droid**: add the app's own repository with this
+[one-tap link](https://fdroid.link/#https://603madison.github.io/SuperAwesomeMagicalWeather/repo?fingerprint=959FA8D3634E3CF7409BA1D5BD1C438FD68B9FC169C47E429E16800FD076DBBF),
+or in F-Droid under Settings › Repositories with the address
+`https://603madison.github.io/SuperAwesomeMagicalWeather/repo` and fingerprint
+`959FA8D3634E3CF7409BA1D5BD1C438FD68B9FC169C47E429E16800FD076DBBF`. It has the
+same signed APKs as the GitHub releases, so you can switch between the two. See
+[docs/FDROID.md](docs/FDROID.md).
 
 > **Formerly Northvane.** The app was renamed in 1.7.0. It installs as an
 > update over Northvane, and your places and settings carry over. Downloads up
