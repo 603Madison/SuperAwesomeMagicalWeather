@@ -453,6 +453,11 @@ private fun SatellitePage(state: MainUiState, container: AppContainer, onBack: (
                 "Show stale data", s.showStaleData, { on -> update { setShowStaleData(on) } },
                 subtitle = "In Backwoods mode, cards (and tabs) with data over 12 hours old are hidden. Turn this on to show them anyway.",
             )
+            LabeledSwitch(
+                "Also when Android limits this app's data", s.followRestrictedData, { on -> update { setFollowRestrictedData(on) } },
+                subtitle = "Android reports Data Saver and a switched-off \"Background data\" for this app the same way. " +
+                    "Turn this off if Background data is off on purpose and Backwoods mode keeps turning on.",
+            )
         }
         SectionCard("Allowed in Backwoods mode") {
             SatelliteGroup.entries.forEach { group ->
@@ -497,7 +502,7 @@ private fun SatellitePage(state: MainUiState, container: AppContainer, onBack: (
                 network.constrained -> "bandwidth-limited"
                 network.metered -> "mobile data"
                 else -> "unmetered"
-            } + (if (network.dataSaver) " · Android Data Saver is on" else "") + (if (state.liteMode) " · Backwoods mode is on" else "") + ". Over satellite, a WeeWX or AI server is only reachable at a public address.",
+            } + (if (network.dataSaver) " · Android Data Saver is on" else if (network.restricted) " · Android limits this app's background data" else "") + (if (state.liteMode) " · Backwoods mode is on" else "") + ". Over satellite, a WeeWX or AI server is only reachable at a public address.",
         )
     }
 }

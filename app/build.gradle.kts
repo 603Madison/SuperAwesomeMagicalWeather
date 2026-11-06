@@ -27,8 +27,8 @@ android {
         applicationId = "app.northvane.weather"
         minSdk = 26
         targetSdk = 37
-        versionCode = 17
-        versionName = "1.7.0"
+        versionCode = 18
+        versionName = "1.7.1"
     }
 
     signingConfigs {
@@ -59,6 +59,13 @@ android {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
         }
+    }
+
+    // F-Droid and other independent builders can't read the dependency list AGP
+    // otherwise embeds, encrypted with Google's key, in the APK.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
 
     compileOptions {

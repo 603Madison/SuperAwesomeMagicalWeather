@@ -64,6 +64,14 @@ jobs:
             echo "::error::$TAG doesn't match versionName $VERSION_NAME in app/build.gradle.kts"
             exit 1
           fi
+          # F-Droid shows the changelog for each version code from the fastlane folders.
+          VERSION_CODE=$(sed -n 's/.*versionCode = \([0-9]*\).*/\1/p' app/build.gradle.kts)
+          for dir in fastlane mini/fastlane; do
+            if [ -d "$dir" ] && [ ! -s "$dir/metadata/android/en-US/changelogs/$VERSION_CODE.txt" ]; then
+              echo "::error::Add $dir/metadata/android/en-US/changelogs/$VERSION_CODE.txt (the F-Droid changelog)"
+              exit 1
+            fi
+          done
           echo "COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4

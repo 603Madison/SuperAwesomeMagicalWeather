@@ -127,6 +127,8 @@ class HomeActions(
     val laundryOut: (Boolean) -> Unit = {},
     val markPlanted: (Crop) -> Unit = {},
     val refreshSummary: () -> Unit = {},
+    /** Stop Backwoods mode following Android's ambiguous "restricted background data". */
+    val ignoreRestrictedData: () -> Unit = {},
 )
 
 @Composable
@@ -254,7 +256,9 @@ private fun HomeContent(
                                 forced = state.settings.dataSaver == DataSaverMode.ALWAYS,
                                 satellite = state.network.satellite,
                                 dataSaver = state.network.dataSaver && !state.network.constrained,
+                                restricted = state.network.restricted && !state.network.dataSaver && !state.network.constrained,
                                 allowed = state.settings.satelliteFeatures,
+                                onIgnoreRestricted = actions.ignoreRestrictedData,
                             )
                         }
                     }
@@ -720,7 +724,15 @@ private fun SourcesFooter(snapshot: WeatherSnapshot, time: TimeFormat) {
 }
 
 @Composable
-private fun DataSaverBanner(forced: Boolean, satellite: Boolean, allowed: Set<SatelliteFeature>, dataSaver: Boolean = false) {
+private fun DataSaverBanner(
+    forced: Boolean,
+    satellite: Boolean,
+    allowed: Set<SatelliteFeature>,
+    dataSaver: Boolean = false,
+    restricted: Boolean = false,
+    onIgnoreRestricted: () -> Unit = {},
+) {
+    val context = LocalContext.current
     val paused = SatelliteFeature.entries.filter { it !in allowed && it != SatelliteFeature.OWM_FALLBACK }
     Card(
         shape = RoundedCornerShape(20.dp),
@@ -736,6 +748,7 @@ private fun DataSaverBanner(forced: Boolean, satellite: Boolean, allowed: Set<Sa
                         forced -> "Backwoods mode is on"
                         satellite -> "Backwoods mode: satellite connection"
                         dataSaver -> "Backwoods mode: Android Data Saver is on"
+                        restricted -> "Backwoods mode: Android is limiting this app's data"
                         else -> "Backwoods mode: limited connection"
                     },
                     style = MaterialTheme.typography.titleSmall,
@@ -745,14 +758,40 @@ private fun DataSaverBanner(forced: Boolean, satellite: Boolean, allowed: Set<Sa
                     if (paused.isEmpty()) {
                         "Everything is allowed (Settings › Backwoods mode)."
                     } else {
-                        "Paused to save data: " + paused.joinToString(", ") { it.title.lowercase() } +
+                        "Paused to save data: " + paused.joinToString(", ") { f -> f.title.let { if (it.length > 1 && it[1].isUpperCase()) it else it.replaceFirstChar(Char::lowercase) } } +
                             ". Change in Settings › Backwoods mode."
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                 )
+                if (restricted && !forced && !satellite) {
+                    // Android reports Data Saver and a switched-off "Background data" the same way.
+                    Text(
+                        "Either Data Saver is on, or Background data is off for this app in Android's settings. " +
+                            "Android doesn't say which.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    Row {
+                        TextButton(onClick = { openAppDataSettings(context) }) { Text("App data settings") }
+                        TextButton(onClick = onIgnoreRestricted) { Text("Ignore this") }
+                    }
+                }
             }
         }
+    }
+}
+
+/** The app's "Mobile data & Wi-Fi" page (Background data, Unrestricted data), or its info page. */
+private fun openAppDataSettings(context: android.content.Context) {
+    val uri = android.net.Uri.fromParts("package", context.packageName, null)
+    val intents = listOf(
+        android.content.Intent(android.provider.Settings.ACTION_IGNORE_BACKGROUND_DATA_RESTRICTIONS_SETTINGS, uri),
+        android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, uri),
+    )
+    for (intent in intents) {
+        if (runCatching { context.startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess) return
     }
 }
 

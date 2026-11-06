@@ -1,0 +1,3 @@
+Renamed from Northvane to SuperAwesomeMagicalWeather. Installs as an update; places and settings stay.
+
+Security: plain-HTTP connections to your own servers can no longer be redirected onto the internet, and damaged radar downloads can no longer crash the app.

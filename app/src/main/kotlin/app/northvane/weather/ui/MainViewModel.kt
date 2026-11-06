@@ -287,6 +287,10 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch { container.locations.move(id, offset) }
     }
 
+    fun setFollowRestrictedData(follow: Boolean) {
+        viewModelScope.launch { container.settings.setFollowRestrictedData(follow) }
+    }
+
     fun setHourlyExpanded(expanded: Boolean) {
         viewModelScope.launch { container.settings.setHourlyExpanded(expanded) }
     }

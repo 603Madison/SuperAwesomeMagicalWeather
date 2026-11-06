@@ -57,6 +57,13 @@ android {
         }
     }
 
+    // F-Droid and other independent builders can't read the dependency list AGP
+    // otherwise embeds, encrypted with Google's key, in the APK.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

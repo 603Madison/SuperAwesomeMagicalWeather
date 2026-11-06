@@ -3,6 +3,15 @@
 All notable changes to SuperAwesomeMagicalWeather (called Northvane before 1.7.0). The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions follow [Semantic Versioning](https://semver.org/).
 
+## [1.7.1] - 2026-11-06
+
+### Fixed
+- **Backwoods mode said "Android Data Saver is on" when it wasn't.** Android reports Data Saver and a switched-off "Background data" for the app the same way, and the app took both as Data Saver. Now only a certain Data Saver is called that. For the other case the banner says what Android actually reports, with an **App data settings** shortcut and an **Ignore this** button; the same choice is in Settings › Backwoods mode.
+- The list of paused items no longer writes "AI" as "ai".
+
+### Added
+- **Ready for F-Droid**: store listings in the fastlane layout, build recipes in `fdroid/`, and no Google-encrypted dependency block in the APKs. See `docs/FDROID.md`.
+
 ## [1.7.0] - 2026-11-03
 
 ### Changed

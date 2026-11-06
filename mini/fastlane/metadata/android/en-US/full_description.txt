@@ -1,0 +1,12 @@
+A small weather app for Android flip phones such as the Kyocera DuraXV, Sonim XP3plus, TCL Flip and CAT S22 Flip, built for 2.4–2.8" screens and keypads. It works fully with or without a touchscreen.
+
+<ul>
+<li>Everything works from the keypad: ▲▼ to move, OK to select, and the soft keys for the actions shown at the bottom.</li>
+<li>Number shortcuts on the home screen: 1 Hourly, 2 7-day, 3 Alerts, 4 Radar, 5 Places, 6 Settings, 0 Keys & help.</li>
+<li>Current conditions, 48 hours, 7 days with the full forecast text, and severe weather alerts with notifications.</li>
+<li>Several places: search by town or ZIP code with the keypad, or use GPS.</li>
+<li>Radar as one map picture per frame, with zoom and pan from the keypad.</li>
+<li>Light on data and memory (about 25 KB per forecast refresh), so it suits Android Go phones.</li>
+</ul>
+
+Forecasts and alerts come from the US National Weather Service and Environment and Climate Change Canada, radar maps from the Iowa Environmental Mesonet, and place search from Open-Meteo. No accounts, ads or tracking.

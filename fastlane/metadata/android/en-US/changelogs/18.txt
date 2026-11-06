@@ -1,0 +1,3 @@
+Fixed: Backwoods mode said "Android Data Saver is on" when it was off. Android reports Data Saver and a switched-off "Background data" for the app the same way, so the banner now says that, with a shortcut to the app's data settings and an "Ignore this" button.
+
+Ready for F-Droid.

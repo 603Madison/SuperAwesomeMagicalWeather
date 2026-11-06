@@ -1,0 +1,27 @@
+A private, ad-free weather app built on free NOAA and National Weather Service data. No accounts, no analytics and no API keys built in.
+
+<b>Weather</b>
+<ul>
+<li>Current conditions, hourly and 7-day forecasts with real numbers: gusts, rain and snow amounts, humidity, cloud cover and thunder chance.</li>
+<li>Radar for the past hour, plus a future cast from NOAA's HRRR model adjusted to match the latest radar.</li>
+<li>Severe weather alerts in the background for every saved place, with separate channels for warnings, watches, advisories and statements. The Today screen turns red during a warning.</li>
+<li>US and Canada: the National Weather Service for the US, Environment and Climate Change Canada for Canada.</li>
+<li>Your own WeeWX weather station can supply current conditions.</li>
+</ul>
+
+<b>Planning tools</b> (each can be turned on or off)
+<ul>
+<li>Air quality, UV index and a personal allergy score.</li>
+<li>Aurora forecast with notifications when the northern lights may be visible.</li>
+<li>Power outage risk, frozen pipes, black ice and frost.</li>
+<li>Outdoor activity scores, fall foliage, trail mud, clothes drying, garden, heating, maple sap runs and burn days.</li>
+<li>Traffic: work zones, crashes and closures.</li>
+</ul>
+
+<b>Backwoods mode</b>
+Saves data on satellite connections such as T-Mobile T-Satellite, and while Android's Data Saver is on. You choose exactly what it may still download.
+
+<b>Optional services</b>
+Some extras use services that need your own key: Google Pollen API (pollen), EPA AirNow (air quality), New England 511 (traffic incidents), TomTom (traffic speeds), OpenWeatherMap (fallback outside North America) and your own AI server (forecast summary). None of them are needed, and nothing is sent to them unless you add a key.
+
+There's also SuperAwesomeMagicalWeather Mini, a separate app for flip phones.

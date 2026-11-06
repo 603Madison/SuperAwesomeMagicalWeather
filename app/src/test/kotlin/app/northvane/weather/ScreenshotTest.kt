@@ -384,6 +384,16 @@ class ScreenshotTest {
         save("today_satellite_metric")
     }
 
+    /** Android says "restricted" without saying whether that's Data Saver or Background data switched off. */
+    @Test
+    fun todayRestrictedData() {
+        val settings = AppSettings(dataSaver = DataSaverMode.AUTO)
+        render(dark = false) {
+            HomeScreen(state(snapshot(), settings, NetworkStatus(metered = true, restricted = true), liteMode = true), noActions, {}, {}, {})
+        }
+        save("today_restricted_data")
+    }
+
     @Test
     fun onboarding() {
         render(dark = false) { HomeScreen(MainUiState(ready = true), noActions, {}, {}, {}) }

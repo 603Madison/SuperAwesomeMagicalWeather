@@ -126,6 +126,7 @@ fun NorthvaneRoot(
             laundryOut = vm::laundryOut,
             markPlanted = vm::markPlanted,
             refreshSummary = { vm.summarize() },
+            ignoreRestrictedData = { vm.setFollowRestrictedData(false) },
         )
     }
 

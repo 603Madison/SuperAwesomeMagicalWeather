@@ -29,8 +29,12 @@ unsigned or debug-signed APK.
 1. Update `versionCode` and `versionName` in `app/build.gradle.kts`.
 2. Move the Unreleased notes in `CHANGELOG.md` under a new `## [x.y.z] - date`
    heading. The release uses that section as its notes.
-3. Commit and push to `main`.
-4. Start **Actions › Release › Run workflow** with the version (for example
+3. Write the F-Droid changelog for the new `versionCode` in
+   `fastlane/metadata/android/en-US/changelogs/` and
+   `mini/fastlane/metadata/android/en-US/changelogs/` (up to 500 characters;
+   the release workflow checks for both).
+4. Commit and push to `main`.
+5. Start **Actions › Release › Run workflow** with the version (for example
    `v1.4.3`), or `gh workflow run release.yml -f version=v1.4.3`. Pushing a
    `v*` tag also works.
 

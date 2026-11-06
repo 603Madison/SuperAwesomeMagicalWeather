@@ -36,6 +36,8 @@ Weather Service data. No accounts, no analytics, no built-in API keys.
 Needs Android 8.0 or newer. The satellite features need Android 16+ and a
 carrier with satellite data.
 
+The repository is ready for F-Droid; see [docs/FDROID.md](docs/FDROID.md).
+
 > **Formerly Northvane.** The app was renamed in 1.7.0. It installs as an
 > update over Northvane, and your places and settings carry over. Downloads up
 > to 1.6.2 are named `Northvane-…apk`.
@@ -175,7 +177,7 @@ design, and [SECURITY.md](SECURITY.md) to report a vulnerability.
   each estimate is made.
 - [WeeWX setup](weewx/README.md): connect your own weather station.
 - [Changelog](CHANGELOG.md): what's new in each release.
-- [Contributing](CONTRIBUTING.md) and [Releasing](docs/RELEASING.md).
+- [Contributing](CONTRIBUTING.md), [Releasing](docs/RELEASING.md) and [F-Droid](docs/FDROID.md).
 
 ## Building
 

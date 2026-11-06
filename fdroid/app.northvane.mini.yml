@@ -1,0 +1,28 @@
+# Build recipe for F-Droid (goes in fdroiddata as metadata/app.northvane.mini.yml).
+# See docs/FDROID.md for how to submit it.
+Categories:
+  - Weather
+License: GPL-3.0-or-later
+SourceCode: https://github.com/603Madison/SuperAwesomeMagicalWeather
+IssueTracker: https://github.com/603Madison/SuperAwesomeMagicalWeather/issues
+Changelog: https://github.com/603Madison/SuperAwesomeMagicalWeather/blob/HEAD/CHANGELOG.md
+
+AutoName: SuperAwesomeMagicalWeather Mini
+
+RepoType: git
+Repo: https://github.com/603Madison/SuperAwesomeMagicalWeather.git
+
+Builds:
+  - versionName: 1.7.1
+    versionCode: 18
+    commit: v1.7.1
+    subdir: mini
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+# Mini takes its version from the main app's build file.
+UpdateCheckMode: Tags ^v[0-9.]+$
+UpdateCheckData: app/build.gradle.kts|versionCode\s*=\s*(\d+)|.|versionName\s*=\s*"([^"]+)"
+CurrentVersion: 1.7.1
+CurrentVersionCode: 18

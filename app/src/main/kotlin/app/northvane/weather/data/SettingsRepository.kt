@@ -132,6 +132,8 @@ data class AppSettings(
     val heatingAggressive: Boolean = false,
     /** On satellite limits, show cards whose data is over 12 hours old (or never downloaded). */
     val showStaleData: Boolean = false,
+    /** Whether Backwoods mode also follows Android's "restricted background data" (see NetworkStatus.restricted). */
+    val followRestrictedData: Boolean = true,
     val aiEnabled: Boolean = false,
     val aiProvider: AiProvider = AiProvider.OLLAMA,
     val aiBaseUrl: String = "",
@@ -208,6 +210,7 @@ class SettingsRepository(context: Context) {
         val heatSources = stringPreferencesKey("heat_sources")
         val heatingAggressive = booleanPreferencesKey("heating_aggressive")
         val showStale = booleanPreferencesKey("show_stale_data")
+        val followRestricted = booleanPreferencesKey("follow_restricted_data")
         val ai = booleanPreferencesKey("ai_enabled")
         val aiProvider = stringPreferencesKey("ai_provider")
         val aiBaseUrl = stringPreferencesKey("ai_base_url")
@@ -291,6 +294,7 @@ class SettingsRepository(context: Context) {
                 heatSources = p[Keys.heatSources]?.let { runCatching { NorthvaneJson.decodeFromString(heatList, it) }.getOrNull() } ?: d.heatSources,
                 heatingAggressive = p[Keys.heatingAggressive] ?: d.heatingAggressive,
                 showStaleData = p[Keys.showStale] ?: d.showStaleData,
+                followRestrictedData = p[Keys.followRestricted] ?: d.followRestrictedData,
                 aiEnabled = p[Keys.ai] ?: d.aiEnabled,
                 aiProvider = p[Keys.aiProvider].toEnum(d.aiProvider),
                 aiBaseUrl = p[Keys.aiBaseUrl] ?: d.aiBaseUrl,
@@ -376,6 +380,7 @@ class SettingsRepository(context: Context) {
     suspend fun setTrafficFlow(enabled: Boolean) = store.edit { it[Keys.trafficFlow] = enabled }
     suspend fun setHeatingAggressive(enabled: Boolean) = store.edit { it[Keys.heatingAggressive] = enabled }
     suspend fun setShowStaleData(enabled: Boolean) = store.edit { it[Keys.showStale] = enabled }
+    suspend fun setFollowRestrictedData(enabled: Boolean) = store.edit { it[Keys.followRestricted] = enabled }
     suspend fun setAiEnabled(enabled: Boolean) = store.edit { it[Keys.ai] = enabled }
     suspend fun setAiServer(provider: AiProvider, baseUrl: String, model: String) = store.edit {
         it[Keys.aiProvider] = provider.name

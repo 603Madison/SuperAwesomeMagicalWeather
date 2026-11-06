@@ -29,10 +29,17 @@ data class NetworkStatus(
     val constrained: Boolean = false,
     val metered: Boolean = false,
     /**
-     * Android's Data Saver is on. Reported even when SuperAwesomeMagicalWeather is set to
-     * "Unrestricted data", since the user still asked the phone to save data.
+     * Android's Data Saver is certainly on: the app is exempt from it ("Unrestricted
+     * data"), which Android only reports while Data Saver is on. Counts for Backwoods
+     * mode anyway, since the user still asked the phone to save data.
      */
     val dataSaver: Boolean = false,
+    /**
+     * Android restricts this app's background data. That's either Data Saver (with the
+     * app not exempt) or the app's own "Background data" switch turned off: Android
+     * reports both the same way and doesn't say which.
+     */
+    val restricted: Boolean = false,
 )
 
 /**
@@ -82,7 +89,8 @@ class ConnectivityMonitor(context: Context) {
         // Data Saver can be switched without the network changing.
         val dataSaverReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
-                _status.value = _status.value.copy(dataSaver = dataSaverOn())
+                val (dataSaver, restricted) = restriction()
+                _status.value = _status.value.copy(dataSaver = dataSaver, restricted = restricted)
             }
         }
         runCatching {
@@ -106,32 +114,45 @@ class ConnectivityMonitor(context: Context) {
 
     private fun NetworkCapabilities.toStatus(): NetworkStatus {
         val modern = Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA
+        val (dataSaver, restricted) = restriction()
         return NetworkStatus(
             connected = hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET),
             satellite = modern && hasTransport(NetworkCapabilities.TRANSPORT_SATELLITE),
             constrained = modern && !hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_BANDWIDTH_CONSTRAINED),
             metered = !hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED),
-            dataSaver = dataSaverOn(),
+            dataSaver = dataSaver,
+            restricted = restricted,
         )
     }
 
-    /** "Whitelisted" means Data Saver is on but this app is exempt, which still counts here. */
-    private fun dataSaverOn(): Boolean =
-        cm?.restrictBackgroundStatus.let {
-            it == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED ||
-                it == ConnectivityManager.RESTRICT_BACKGROUND_STATUS_WHITELISTED
-        }
+    /** (Data Saver certainly on, background data restricted for another or unknown reason). */
+    private fun restriction(): Pair<Boolean, Boolean> = restrictionOf(cm?.restrictBackgroundStatus)
+}
+
+/**
+ * Reads Android's restrict-background status. "Whitelisted" (exempt) is only
+ * reported while Data Saver is on. "Enabled" is ambiguous: Android also reports
+ * it whenever the app's own "Background data" switch is off, Data Saver or not
+ * (NetworkPolicyManagerService.getRestrictBackgroundStatusInternal), so it must
+ * not be shown as "Data Saver is on".
+ */
+internal fun restrictionOf(status: Int?): Pair<Boolean, Boolean> = when (status) {
+    ConnectivityManager.RESTRICT_BACKGROUND_STATUS_WHITELISTED -> true to false
+    ConnectivityManager.RESTRICT_BACKGROUND_STATUS_ENABLED -> false to true
+    else -> false to false
 }
 
 /**
  * True when Backwoods limits apply: forced on, or automatic on a satellite or
  * bandwidth-constrained network, or on metered data while Android's Data Saver
- * is on (Data Saver doesn't apply to unmetered Wi-Fi, so neither does this).
+ * is on or (unless the user turned it off) Android restricts the app's
+ * background data. Data Saver doesn't apply to unmetered Wi-Fi, so neither does this.
  */
 fun isLimited(settings: AppSettings, status: NetworkStatus): Boolean = when (settings.dataSaver) {
     DataSaverMode.ALWAYS -> true
     DataSaverMode.OFF -> false
-    DataSaverMode.AUTO -> status.satellite || status.constrained || (status.dataSaver && status.metered)
+    DataSaverMode.AUTO -> status.satellite || status.constrained ||
+        (status.metered && (status.dataSaver || (status.restricted && settings.followRestrictedData)))
 }
 
 /** Whether [feature] may use the network right now. */
