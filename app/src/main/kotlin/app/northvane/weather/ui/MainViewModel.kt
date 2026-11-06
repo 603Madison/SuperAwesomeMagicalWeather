@@ -329,7 +329,11 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         val st = state.value
         val location = st.selected ?: return
         val snapshot = st.snapshot ?: return
-        aiJobs.ask(location, question, snapshot, st.settings, st.liteMode)
+        // Everything the app knows, not just the forecast: cards that depend on the reader's setup too.
+        val extras = runCatching {
+            AiContext.extras(snapshot, st.settings, st.frostClimate, st.nowcast, snapshot.latitude ?: location.latitude, Instant.now())
+        }.getOrDefault("")
+        aiJobs.ask(location, question, snapshot, st.settings, st.liteMode, extras)
     }
 
     fun clearAnswer() {

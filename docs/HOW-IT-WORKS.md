@@ -342,7 +342,15 @@ Weather Watches. Rules vary by town and state, and many need a burn permit.
     times and numbers, and saying when it covers only part of the area (the
     coast, higher elevations). Only when tapped; cached until the alert changes.
   - *Ask about the forecast*: your question answered from the next 48 hours
-    and 7 days of your forecast (about 4 KB of compact lines). Not stored.
+    and 7 days of your forecast plus everything else the app shows: every
+    card's data (aurora, smoke, air, UV, pollen and allergies, trail mud,
+    foliage, rivers and tides, storm totals, outage and pipe risk, frost and
+    ice, activities with their best hours) and what you've set up (garden,
+    heating, laundry, sap, burn days, frost dates). About 5–8 KB. Not stored.
+
+  Replies come in a fixed short shape the app parses: a headline (and, for
+  the forecasters' notes, a confidence level) with up to three points shown
+  on request; answers are one or two sentences.
 
   Providers: **Claude** (Anthropic's API, called through Anthropic's official
   Java SDK; the default model is Claude Opus 5.5 and any model on your account

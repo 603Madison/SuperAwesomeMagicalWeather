@@ -94,7 +94,7 @@ class AiController(private val container: AppContainer, private val scope: Corou
             val snapshot = container.weatherCache.read(location.id)
             val place = placeFor(location, snapshot)
             // Stored per office and place: two places in one office's area get their own notes.
-            val storeKey = "$office|$place"
+            val storeKey = "v2|$office|$place"
             val stored = container.aiReplies.discussion(storeKey)?.takeIf { it.model == config.model }
             update(location.id) { it.copy(office = office, discussion = it.discussion.copy(reply = it.discussion.reply ?: stored)) }
             val now = Instant.now()
@@ -126,7 +126,7 @@ class AiController(private val container: AppContainer, private val scope: Corou
         scope.launch {
             val config = config(settings) ?: return@launch
             val place = placeFor(location, snapshot)
-            val storeKey = "${alert.id}|$place"
+            val storeKey = "v2|${alert.id}|$place"
             container.aiReplies.alert(storeKey)?.takeIf { it.model == config.model }?.let { stored ->
                 update(location.id) { it.copy(alerts = it.alerts + (alert.id to AiTask(stored))) }
                 return@launch
@@ -149,7 +149,7 @@ class AiController(private val container: AppContainer, private val scope: Corou
     }
 
     /** Answers a question about [location]'s forecast. Answers aren't stored. */
-    fun ask(location: SavedLocation, question: String, snapshot: WeatherSnapshot, settings: AppSettings, liteMode: Boolean) {
+    fun ask(location: SavedLocation, question: String, snapshot: WeatherSnapshot, settings: AppSettings, liteMode: Boolean, extras: String = "") {
         val q = question.trim().take(AiPrompts.MAX_QUESTION)
         if (q.length < 3 || !settings.aiEnabled || !settings.aiAsk) return
         askJob?.cancel()
@@ -161,7 +161,7 @@ class AiController(private val container: AppContainer, private val scope: Corou
                 return@launch
             }
             update(location.id) { it.copy(answer = AiTask(loading = true)) }
-            val result = attempt { container.ai.complete(config, AiPrompts.question(q, snapshot, placeFor(location, snapshot), settings.units, Instant.now(), location.longitude)) }
+            val result = attempt { container.ai.complete(config, AiPrompts.question(q, snapshot, placeFor(location, snapshot), settings.units, Instant.now(), location.longitude, extras)) }
             result.onSuccess { text -> update(location.id) { it.copy(answer = AiTask(AiReply(text, config.model, Instant.now(), "question"))) } }
                 .onFailure { e -> update(location.id) { it.copy(answer = AiTask(error = e.toUserMessage())) } }
         }

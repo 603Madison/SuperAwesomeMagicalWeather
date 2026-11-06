@@ -187,3 +187,32 @@ object AiText {
             .trim()
             .take(maxChars)
 }
+
+/**
+ * A short AI reply in the app's at-a-glance shape: a headline, up to three
+ * points and, for forecast discussions, a confidence level. Replies that
+ * don't follow the shape (older stored ones, small local models) keep their
+ * text as the headline.
+ */
+data class AiBrief(val headline: String, val points: List<String>, val confidence: Confidence? = null, val confidenceReason: String? = null) {
+    enum class Confidence(val label: String) { HIGH("High"), MEDIUM("Medium"), LOW("Low") }
+
+    companion object {
+        private val HEADLINE = Regex("(?im)^\\s*HEADLINE\\s*:\\s*(.+)$")
+        private val CONFIDENCE = Regex("(?im)^\\s*CONFIDENCE\\s*:\\s*(high|medium|low)\\b[\\s|:,.–-]*(.*)$")
+        private val POINT = Regex("(?m)^\\s*(?:[-•*]|\\d+[.)])\\s+(.+)$")
+
+        fun parse(text: String): AiBrief {
+            val headline = HEADLINE.find(text)?.groupValues?.get(1)?.trim()
+                ?: return AiBrief(text.trim(), emptyList())
+            val confidence = CONFIDENCE.find(text)
+            return AiBrief(
+                headline = headline.trimEnd('.'),
+                points = POINT.findAll(text).map { it.groupValues[1].trim().trimEnd('.') }
+                    .filter { it.isNotEmpty() && !it.startsWith("(") }.take(3).toList(),
+                confidence = confidence?.groupValues?.get(1)?.let { c -> Confidence.entries.firstOrNull { it.name.equals(c, ignoreCase = true) } },
+                confidenceReason = confidence?.groupValues?.get(2)?.trim()?.trimEnd('.')?.takeIf { it.isNotEmpty() },
+            )
+        }
+    }
+}

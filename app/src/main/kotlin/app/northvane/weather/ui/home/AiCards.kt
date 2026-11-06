@@ -41,6 +41,14 @@ import app.northvane.weather.data.AiReply
 import app.northvane.weather.ui.AiTask
 import app.northvane.weather.ui.AiUiState
 import app.northvane.weather.ui.TimeFormat
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.graphics.Color
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.remember
+import app.northvane.core.ai.AiBrief
+import app.northvane.weather.ui.components.WeatherCard
 
 /**
  * The National Weather Service forecasters' own discussion, rewritten in
@@ -53,15 +61,63 @@ internal fun ForecastersNotesCard(ai: AiUiState, time: TimeFormat, onRefresh: ()
     val office = ai.office ?: return
     if (task.reply == null && !task.loading && task.error == null) return
     val uri = LocalUriHandler.current
+    var more by rememberSaveable { mutableStateOf(false) }
     AiCardFrame(
         title = "Forecasters' notes",
         subtitle = task.reply?.sourceTime?.let { "NWS $office · issued ${time.smart(it)}" } ?: "NWS $office",
         action = { IconButton(onClick = onRefresh, enabled = !task.loading) { Icon(Icons.Filled.Refresh, contentDescription = "Check for a newer discussion") } },
     ) {
-        TaskText(task, waiting = "Reading the forecasters' discussion…")
-        if (task.reply != null) {
-            TextButton(onClick = { runCatching { uri.openUri("https://forecast.weather.gov/product.php?site=$office&issuedby=$office&product=AFD") } }) {
-                Text("Read the original")
+        val reply = task.reply
+        if (reply == null) {
+            TaskText(task, waiting = "Reading the forecasters' discussion…")
+        } else {
+            val brief = remember(reply.text) { AiBrief.parse(reply.text) }
+            Column(Modifier.padding(end = 12.dp)) {
+                Text(brief.headline, style = MaterialTheme.typography.titleMedium)
+                brief.confidence?.let { c ->
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                        ConfidenceChip(c)
+                        brief.confidenceReason?.let {
+                            Spacer(Modifier.width(8.dp))
+                            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                        }
+                    }
+                }
+                if (more) Points(brief.points, Modifier.padding(top = 8.dp))
+                task.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp)) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (brief.points.isNotEmpty()) TextButton(onClick = { more = !more }, contentPadding = PaddingValues(horizontal = 0.dp)) { Text(if (more) "Less" else "More") }
+                    TextButton(onClick = { runCatching { uri.openUri("https://forecast.weather.gov/product.php?site=$office&issuedby=$office&product=AFD") } }) {
+                        Text("Original")
+                    }
+                    Spacer(Modifier.weight(1f))
+                    AiCredit(reply)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConfidenceChip(c: AiBrief.Confidence) {
+    val color = when (c) {
+        AiBrief.Confidence.HIGH -> Color(0xFF2E9D5B)
+        AiBrief.Confidence.MEDIUM -> Color(0xFFD08A00)
+        AiBrief.Confidence.LOW -> Color(0xFFD9534F)
+    }
+    Surface(shape = RoundedCornerShape(50), color = color.copy(alpha = 0.16f)) {
+        Text("${c.label} confidence", style = MaterialTheme.typography.labelMedium, color = color, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
+    }
+}
+
+@Composable
+private fun Points(points: List<String>, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        points.forEach { p ->
+            Row {
+                Text("•", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(8.dp))
+                Text(p, style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
@@ -113,30 +169,21 @@ internal fun AskCard(ai: AiUiState, place: String, onAsk: (String) -> Unit, onCl
 
 @Composable
 private fun AiCardFrame(title: String, subtitle: String?, action: @Composable () -> Unit = {}, content: @Composable () -> Unit) {
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(start = 16.dp, top = 12.dp, end = 4.dp, bottom = 8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("✦ $title", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
-                    subtitle?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                }
-                action()
-            }
-            Spacer(Modifier.size(6.dp))
-            content()
-        }
+    WeatherCard("✦ $title", trailing = action) {
+        subtitle?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp)) }
+        content()
     }
 }
 
-/** The reply, a spinner while it's written, and any error; with a note on who wrote it. */
+/** The reply (as a headline and points when it has that shape), a spinner while it's written, and any error. */
 @Composable
 internal fun TaskText(task: AiTask, waiting: String) {
     Column(Modifier.padding(end = 12.dp)) {
-        task.reply?.let { Text(it.text, style = MaterialTheme.typography.bodyMedium) }
+        task.reply?.let { reply ->
+            val brief = remember(reply.text) { AiBrief.parse(reply.text) }
+            Text(brief.headline, style = if (brief.points.isEmpty()) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.titleSmall)
+            if (brief.points.isNotEmpty()) Points(brief.points, Modifier.padding(top = 6.dp))
+        }
         if (task.loading) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
                 CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
@@ -145,16 +192,17 @@ internal fun TaskText(task: AiTask, waiting: String) {
             }
         }
         task.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp)) }
-        task.reply?.let { AiCredit(it) }
+        task.reply?.let { Row(Modifier.padding(top = 6.dp)) { Spacer(Modifier.weight(1f)); AiCredit(it) } }
     }
 }
 
+/** Small and quiet: who wrote it and when. */
 @Composable
 private fun AiCredit(reply: AiReply) {
     Text(
-        "Written by AI (${reply.model}) · ${TimeFormat.ago(reply.createdAt)}. It can be wrong; official alerts come first.",
+        "✦ AI · ${TimeFormat.ago(reply.createdAt)}",
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 6.dp),
+        modifier = Modifier.semantics { contentDescription = "Written by AI (${reply.model}) ${TimeFormat.ago(reply.createdAt)}; it can be wrong, and official alerts come first" },
     )
 }

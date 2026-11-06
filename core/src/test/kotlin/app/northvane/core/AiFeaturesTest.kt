@@ -194,4 +194,17 @@ class AiFeaturesTest {
         assertTrue(request.user.contains("likely hidden") && request.user.contains("Wildfire smoke"), request.user)
         assertTrue(request.system.contains("northern lights"))
     }
+
+    @Test
+    fun parsesBriefReplies() {
+        val brief = app.northvane.core.ai.AiBrief.parse(
+            AiText.clean("**HEADLINE:** Soaking rain tonight, 1.5–2 in near the coast\n- Thunder possible this evening.\n- Drier and cooler Sunday afternoon\nCONFIDENCE: Medium | front position still uncertain"),
+        )
+        assertEquals("Soaking rain tonight, 1.5–2 in near the coast", brief.headline)
+        assertEquals(listOf("Thunder possible this evening", "Drier and cooler Sunday afternoon"), brief.points)
+        assertEquals(app.northvane.core.ai.AiBrief.Confidence.MEDIUM, brief.confidence)
+        assertEquals("front position still uncertain", brief.confidenceReason)
+        // Free text (an older stored reply, or a model that ignored the format) stays readable.
+        assertEquals("Rain tonight.", app.northvane.core.ai.AiBrief.parse("Rain tonight.").headline)
+    }
 }

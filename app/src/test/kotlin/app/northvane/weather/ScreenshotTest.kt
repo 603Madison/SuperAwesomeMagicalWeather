@@ -1,6 +1,7 @@
 package app.northvane.weather
 
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.runtime.Composable
@@ -466,6 +467,21 @@ class ScreenshotTest {
         save("outlook_water")
     }
 
+    /** Every card the app can show reaches the AI's question context. */
+    @Test
+    fun questionsCarryEverythingTheAppKnows() {
+        val snap = withStormSmokeAndWater(snapshot())
+        val settings = state(snap).settings.copy(laundryOutSince = null)
+        val now = Instant.now()
+        val extras = app.northvane.weather.ui.AiContext.extras(snap, settings, null, emptyList(), snap.latitude ?: location.latitude, now)
+        val q = app.northvane.core.ai.AiPrompts.question("How muddy are the trails?", snap, "Portland, ME", settings.units, now, location.longitude, extras)
+        File("build/outputs/ai_question_context.txt").apply { parentFile.mkdirs() }.writeText(q.system + "\n\n" + q.user)
+        listOf("Hourly", "Daily:", "Storm:", "Wildfire smoke", "River:", "Tides", "Air quality now", "UV index", "Pollen:", "Sun today",
+            "Clothes drying", "Fall foliage", "headline")
+            .forEach { assertTrue(it in q.user, "missing \"$it\"") }
+        assertTrue("trail mud" in q.system && "never say the app doesn't track" in q.system)
+    }
+
     /** The largest system font size: nothing on Today should clip or overlap. */
     @Test
     @Config(qualifiers = "w400dp-h2400dp-xxhdpi", fontScale = 1.6f)
@@ -592,18 +608,16 @@ class ScreenshotTest {
             office = "GYX",
             discussion = AiTask(
                 AiReply(
-                    "Steady rain spreads inland tonight, heaviest near the coast, where 1.5 to 2 inches is likely by Saturday night; " +
-                        "inland about an inch. Thunder is possible near the coast this evening. Colder air arrives Sunday, " +
-                        "enough for some snow on the highest peaks. Next week stays cool with only light showers, mostly in the mountains.\n" +
-                        "Confidence: high on the rain totals, lower on how much snow reaches the peaks.",
+                    "HEADLINE: Soaking rain tonight, 1.5 to 2 inches near the coast\n" +
+                        "- Thunder possible this evening\n- Cooler and drier by Sunday afternoon\n- Snow only on the highest peaks\n" +
+                        "CONFIDENCE: medium | front position still uncertain",
                     "claude-opus-5-5", now.minusSeconds(900), "afd-1", now.minusSeconds(3 * 3600),
                 ),
             ),
             question = "Can I paint the deck Saturday afternoon?",
             answer = AiTask(
                 AiReply(
-                    "Not Saturday: showers continue most of the afternoon (60 to 70% chance) and it stays damp. " +
-                        "Monday afternoon looks better, dry and 54°F with a light breeze.",
+                    "Not Saturday: showers most of the afternoon. Monday after 1 PM looks dry and 54°F.",
                     "claude-opus-5-5", now.minusSeconds(30), "question",
                 ),
             ),
@@ -616,7 +630,7 @@ class ScreenshotTest {
             }
         }
         compose.onNodeWithText("Forecasters' notes", substring = true).assertExists()
-        compose.onNodeWithText("Read the original").assertExists()
+        compose.onNodeWithText("Original").assertExists()
         save("today_ai_cards")
     }
 
@@ -629,15 +643,14 @@ class ScreenshotTest {
             it.copy(
                 settings = it.settings.copy(aiEnabled = true, aiProvider = AiProvider.CLAUDE, aiModel = "claude-opus-5-5"),
                 ai = AiUiState(alerts = mapOf(alert.id to AiTask(AiReply(
-                    "Heavy rain could cause flooding from Thursday 11 AM until Friday afternoon, across southeast New Mexico and West Texas. " +
-                        "Avoid low spots and flooded roads, and turn around if water covers the road.",
+                    "HEADLINE: Flooding possible from Thursday 11 AM to Friday afternoon\n- Avoid low spots and flooded roads\n- Turn around if water covers the road",
                     "claude-opus-5-5", Instant.now(), alert.id,
                 )))),
             )
         }
         render(dark = false) { AlertsScreen(st, onRefresh = {}, onOpenSettings = {}) }
         compose.onAllNodesWithText(alert.event)[0].performClick()
-        compose.onNodeWithText("Heavy rain could cause flooding", substring = true).assertExists()
+        compose.onNodeWithText("Flooding possible", substring = true).assertExists()
         save("alert_explained")
     }
 

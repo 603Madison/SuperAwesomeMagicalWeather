@@ -4,6 +4,7 @@ import app.northvane.core.model.UnitSystem
 import app.northvane.core.aurora.AuroraAdvisor
 import app.northvane.core.model.AuroraView
 import app.northvane.core.model.OutageLevel
+import app.northvane.core.outlook.BestWindow
 import app.northvane.core.outlook.OutlookText
 import app.northvane.core.outlook.StormTotals
 import app.northvane.core.radar.SmokeLevel
@@ -29,20 +30,20 @@ object AiPrompts {
 
     private const val PLAIN = "Write plain text for a phone screen: no markdown, headings or emoji."
 
-    /** The forecasters' discussion in plain words, for one place in the office's area. */
+    /** The forecasters' discussion, boiled down for one place in the office's area. */
     fun discussion(d: ForecastDiscussion, place: String, zone: ZoneId): AiRequest = AiRequest(
-        system = "You explain National Weather Service forecast discussions to people without a meteorology background. " +
-            "A discussion is the forecasters' own reasoning behind the forecast for a large area. " +
-            "Tell the reader what the forecasters expect at their place over the next few days, how confident they are, " +
-            "and what could still change. Where the discussion treats parts of the area differently (coast, foothills, " +
-            "mountains, north and south), use what applies to the reader's place and leave out the rest; never comment on " +
-            "what you know or don't know about their location. Translate jargon (QPF, PTYPE, shortwave, upslope and so on) " +
-            "into everyday words, and skip marine and fire-weather detail unless it changes things on land. " +
-            "Keep it short: at most 4 sentences and 70 words, then one line that starts with \"Confidence:\" giving high, " +
-            "medium or low and the reason in under 15 words. " + PLAIN,
+        system = "You boil National Weather Service forecast discussions down for people at a glance. A discussion is the " +
+            "forecasters' reasoning for a large area; keep only what matters at the reader's place over the next few days, " +
+            "how sure the forecasters are, and what could change. Where the discussion treats parts of the area differently " +
+            "(coast, foothills, mountains), use the part that fits the reader's place and drop the rest. Use everyday words, no jargon. " +
+            "Reply in exactly this format and nothing else:\n" +
+            "HEADLINE: the one thing to know, under 14 words\n" +
+            "- a supporting point, under 12 words\n" +
+            "- (one to three of these)\n" +
+            "CONFIDENCE: high, medium or low | the reason in under 8 words",
         user = "The reader is in $place. Discussion from NWS ${d.office}, issued ${stamp(d.issued, zone)} local time:\n\n" +
             "<discussion>\n${d.text}\n</discussion>",
-        replyTokens = 300,
+        replyTokens = 200,
         effort = AiEffort.LOW,
     )
 
@@ -51,8 +52,11 @@ object AiPrompts {
         system = "You rewrite National Weather Service alerts so they are quick to understand. " +
             "Say what is expected, when it matters (in the reader's local time), and the one or two things worth doing about it. " +
             "If the alert says it applies only to part of its area (the coast, higher elevations, a county) and the reader's place " +
-            "may be outside that part, say so. Keep every number and time from the alert; add none of your own. " +
-            "Use at most 3 short sentences and 60 words. " + PLAIN,
+            "may be outside that part, say so. Keep the alert's numbers and times; add none of your own. " +
+            "Reply in exactly this format and nothing else:\n" +
+            "HEADLINE: what happens and when at the reader's place, under 16 words\n" +
+            "- one thing to do, under 10 words\n" +
+            "- (at most two of these)",
         user = buildString {
             appendLine("The reader is in $place. It is now ${stamp(now, zone)} local time.")
             appendLine("<alert>")
@@ -65,23 +69,34 @@ object AiPrompts {
             a.instruction?.let { appendLine("Instructions:\n${it.trim().take(1500)}") }
             append("</alert>")
         },
-        replyTokens = 300,
+        replyTokens = 160,
         effort = AiEffort.LOW,
     )
 
     /** A question about the forecast, answered from the forecast itself. */
-    fun question(question: String, s: WeatherSnapshot, place: String, units: UnitSystem, now: Instant, longitude: Double? = null): AiRequest = AiRequest(
+    fun question(
+        question: String,
+        s: WeatherSnapshot,
+        place: String,
+        units: UnitSystem,
+        now: Instant,
+        longitude: Double? = null,
+        /** The app's outlooks that depend on the user's own settings (garden, heating, allergies…), already written out. */
+        extras: String = "",
+    ): AiRequest = AiRequest(
         system = "You answer questions about the weather in a phone weather app. Answer from the data given: the forecast and the " +
-            "app's own outlooks (northern lights, wildfire smoke, air quality, pollen, rivers and tides, storm totals, power outage " +
-            "and frozen pipe risk, frost and black ice, outdoor activity scores). It is the only information you have; when one of " +
-            "the outlooks answers the question, use it. Be direct: lead with the answer, give the times and numbers that " +
+            "app's own outlooks: northern lights, wildfire smoke, air quality, UV, pollen and allergies, trail mud, fall foliage, rivers " +
+            "and tides, storm totals, power outage and frozen pipe risk, frost and black ice, outdoor activities with their best " +
+            "hours, recent rain, and whatever the reader set up (garden, heating, clothes drying, maple sap, burn days). It is the " +
+            "only information you have; when one of these answers the question, use it, and never say the app doesn't track " +
+            "something that appears below. Be direct: lead with the answer, give the times and numbers that " +
             "support it, and suggest a better time if the one asked about looks poor. If the forecast doesn't cover what was asked " +
             "(too far ahead, or something it doesn't measure), say so plainly. If the question isn't about the weather or " +
             "planning around it, say that you can only help with the forecast. " +
-            "Use at most 4 short sentences and 80 words. " + PLAIN,
-        user = "<forecast>\n${forecastData(s, place, units, now)}\n${outlooks(s, units, now, longitude).ifEmpty { "No other outlooks." }}\n</forecast>\n\n" +
+            "Answer in one or two short sentences, under 40 words. " + PLAIN,
+        user = "<forecast>\n${forecastData(s, place, units, now)}\n${outlooks(s, units, now, longitude).ifEmpty { "No other outlooks." }}\n${extras.trim()}\n</forecast>\n\n" +
             "Question: ${question.trim().take(MAX_QUESTION)}",
-        replyTokens = 450,
+        replyTokens = 200,
         effort = AiEffort.MEDIUM,
     )
 
@@ -196,15 +211,75 @@ object AiPrompts {
                 }
                 w.waterTempC?.let { appendLine("Water temperature ${f.temperatureWithUnit(it)}.") }
             }
+            s.current?.let { c ->
+                val extra = listOfNotNull(
+                    c.dewpointC?.let { "dew point ${f.temperatureWithUnit(it)}" },
+                    c.pressureHpa?.let { "pressure ${f.pressure(it)}" },
+                    c.visibilityKm?.let { "visibility ${f.visibility(it)}" },
+                    c.rainTodayMm?.let { "rain so far today ${f.precipitation(it)}" },
+                    c.stationName?.let { "station $it" },
+                )
+                if (extra.isNotEmpty()) appendLine("Conditions now also: ${extra.joinToString(", ")}.")
+            }
+            if (s.sunrise != null || s.sunset != null) {
+                appendLine("Sun today: " + listOfNotNull(s.sunrise?.let { "rises ${hour.format(it)}" }, s.sunset?.let { "sets ${hour.format(it)}" }).joinToString(", ") + ".")
+            }
+            s.airQuality?.current?.let { appendLine("Air quality now: AQI ${it.aqi} (${it.category.label})" + (it.pollutant?.let { p -> ", mainly $p" } ?: "") + ".") }
+            s.uv?.let { uv ->
+                val peak = uv.peak()
+                appendLine("UV index: now ${uv.at(now)?.let { "%.0f".format(Locale.ROOT, it) } ?: "unknown"}" +
+                    (uv.todayMax?.let { ", today's peak ${"%.0f".format(Locale.ROOT, it)}" } ?: "") +
+                    (peak?.let { " around ${hour.format(it.time)}" } ?: "") + ".")
+            }
+            s.history?.let { h ->
+                val recent = h.days.sortedBy { it.date }.takeLast(7)
+                val rain = recent.mapNotNull { it.precipMm }
+                if (rain.isNotEmpty()) appendLine("Observed rain and melted snow over the last ${recent.size} days: ${f.precipitation(rain.sum())}.")
+                h.snowDepthMm?.takeIf { it > 0 }?.let { appendLine("Snow on the ground: about ${f.snow(it)}" + (h.snowDepthStation?.let { st -> " (reported at $st)" } ?: "") + ".") }
+            }
+            val mudDays = s.daily.filter { !it.date.isBefore(today) && it.mud != null }.take(5)
+            if (mudDays.isNotEmpty()) {
+                appendLine(
+                    "Trail mud (the app's estimate from observed and forecast rain, snowmelt and thaw): " +
+                        mudDays.joinToString("; ") { d ->
+                            val m = d.mud!!
+                            val why = m.reasons.take(2).joinToString(", ") { r -> r.kind.name.lowercase().replace('_', ' ') }
+                            "${day.format(d.date)} ${m.level.label.lowercase()}" + (if (why.isNotEmpty()) " ($why)" else "")
+                        } + if (mudDays.any { it.mud!!.mudSeason }) "; spring mud season." else ".",
+                )
+            }
+            s.foliage?.let { fo ->
+                fo.today?.let { t ->
+                    appendLine(
+                        "Fall foliage (the app's estimate): ${t.stage.label.lowercase()}, about ${t.colorPercent}% color; estimated peak ${day.format(fo.estimatedPeak)} ${fo.estimatedPeak}" +
+                            (fo.days.filter { it.leafDrop }.takeIf { it.isNotEmpty() }?.let { d -> "; wind or rain may strip leaves ${d.joinToString(", ") { day.format(it.date) }}" } ?: "") + ".",
+                    )
+                }
+            }
             s.daily.filter { !it.date.isBefore(today) }.take(7).forEach { d ->
                 val notes = buildList {
-                    d.outageRisk?.takeIf { it.level >= OutageLevel.ELEVATED }?.let { add("power outage risk ${it.level.label.lowercase()}") }
-                    d.pipeRisk?.takeIf { it.level >= OutageLevel.ELEVATED }?.let { add("frozen pipe risk ${it.level.label.lowercase()}") }
+                    d.outageRisk?.let { add("power outage risk ${it.level.label.lowercase()}") }
+                    d.pipeRisk?.let { add("frozen pipe risk ${it.level.label.lowercase()}") }
                     d.morningIce?.frost?.let { add("morning frost ${it.label}") }
                     d.morningIce?.blackIce?.let { add("black ice ${it.label}") }
-                    d.activities.takeIf { it.isNotEmpty() }?.let { a -> add("activity scores " + a.joinToString(", ") { "${it.label} ${it.score}" }) }
+                    d.activities.takeIf { it.isNotEmpty() }?.let { list ->
+                        add(
+                            "activities: " + list.joinToString(", ") { a ->
+                                val window = BestWindow.find(a.activity, s.hourly, d.date, zone, now)
+                                    ?.let { w -> " best ${hour.format(w.start)} to ${hour.format(w.end)}" }.orEmpty()
+                                val why = a.tips.firstOrNull()?.let { " (${OutlookText.tip(it, f)})" }.orEmpty()
+                                "${a.label} ${a.score}/100$window$why"
+                            },
+                        )
+                    }
                 }
                 if (notes.isNotEmpty()) appendLine("${day.format(d.date)}: ${notes.joinToString("; ")}.")
+            }
+            // The National Weather Service's own words for the next few periods.
+            s.daily.filter { !it.date.isBefore(today) }.take(4).forEach { d ->
+                listOfNotNull(d.dayDetail?.let { "day" to it }, d.nightDetail?.let { "night" to it }).forEach { (part, text) ->
+                    appendLine("NWS ${day.format(d.date)} $part: ${text.trim().take(300)}")
+                }
             }
         }.trim()
     }

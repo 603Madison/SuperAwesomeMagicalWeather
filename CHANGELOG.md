@@ -5,6 +5,15 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-11-06
+
+### Changed
+- **AI replies are short and scannable.** Forecasters' notes are one headline with a High/Medium/Low confidence chip; the supporting points are behind **More**. Alert explanations are one line plus at most two things to do, and answers are one or two sentences. The "written by AI" note is a small "✦ AI · 3 min ago" (the full note is read out by TalkBack).
+- The AI cards use the same card style as the rest of Today, with the ⋮ menu to move or hide them.
+
+### Fixed
+- **If it's in the app, the AI can use it.** Questions now also get trail mud, recent rain and snow on the ground, fall foliage, UV and air quality right now, sunrise and sunset, the National Weather Service's own forecast wording, each activity's best hours and what decides its score, the app's headline and 15-minute rain, frost dates, and what you've set up: your allergy score, garden (planting, harvest, frost nights, watering), heating, clothes drying, maple sap and burn days. The model is told never to say the app doesn't track something it does.
+
 ## [2.0.0] - 2026-11-06
 
 A polish release: Today shows less, louder when it matters, and the traffic feature is gone.
