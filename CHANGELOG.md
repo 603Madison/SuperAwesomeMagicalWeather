@@ -5,6 +5,11 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.9.2] - 2026-11-06
+
+### Fixed
+- **Ask about the forecast knows what the app knows.** Questions used to get only the forecast, so "when are we getting northern lights?" was answered with "the forecast doesn't cover that" right above the aurora card. Questions now also get the app's own outlooks: northern lights (Kp, best time, clouds), storm totals, wildfire smoke, air quality and pollen forecasts, the nearest river and tides, power outage and frozen pipe risk, frost and black ice, and activity scores.
+
 ## [1.9.1] - 2026-11-06
 
 ### Fixed

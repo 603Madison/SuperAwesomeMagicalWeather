@@ -1,0 +1,1 @@
+Fixed: Ask about the forecast now uses the app's own outlooks too (northern lights, smoke, air quality, pollen, rivers and tides, storm totals, outage and pipe risk, frost, activities).

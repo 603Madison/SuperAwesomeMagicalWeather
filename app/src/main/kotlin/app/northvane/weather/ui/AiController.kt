@@ -161,7 +161,7 @@ class AiController(private val container: AppContainer, private val scope: Corou
                 return@launch
             }
             update(location.id) { it.copy(answer = AiTask(loading = true)) }
-            val result = attempt { container.ai.complete(config, AiPrompts.question(q, snapshot, placeFor(location, snapshot), settings.units, Instant.now())) }
+            val result = attempt { container.ai.complete(config, AiPrompts.question(q, snapshot, placeFor(location, snapshot), settings.units, Instant.now(), location.longitude)) }
             result.onSuccess { text -> update(location.id) { it.copy(answer = AiTask(AiReply(text, config.model, Instant.now(), "question"))) } }
                 .onFailure { e -> update(location.id) { it.copy(answer = AiTask(error = e.toUserMessage())) } }
         }

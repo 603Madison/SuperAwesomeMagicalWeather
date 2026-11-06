@@ -170,4 +170,28 @@ class AiFeaturesTest {
         assertEquals("• One\n• Two", AiText.clean("<think>hm</think>\n- One\n* Two"))
         assertEquals("Hi", AiText.clean("## Hi\n\n\n\n"))
     }
+
+    @Test
+    fun questionsSeeTheAppsOwnOutlooks() {
+        val now = Instant.parse("2026-11-06T21:00:00Z")
+        val hours = (0 until 30).map { i ->
+            app.northvane.core.model.HourlyForecast(
+                time = now.plusSeconds(3600L * i), temperatureC = 8.0, condition = app.northvane.core.model.WeatherCondition.OVERCAST,
+                isDaytime = false, shortForecast = "Cloudy", precipitationChance = 10, windSpeedKph = 8.0, windDirection = "N",
+                humidityPercent = 80.0, skyCoverPercent = 92,
+            )
+        }
+        val kp = app.northvane.core.model.KpForecast(
+            (0 until 8).map { i -> app.northvane.core.model.KpPoint(now.plusSeconds(3L * 3600 * i), 5.3, app.northvane.core.model.KpPoint.Kind.PREDICTED) },
+            now,
+        )
+        val snapshot = app.northvane.core.model.WeatherSnapshot(
+            locationId = "p", fetchedAt = now, timeZoneId = "America/New_York", hourly = hours, latitude = 43.66, aurora = kp,
+            smoke = app.northvane.core.radar.SmokeOutlook(now, now, listOf(app.northvane.core.radar.SmokeHour(now.plusSeconds(7200), 40.0))),
+        )
+        val request = AiPrompts.question("When are we getting northern lights?", snapshot, "Portland, ME", app.northvane.core.model.UnitSystem.IMPERIAL, now, longitude = -70.26)
+        assertTrue(request.user.contains("Northern lights (NOAA Kp forecast):") && request.user.contains("Tonight: Kp 5.3"), request.user)
+        assertTrue(request.user.contains("likely hidden") && request.user.contains("Wildfire smoke"), request.user)
+        assertTrue(request.system.contains("northern lights"))
+    }
 }

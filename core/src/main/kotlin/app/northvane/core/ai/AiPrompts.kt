@@ -1,6 +1,12 @@
 package app.northvane.core.ai
 
 import app.northvane.core.model.UnitSystem
+import app.northvane.core.aurora.AuroraAdvisor
+import app.northvane.core.model.AuroraView
+import app.northvane.core.model.OutageLevel
+import app.northvane.core.outlook.OutlookText
+import app.northvane.core.outlook.StormTotals
+import app.northvane.core.radar.SmokeLevel
 import app.northvane.core.model.WeatherAlert
 import app.northvane.core.model.WeatherSnapshot
 import app.northvane.core.nws.ForecastDiscussion
@@ -64,14 +70,17 @@ object AiPrompts {
     )
 
     /** A question about the forecast, answered from the forecast itself. */
-    fun question(question: String, s: WeatherSnapshot, place: String, units: UnitSystem, now: Instant): AiRequest = AiRequest(
-        system = "You answer questions about the weather forecast in a phone weather app. Answer from the forecast data given; " +
-            "it is the only weather information you have. Be direct: lead with the answer, give the times and numbers that " +
+    fun question(question: String, s: WeatherSnapshot, place: String, units: UnitSystem, now: Instant, longitude: Double? = null): AiRequest = AiRequest(
+        system = "You answer questions about the weather in a phone weather app. Answer from the data given: the forecast and the " +
+            "app's own outlooks (northern lights, wildfire smoke, air quality, pollen, rivers and tides, storm totals, power outage " +
+            "and frozen pipe risk, frost and black ice, outdoor activity scores). It is the only information you have; when one of " +
+            "the outlooks answers the question, use it. Be direct: lead with the answer, give the times and numbers that " +
             "support it, and suggest a better time if the one asked about looks poor. If the forecast doesn't cover what was asked " +
             "(too far ahead, or something it doesn't measure), say so plainly. If the question isn't about the weather or " +
             "planning around it, say that you can only help with the forecast. " +
             "Use at most 4 short sentences and 80 words. " + PLAIN,
-        user = "<forecast>\n${forecastData(s, place, units, now)}\n</forecast>\n\nQuestion: ${question.trim().take(MAX_QUESTION)}",
+        user = "<forecast>\n${forecastData(s, place, units, now)}\n${outlooks(s, units, now, longitude).ifEmpty { "No other outlooks." }}\n</forecast>\n\n" +
+            "Question: ${question.trim().take(MAX_QUESTION)}",
         replyTokens = 450,
         effort = AiEffort.MEDIUM,
     )
@@ -124,6 +133,79 @@ object AiPrompts {
             }
             s.airQuality?.current?.let { appendLine("Air quality index ${it.aqi} (${it.category.label}).") }
             s.uv?.todayMax?.let { appendLine("UV index today up to ${it.toInt()}.") }
+        }.trim()
+    }
+
+    /**
+     * The app's own outlooks, as compact lines: everything a card on the
+     * Today or Outlook tab could tell the reader, so an answer never says
+     * "the forecast doesn't cover that" when the app does.
+     */
+    fun outlooks(s: WeatherSnapshot, units: UnitSystem, now: Instant, longitude: Double? = null): String {
+        val zone = runCatching { ZoneId.of(s.timeZoneId) }.getOrDefault(ZoneId.systemDefault())
+        val f = UnitFormatter(units)
+        val hour = DateTimeFormatter.ofPattern("EEE h a", Locale.US).withZone(zone)
+        val day = DateTimeFormatter.ofPattern("EEE", Locale.US)
+        val today = now.atZone(zone).toLocalDate()
+        return buildString {
+            val lat = s.latitude
+            val aurora = s.aurora
+            if (aurora != null && lat != null && longitude != null) {
+                val report = AuroraAdvisor.report(aurora, lat, longitude, s.hourly, zone, now)
+                if (report.nights.isNotEmpty()) {
+                    appendLine("Northern lights (NOAA Kp forecast):")
+                    if (report.nowView != AuroraView.NONE) appendLine("Right now: ${report.nowView.label.lowercase()} (Kp ${report.nowKp}).")
+                    report.nights.forEach { n ->
+                        val name = if (n.date == today) "Tonight" else "${day.format(n.date)} night"
+                        append("$name: Kp ${"%.1f".format(Locale.ROOT, n.maxKp)}, ${n.view.label.lowercase()}")
+                        n.peakAt?.let { append(", best around ${hour.format(it)}") }
+                        n.cloudPercent?.let { append(", cloud cover about $it%" + if (it >= 85) " (likely hidden)" else "") }
+                        appendLine(".")
+                    }
+                }
+            }
+            StormTotals.find(s.hourly, s.daily, s.alerts, now, zone)?.let { st ->
+                append("Storm: ${st.title}")
+                if (st.start != null && st.end != null) append(" from ${hour.format(st.start)} to ${hour.format(st.end)}")
+                if (st.snowMm >= 5) append(", snow about ${f.snow(st.snowMm)}")
+                if (st.iceMm >= 0.5) append(", ice about ${f.precipitation(st.iceMm)}")
+                if (st.rainMm >= 2) append(", rain about ${f.precipitation(st.rainMm)}")
+                appendLine(".")
+            }
+            s.smoke?.peak?.let { p ->
+                val level = SmokeLevel.of(p.microgramsPerM3)
+                if (level != SmokeLevel.NONE) appendLine("Wildfire smoke: ${level.label.lowercase()}, worst around ${hour.format(p.time)}.")
+            }
+            s.airQuality?.days?.filter { !it.date.isBefore(today) }?.take(3)?.takeIf { it.isNotEmpty() }?.let { days ->
+                appendLine("Air quality forecast: " + days.joinToString("; ") { d -> "${day.format(d.date)} " + (d.aqi?.let { "AQI $it " } ?: "") + (d.category?.label ?: "") })
+            }
+            s.pollen?.days?.take(3)?.takeIf { it.isNotEmpty() }?.let { days ->
+                appendLine("Pollen: " + days.joinToString("; ") { d -> "${day.format(d.date)} " + (d.worst?.let { "${it.name.lowercase()} ${OutlookText.pollenCategory(it.index).lowercase()}" } ?: "none") })
+            }
+            s.water?.let { w ->
+                w.river?.let { r ->
+                    append("River: ${r.name}")
+                    r.gageHeightFt?.let { append(", height ${f.height(it * 0.3048)}") }
+                    r.dischargeCfs?.let { append(", flow ${f.discharge(it)}") }
+                    append(if (r.rising) ", rising" else ", steady or falling")
+                    appendLine(".")
+                }
+                w.tide?.let { t ->
+                    val next = t.events.filter { it.time.isAfter(now) }.take(4)
+                    if (next.isNotEmpty()) appendLine("Tides at ${t.name}: " + next.joinToString(", ") { e -> "${if (e.high) "high" else "low"} ${hour.format(e.time)}" } + ".")
+                }
+                w.waterTempC?.let { appendLine("Water temperature ${f.temperatureWithUnit(it)}.") }
+            }
+            s.daily.filter { !it.date.isBefore(today) }.take(7).forEach { d ->
+                val notes = buildList {
+                    d.outageRisk?.takeIf { it.level >= OutageLevel.ELEVATED }?.let { add("power outage risk ${it.level.label.lowercase()}") }
+                    d.pipeRisk?.takeIf { it.level >= OutageLevel.ELEVATED }?.let { add("frozen pipe risk ${it.level.label.lowercase()}") }
+                    d.morningIce?.frost?.let { add("morning frost ${it.label}") }
+                    d.morningIce?.blackIce?.let { add("black ice ${it.label}") }
+                    d.activities.takeIf { it.isNotEmpty() }?.let { a -> add("activity scores " + a.joinToString(", ") { "${it.label} ${it.score}" }) }
+                }
+                if (notes.isNotEmpty()) appendLine("${day.format(d.date)}: ${notes.joinToString("; ")}.")
+            }
         }.trim()
     }
 
