@@ -80,6 +80,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.northvane.core.alerts.AlertClassifier
 import app.northvane.core.model.CurrentConditions
 import app.northvane.core.model.DailyForecast
@@ -973,7 +974,18 @@ private fun Onboarding(
     ) {
         WeatherIcon(WeatherCondition.PARTLY_CLOUDY, isDay = true, size = 96.dp)
         Spacer(Modifier.height(16.dp))
-        Text("Welcome to SuperAwesomeMagicalWeather", style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+        Text("Welcome to", style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+        // One line however wide the screen: the name never breaks mid-word.
+        Text(
+            "SuperAwesomeMagicalWeather",
+            style = MaterialTheme.typography.headlineSmall,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(
+                minFontSize = 14.sp,
+                maxFontSize = MaterialTheme.typography.headlineSmall.fontSize,
+            ),
+        )
         Spacer(Modifier.height(8.dp))
         Text(
             "Free forecasts, radar and alerts from the National Weather Service, with optional data from your own WeeWX station.",
