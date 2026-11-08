@@ -1,36 +1,52 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 // Platform-independent data layer: API clients, parsing, source fallback,
-// radar frame math and network security policy. Kept free of Android APIs so
-// it can be unit tested on a plain JVM.
+// radar frame math, outlooks and AI prompts. Shared by the Android apps (JVM)
+// and the iPhone app (iOS); unit tested on a plain JVM.
 plugins {
-    alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.kotlin.serialization)
 }
 
-java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
-}
-
 kotlin {
+    jvm {
+        compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
+    }
+    iosArm64()
+    iosSimulatorArm64()
+
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+        optIn.add("kotlin.time.ExperimentalTime")
+        optIn.add("kotlin.io.encoding.ExperimentalEncodingApi")
+    }
+
+    sourceSets {
+        commonMain.dependencies {
+            api(libs.kotlinx.coroutines.core)
+            api(libs.kotlinx.serialization.json)
+            api(libs.kotlinx.datetime)
+            api(libs.kotlinx.io.core)
+            implementation(libs.atomicfu)
+        }
+        jvmMain.dependencies {
+            api(libs.okhttp)
+            implementation(libs.anthropic.java)
+        }
+        iosMain.dependencies {
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.darwin)
+        }
+        jvmTest.dependencies {
+            implementation(libs.kotlin.test.junit)
+            implementation(libs.junit)
+            implementation(libs.kotlinx.coroutines.test)
+        }
     }
 }
 
-dependencies {
-    api(libs.kotlinx.coroutines.core)
-    api(libs.kotlinx.serialization.json)
-    api(libs.okhttp)
-    implementation(libs.anthropic.java)
 
-    testImplementation(libs.kotlin.test.junit)
-    testImplementation(libs.junit)
-    testImplementation(libs.kotlinx.coroutines.test)
-}
-
-tasks.test {
-    // Opt-in tests against the live weather services: ./gradlew :core:test -Pnorthvane.live=true
+tasks.named<Test>("jvmTest") {
+    // Opt-in tests against the live weather services: ./gradlew :core:jvmTest -Pnorthvane.live=true
     systemProperty("northvane.live", providers.gradleProperty("northvane.live").getOrElse("false"))
 }
