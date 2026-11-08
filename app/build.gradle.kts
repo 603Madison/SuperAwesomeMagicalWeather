@@ -20,6 +20,9 @@ fun signingValue(property: String, env: String): String? =
 val keystorePath = signingValue("storeFile", "RELEASE_KEYSTORE_FILE")
 
 android {
+    // Also lint :shared and :ui, the multiplatform modules this app's screens live in.
+    lint { checkDependencies = true }
+
     namespace = "app.northvane.weather"
     compileSdk = 37
 

@@ -213,7 +213,7 @@ platform 37.
 ./gradlew :core:jvmTest                    # data layer and security tests
 ./gradlew :app:testDebugUnitTest        # app tests; renders screenshots to app/build/outputs/screenshots
 ./gradlew :mini:testDebugUnitTest       # Mini tests, driven by keys only
-./gradlew :app:lintDebug :ui:lintDebug :mini:lintDebug
+./gradlew :app:lintDebug :mini:lintDebug
 ./gradlew :app:assembleDebug :mini:assembleDebug   # installable debug APKs
 ./gradlew :core:jvmTest -Pnorthvane.live=true          # also hit the real NWS, NOAA and IEM services
 ```
