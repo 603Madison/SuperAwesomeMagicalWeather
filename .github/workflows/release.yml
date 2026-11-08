@@ -30,6 +30,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    outputs:
+      commit: ${{ steps.pick.outputs.commit }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -41,6 +43,7 @@ jobs:
       # Inputs reach the script only through env and are checked before use, so a
       # crafted version or commit can't run commands.
       - name: Pick commit and check version
+        id: pick
         env:
           INPUT_COMMIT: ${{ inputs.commit }}
           EVENT_SHA: ${{ github.sha }}
@@ -81,6 +84,7 @@ jobs:
             fi
           done
           echo "COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
@@ -167,6 +171,35 @@ jobs:
               --latest=$([ "$TAG" = "$newest" ] && echo true || echo false) \
               $(echo "$TAG" | grep -q -- '-' && echo --prerelease)
           fi
+
+  # The iPhone app from the same commit, as an unsigned .ipa (see docs/IOS.md).
+  ios:
+    needs: release
+    uses: ./.github/workflows/ios.yml
+    with:
+      ref: ${{ needs.release.outputs.commit }}
+      version: ${{ inputs.version || github.ref_name }}
+
+  ios-publish:
+    needs: [release, ios]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ios-ipa
+      - name: Attach the .ipa to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ls SuperAwesomeMagicalWeather-*.ipa
+          # Add its checksum to the release's list next to the APKs'.
+          gh release download "$TAG" --pattern SHA256SUMS.txt --clobber
+          grep -v '\.ipa$' SHA256SUMS.txt > sums.txt || true
+          sha256sum SuperAwesomeMagicalWeather-*.ipa >> sums.txt
+          mv sums.txt SHA256SUMS.txt
+          gh release upload "$TAG" SuperAwesomeMagicalWeather-*.ipa SHA256SUMS.txt --clobber
 
   # Updates the F-Droid repository on GitHub Pages with the new release.
   fdroid-repo:

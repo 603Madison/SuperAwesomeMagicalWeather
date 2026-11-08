@@ -101,6 +101,8 @@ class MiniKeysTest {
         }
         scenario = ActivityScenario.launch(MainActivity::class.java)
         compose.waitForIdle()
+        // The saved forecast loads off the main thread, which waitForIdle doesn't wait for.
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Light rain").fetchSemanticsNodes().isNotEmpty() }
     }
 
     @After

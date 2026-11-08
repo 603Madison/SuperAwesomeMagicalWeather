@@ -207,7 +207,6 @@ class IosConnectivity : Connectivity {
                 // Low Data Mode and satellite links report as constrained; cellular and hotspots as expensive.
                 constrained = nw_path_is_constrained(path),
                 metered = nw_path_is_expensive(path),
-                dataSaver = nw_path_is_constrained(path),
             )
         }
         nw_path_monitor_set_queue(monitor, dispatch_get_main_queue())

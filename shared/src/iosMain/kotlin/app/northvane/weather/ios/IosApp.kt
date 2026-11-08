@@ -101,6 +101,8 @@ class IosPlatform : Platform {
 
     override fun syncReminders(settings: AppSettings) = IosApp.bookReminders()
 
+    override val frequentBackgroundChecks = false
+
     override fun is24HourClock(): Boolean = is24Hour()
 }
 

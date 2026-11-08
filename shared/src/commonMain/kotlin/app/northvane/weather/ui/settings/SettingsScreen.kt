@@ -205,7 +205,13 @@ private fun AppearancePage(state: MainUiState, container: AppContainer, onBack: 
             )
         }
         SectionCard("Home-screen widget") {
-            Hint("Long-press your home screen, tap Widgets and pick SuperAwesomeMagicalWeather. It shows the place on your Today screen and updates about every hour.")
+            Hint(
+                if (LocalPlatform.current.name == "iOS") {
+                    "Touch and hold your Home Screen or Lock Screen, tap Edit › Add Widget and pick SuperAwesomeMagicalWeather. It shows the place on your Today screen."
+                } else {
+                    "Long-press your home screen, tap Widgets and pick SuperAwesomeMagicalWeather. It shows the place on your Today screen and updates about every hour."
+                },
+            )
         }
     }
 }
@@ -278,7 +284,7 @@ private fun TodayPage(state: MainUiState, container: AppContainer, onBack: () ->
             LabeledSwitch("Black ice & frost", s.morningIceEnabled, { on -> update { setMorningIce(on) } },
                 subtitle = "Icy roads and frosty windshields that morning")
         }
-        if (s.auroraEnabled) {
+        if (s.auroraEnabled && container.platform.frequentBackgroundChecks) {
             SectionCard("Aurora") {
                 LabeledSwitch("Aurora notifications", s.auroraNotify, { on ->
                     if (on) askForNotifications()
@@ -422,10 +428,12 @@ private fun AlertsPage(state: MainUiState, container: AppContainer, onBack: () -
                     app.northvane.core.time.DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "h:mm a").format(t)
                 }, { m -> updateDaily { setTonightMinutes(m) } })
             }
-            LabeledSwitch("Rain starting soon", s.rainSoonEnabled, { on ->
-                if (on) askIfNeeded()
-                updateDaily { setRainSoon(on) }
-            }, subtitle = "A heads-up up to an hour before rain or snow starts, for places with notifications on. Never 10 PM–6 AM")
+            if (container.platform.frequentBackgroundChecks) {
+                LabeledSwitch("Rain starting soon", s.rainSoonEnabled, { on ->
+                    if (on) askIfNeeded()
+                    updateDaily { setRainSoon(on) }
+                }, subtitle = "A heads-up up to an hour before rain or snow starts, for places with notifications on. Never 10 PM–6 AM")
+            }
         }
         if (s.alertsEnabled) {
             SectionCard("Notify me about") {
@@ -448,7 +456,7 @@ private fun AlertsPage(state: MainUiState, container: AppContainer, onBack: () -
                 }
             }
             SectionCard("Test") {
-                Hint("Android may delay background checks to save battery. Warnings use a high-priority channel; adjust sounds per channel in system settings.")
+                Hint(if (LocalPlatform.current.name == "iOS") "iOS decides when background checks run, usually within the hour, and the app checks whenever you open it. Warnings are time-sensitive notifications." else "Android may delay background checks to save battery. Warnings use a high-priority channel; adjust sounds per channel in system settings.")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     FilledTonalButton(onClick = {
                         val sent = container.platform.notifications.sendTest(state.selected?.id, state.selected?.displayName)
@@ -501,11 +509,13 @@ private fun SatellitePage(state: MainUiState, container: AppContainer, onBack: (
                 "Show stale data", s.showStaleData, { on -> update { setShowStaleData(on) } },
                 subtitle = "In Backwoods mode, cards (and tabs) with data over 12 hours old are hidden. Turn this on to show them anyway.",
             )
-            LabeledSwitch(
-                "Also when Android limits this app's data", s.followRestrictedData, { on -> update { setFollowRestrictedData(on) } },
-                subtitle = "Android reports Data Saver and a switched-off \"Background data\" for this app the same way. " +
-                    "Turn this off if Background data is off on purpose and Backwoods mode keeps turning on.",
-            )
+            if (LocalPlatform.current.name != "iOS") {
+                LabeledSwitch(
+                    "Also when Android limits this app's data", s.followRestrictedData, { on -> update { setFollowRestrictedData(on) } },
+                    subtitle = "Android reports Data Saver and a switched-off \"Background data\" for this app the same way. " +
+                        "Turn this off if Background data is off on purpose and Backwoods mode keeps turning on.",
+                )
+            }
         }
         SectionCard("Allowed in Backwoods mode") {
             SatelliteGroup.entries.forEach { group ->

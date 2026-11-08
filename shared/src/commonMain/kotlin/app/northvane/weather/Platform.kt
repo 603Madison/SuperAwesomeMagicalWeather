@@ -62,6 +62,9 @@ interface Platform {
     /** The signing certificate's SHA-1, shown when setting up a key restricted to this app. */
     fun signingSha1(): String? = null
 
+    /** Whether the app can wake often enough for short-notice heads-ups (rain starting soon, northern lights now). */
+    val frequentBackgroundChecks: Boolean get() = true
+
     /** Whether times show as 13:00 rather than 1 PM. */
     fun is24HourClock(): Boolean = false
 }

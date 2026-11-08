@@ -1,0 +1,1 @@
+SuperAwesomeMagicalWeather is now on iPhone too (same app, built from the same code), and the app uses the Lexend typeface throughout.

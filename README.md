@@ -4,8 +4,8 @@
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/603Madison/SuperAwesomeMagicalWeather?label=download)](https://github.com/603Madison/SuperAwesomeMagicalWeather/releases/latest)
 
-A private, ad-free weather app for Android, built on free NOAA and National
-Weather Service data. No accounts, no analytics, no built-in API keys.
+A private, ad-free weather app for Android and iPhone, built on free NOAA and
+National Weather Service data. No accounts, no analytics, no built-in API keys.
 
 <p>
 <img src="docs/screenshots/today.png" width="200" alt="Today screen, Portland, ME">
@@ -48,6 +48,14 @@ same signed APKs as the GitHub releases, so you can switch between the two. See
 > **Formerly Northvane.** The app was renamed in 1.7.0. It installs as an
 > update over Northvane, and your places and settings carry over. Downloads up
 > to 1.6.2 are named `Northvane-…apk`.
+
+### iPhone
+
+Each release also has `SuperAwesomeMagicalWeather-vX.Y.Z.ipa`: the same app,
+built from the same code, for iOS 17 or newer. Apple only runs apps signed for
+your device, so install it with [Sideloadly](https://sideloadly.io) or AltStore
+and your Apple ID. With a free Apple ID it has to be reinstalled every 7 days
+(your places and settings stay). See [docs/IOS.md](docs/IOS.md).
 
 ### SuperAwesomeMagicalWeather Mini, for flip phones
 
@@ -200,6 +208,7 @@ design, and [SECURITY.md](SECURITY.md) to report a vulnerability.
 
 - [How it works](docs/HOW-IT-WORKS.md): data sources, the future cast, and how
   each estimate is made.
+- [iPhone](docs/IOS.md): installing the iPhone app, and how it differs from Android.
 - [WeeWX setup](weewx/README.md): connect your own weather station.
 - [Changelog](CHANGELOG.md): what's new in each release.
 - [Contributing](CONTRIBUTING.md), [Releasing](docs/RELEASING.md) and [F-Droid](docs/FDROID.md).
@@ -210,12 +219,12 @@ You need Android Studio with AGP 9.4 support, JDK 17+ and Android SDK
 platform 37.
 
 ```bash
-./gradlew :core:jvmTest                    # data layer and security tests
+./gradlew :core:jvmTest                # data layer and security tests
 ./gradlew :app:testDebugUnitTest        # app tests; renders screenshots to app/build/outputs/screenshots
 ./gradlew :mini:testDebugUnitTest       # Mini tests, driven by keys only
 ./gradlew :app:lintDebug :mini:lintDebug
 ./gradlew :app:assembleDebug :mini:assembleDebug   # installable debug APKs
-./gradlew :core:jvmTest -Pnorthvane.live=true          # also hit the real NWS, NOAA and IEM services
+./gradlew :core:jvmTest -Pnorthvane.live=true   # also hit the real NWS, NOAA and IEM services
 ```
 
 To build signed release APKs, put your key details in a git-ignored
@@ -231,9 +240,11 @@ keyPassword=…
 
 | Folder | What's in it |
 |---|---|
-| `core/` | Plain Kotlin, no Android: API clients, parsers, forecast merging, estimates, radar decoding, network security policy |
-| `app/` | The Android app: Compose UI, MapLibre radar, background alert checks, encrypted key storage |
-| `ui/` | Look and feel shared by both apps: weather icons, sky colors, brand colors |
+| `core/` | Kotlin Multiplatform, no UI: API clients, parsers, forecast merging, estimates, radar decoding, AI prompts, network security policy |
+| `shared/` | The app itself, for Android and iOS (Compose Multiplatform): screens, view models, settings, caches, background-check logic |
+| `app/` | The Android shell: activity, MapLibre radar, WorkManager jobs, notifications, widget, tile, Keystore-encrypted keys |
+| `iosApp/` | The iPhone shell: SwiftUI host, WidgetKit widget, Xcode project spec (XcodeGen); the iOS platform code is in `shared/src/iosMain` |
+| `ui/` | Look and feel shared by every app: weather icons, sky colors, brand colors, the Lexend typeface |
 | `mini/` | The flip-phone app |
 | `weewx/` | WeeWX skin and setup guide |
 | `docs/` | How it works, security notes, release process, screenshots |

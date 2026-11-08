@@ -5,6 +5,17 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-08
+
+SuperAwesomeMagicalWeather on iPhone, and one typeface everywhere.
+
+### Added
+- **iPhone app.** The same app as on Android: Today, Outlook, Radar, Alerts, the AI features and every setting, from the same code. Radar draws over Apple Maps; API keys live in the iOS Keychain; alerts arrive as iOS notifications (warnings as time-sensitive); the morning briefing and Tonight arrive at the time you pick; and there's a Home Screen and Lock Screen widget. Each release has an `.ipa` to install with Sideloadly or AltStore (see docs/IOS.md).
+
+### Changed
+- **Lexend** is the typeface in the app and Mini (and on iPhone): one variable font file, bundled with the app.
+- The app's screens, settings, caches and AI features now live in a shared module (Kotlin Multiplatform). Nothing changes on Android: settings, places and caches stay where they were.
+
 ## [2.1.0] - 2026-11-06
 
 Smarter, leaner, and easier to reach.
