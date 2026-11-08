@@ -101,10 +101,10 @@ class NwsClient(
         fun zoneOf(point: NwsPoint): ZoneId = runCatching { ZoneId.of(point.timeZone) }.getOrDefault(ZoneId.of("UTC"))
 
         /** NWS-recommended User-Agent form: product/version (contact). */
-        fun userAgent(appVersion: String, contact: String?): String {
+        fun userAgent(appVersion: String, contact: String?, platform: String = "Android"): String {
             val safeContact = contact?.trim()?.filter { it.code in 0x21..0x7E && it != '(' && it != ')' }?.take(100)
             return if (safeContact.isNullOrEmpty()) {
-                "SuperAwesomeMagicalWeather/$appVersion (Android weather app)"
+                "SuperAwesomeMagicalWeather/$appVersion ($platform weather app)"
             } else {
                 "SuperAwesomeMagicalWeather/$appVersion ($safeContact)"
             }

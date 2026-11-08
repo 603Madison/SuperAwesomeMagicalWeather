@@ -99,6 +99,7 @@ android {
 dependencies {
     implementation(project(":core"))
     implementation(project(":ui"))
+    implementation(project(":shared"))
     implementation(libs.zxing.core)
 
     implementation(platform(libs.compose.bom))

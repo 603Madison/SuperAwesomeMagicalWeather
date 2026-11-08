@@ -103,6 +103,21 @@ class ScreenshotTest {
     @get:Rule
     val compose = createComposeRule()
 
+    /** One container per test, on the test's own Application and files. */
+    private val testContainer: AppContainer by lazy {
+        lateinit var c: AppContainer
+        c = AppContainer(AndroidPlatform(ApplicationProvider.getApplicationContext()) { c.settings })
+        c
+    }
+
+    /** Screens read platform details (version, clock format) from [LocalPlatform], as under [NorthvaneRoot]. */
+    private fun androidx.compose.ui.test.junit4.ComposeContentTestRule.setAppContent(content: @Composable () -> Unit) = setContent {
+        androidx.compose.runtime.CompositionLocalProvider(
+            app.northvane.weather.ui.LocalPlatform provides testContainer.platform,
+            content = content,
+        )
+    }
+
     private fun resource(name: String) = requireNotNull(javaClass.getResource("/live/$name")).readText()
 
     private val location = SavedLocation("home", "Portland, ME", 43.6591, -70.2568)
@@ -199,7 +214,7 @@ class ScreenshotTest {
     private val noActions = HomeActions({}, {}, {}, {}, {}, {})
 
     private fun render(dark: Boolean, content: @Composable () -> Unit) {
-        compose.setContent {
+        compose.setAppContent {
             NorthvaneTheme(darkTheme = dark, dynamicColor = false) {
                 Box {
                     Backdrop()
@@ -271,11 +286,11 @@ class ScreenshotTest {
     @Test
     @Config(qualifiers = "w400dp-h1600dp-xxhdpi")
     fun themesGallery() {
-        val container = AppContainer(ApplicationProvider.getApplicationContext())
+        val container = testContainer
         var current by androidx.compose.runtime.mutableStateOf(AppTheme.HARBOR to false)
         var showPicker by androidx.compose.runtime.mutableStateOf(false)
         val st = state()
-        compose.setContent {
+        compose.setAppContent {
             val (theme, dark) = current
             NorthvaneTheme(darkTheme = dark, dynamicColor = false, theme = theme, weather = ThemeWeather(WeatherCondition.CLEAR, true, 12.0)) {
                 Box {
@@ -304,14 +319,14 @@ class ScreenshotTest {
     @Test
     @Config(qualifiers = "w400dp-h2600dp-xxhdpi")
     fun allergiesEditor() {
-        val container = AppContainer(ApplicationProvider.getApplicationContext())
+        val container = testContainer
         render(dark = false) { AllergiesScreen(state(), container, onBack = {}) }
         save("allergies_editor")
     }
 
     @Test
     fun locationsWithNicknames() {
-        val container = AppContainer(ApplicationProvider.getApplicationContext())
+        val container = testContainer
         val vm = MainViewModel(container)
         render(dark = false) { LocationsScreen(state(), vm, container, onBack = {}) }
         compose.onAllNodesWithContentDescription("Options for Mom's")[0].performClick()
@@ -321,7 +336,7 @@ class ScreenshotTest {
     @Test
     @Config(qualifiers = "w400dp-h3200dp-xxhdpi")
     fun dataSourcesPollen() {
-        val container = AppContainer(ApplicationProvider.getApplicationContext())
+        val container = testContainer
         render(dark = false) { DataSourcesScreen(state(), container, onBack = {}, onSourcesChanged = {}) }
         save("data_sources")
     }
@@ -389,7 +404,7 @@ class ScreenshotTest {
 
     @Test
     fun radarPausedOnSatellite() {
-        val container = AppContainer(ApplicationProvider.getApplicationContext())
+        val container = testContainer
         render(dark = false) {
             RadarScreen(state(liteMode = true, network = NetworkStatus(satellite = true)), container, onOpenSettings = {})
         }
@@ -399,10 +414,10 @@ class ScreenshotTest {
     @Test
     @Config(qualifiers = "w400dp-h1600dp-xxhdpi")
     fun settingsPages() {
-        val container = AppContainer(ApplicationProvider.getApplicationContext())
+        val container = testContainer
         var page by androidx.compose.runtime.mutableStateOf<SettingsPage?>(null)
         val st = state()
-        compose.setContent {
+        compose.setAppContent {
             NorthvaneTheme(darkTheme = false, dynamicColor = false) {
                 Box {
                     Backdrop()

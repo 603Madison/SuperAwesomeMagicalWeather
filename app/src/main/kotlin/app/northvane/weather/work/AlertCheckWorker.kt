@@ -83,7 +83,7 @@ class AlertCheckWorker(appContext: Context, params: WorkerParameters) : Coroutin
     }
 }
 
-class AlertScheduler(private val context: Context, private val settings: SettingsRepository) {
+class AndroidAlertScheduler(private val context: Context, private val settings: () -> SettingsRepository) : app.northvane.weather.AlertScheduler {
 
     private fun constraints(): Constraints {
         val builder = Constraints.Builder()
@@ -96,8 +96,8 @@ class AlertScheduler(private val context: Context, private val settings: Setting
         return builder.build()
     }
 
-    suspend fun sync() {
-        val current = settings.settings.first()
+    override suspend fun sync() {
+        val current = settings().settings.first()
         val workManager = WorkManager.getInstance(context)
         if (!current.alertsEnabled) {
             workManager.cancelUniqueWork(PERIODIC)
@@ -112,7 +112,7 @@ class AlertScheduler(private val context: Context, private val settings: Setting
         workManager.enqueueUniquePeriodicWork(PERIODIC, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
-    fun checkNow() {
+    override fun checkNow() {
         val request = OneTimeWorkRequestBuilder<AlertCheckWorker>().setConstraints(constraints()).build()
         WorkManager.getInstance(context).enqueueUniqueWork(ONE_SHOT, ExistingWorkPolicy.REPLACE, request)
     }

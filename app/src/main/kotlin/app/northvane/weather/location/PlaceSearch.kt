@@ -7,7 +7,7 @@ import android.os.Build
 import app.northvane.core.model.GeoPoint
 import app.northvane.core.owm.OwmClient
 import app.northvane.core.owm.PlaceResult
-import app.northvane.weather.data.SecretStore
+import app.northvane.weather.SecretStore
 import app.northvane.weather.data.SettingsRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -23,13 +23,13 @@ import kotlin.coroutines.resume
  * OpenWeatherMap's geocoder if the user has configured a key. Plain
  * "lat, lon" input is accepted directly.
  */
-class PlaceSearch(
+class AndroidPlaceSearch(
     private val context: Context,
     private val owm: OwmClient,
     private val secrets: SecretStore,
     private val settings: SettingsRepository,
-) {
-    suspend fun search(query: String): List<PlaceResult> {
+) : app.northvane.weather.PlaceSearch {
+    override suspend fun search(query: String): List<PlaceResult> {
         val q = query.trim().take(100)
         if (q.length < 2) return emptyList()
         parseCoordinates(q)?.let { p ->
@@ -77,7 +77,7 @@ class PlaceSearch(
     }
 
     /** US ZIP code for a point, from the device's geocoder (used for EPA's UV forecast). */
-    suspend fun postalCode(latitude: Double, longitude: Double): String? {
+    override suspend fun postalCode(latitude: Double, longitude: Double): String? {
         if (!Geocoder.isPresent()) return null
         val geocoder = Geocoder(context, Locale.US)
         val addresses: List<Address> = runCatching {

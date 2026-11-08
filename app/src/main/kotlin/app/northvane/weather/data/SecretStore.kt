@@ -1,5 +1,6 @@
 package app.northvane.weather.data
 
+import app.northvane.weather.SecretStore
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -21,11 +22,11 @@ import javax.crypto.spec.GCMParameterSpec
  * Values are never written to logs and are not handed back to the UI for
  * display; screens only learn whether a value is set.
  */
-class SecretStore(context: Context) {
+class AndroidSecretStore(context: Context) : SecretStore {
     private val prefs = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
     private val lock = Any()
 
-    fun get(name: String): String? = synchronized(lock) {
+    override fun get(name: String): String? = synchronized(lock) {
         val stored = prefs.getString(name, null) ?: return null
         try {
             decrypt(name, stored)
@@ -40,9 +41,9 @@ class SecretStore(context: Context) {
         }
     }
 
-    fun has(name: String): Boolean = synchronized(lock) { prefs.contains(name) }
+    override fun has(name: String): Boolean = synchronized(lock) { prefs.contains(name) }
 
-    fun put(name: String, value: String?) = synchronized(lock) {
+    override fun put(name: String, value: String?) = synchronized(lock) {
         if (value.isNullOrEmpty()) {
             prefs.edit { remove(name) }
         } else {
@@ -50,7 +51,6 @@ class SecretStore(context: Context) {
         }
     }
 
-    fun remove(name: String) = put(name, null)
 
     private fun secretKey(): SecretKey {
         val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
@@ -89,24 +89,11 @@ class SecretStore(context: Context) {
         return String(cipher.doFinal(decoder.decode(parts[2])), Charsets.UTF_8)
     }
 
-    companion object {
+    private companion object {
         private const val FILE = "secrets"
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
         private const val KEY_ALIAS = "northvane_secrets_v1"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
 
-        const val OWM_API_KEY = "owm_api_key"
-        const val POLLEN_API_KEY = "google_pollen_api_key"
-        const val AIRNOW_API_KEY = "airnow_api_key"
-
-        /** Keys for features that were removed (traffic, 2.0); deleted at startup. */
-        val RETIRED = listOf("ne511_api_key", "tomtom_api_key")
-        const val AI_API_KEY = "ai_api_key"
-        const val CLAUDE_API_KEY = "claude_api_key"
-
-        /** Each AI provider keeps its own key, so switching between them doesn't lose one. */
-        fun aiKeyName(provider: app.northvane.core.ai.AiProvider): String =
-            if (provider == app.northvane.core.ai.AiProvider.CLAUDE) CLAUDE_API_KEY else AI_API_KEY
-        fun weewxSecret(stationId: String) = "weewx_secret_$stationId"
     }
 }

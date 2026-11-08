@@ -23,17 +23,17 @@ import kotlin.coroutines.resume
  * the user granted precise location, otherwise the approximate one. Results
  * are rounded to ~11 m before leaving this class.
  */
-class DeviceLocationProvider(private val context: Context) {
+class DeviceLocationProvider(private val context: Context) : app.northvane.weather.DeviceLocation {
 
-    fun hasPermission(): Boolean = granted(Manifest.permission.ACCESS_COARSE_LOCATION) || hasPrecise()
+    override fun hasPermission(): Boolean = granted(Manifest.permission.ACCESS_COARSE_LOCATION) || hasPrecise()
 
-    fun hasPrecise(): Boolean = granted(Manifest.permission.ACCESS_FINE_LOCATION)
+    override fun hasPrecise(): Boolean = granted(Manifest.permission.ACCESS_FINE_LOCATION)
 
     private fun granted(permission: String) =
         ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 
     @SuppressLint("MissingPermission") // checked by hasPermission()
-    suspend fun current(): GeoPoint? {
+    override suspend fun current(): GeoPoint? {
         if (!hasPermission()) return null
         val manager = context.getSystemService(LocationManager::class.java) ?: return null
         val fused = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) listOf(LocationManager.FUSED_PROVIDER) else emptyList()
