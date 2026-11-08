@@ -44,7 +44,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import app.northvane.weather.ui.TimeFormat
-import java.time.ZoneId
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -90,7 +89,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
-import java.time.Instant
+import app.northvane.core.time.*
 
 /**
  * Renders real screens with real NWS data for Portland, ME (captured
@@ -112,7 +111,7 @@ class ScreenshotTest {
         val point = NwsParsers.parsePoint(resource("me_point.json"))
         val zone = NwsClient.zoneOf(point)
         val grid = NwsGridData.parse(resource("me_grid.json"))
-        val now = Instant.now()
+        val now = kotlin.time.Clock.System.now()
         val (sunrise, sunset) = Solar.sunTimes(location.latitude, location.longitude, now.atZone(zone).toLocalDate(), zone)
         val daily = ForecastDetails.enrichDaily(NwsParsers.parseDaily(resource("me_daily.json"), zone), grid, zone)
         return WeatherSnapshot(
@@ -136,22 +135,22 @@ class ScreenshotTest {
     }
 
     /** Captured EPA hourly UV forecast, moved to today. */
-    private fun uvToday(now: Instant, zone: java.time.ZoneId): UvForecast {
+    private fun uvToday(now: Instant, zone: app.northvane.core.time.ZoneId): UvForecast {
         val hours = EpaUvClient.parseHourly(resource("uv.json"), zone)
-        val shift = java.time.Duration.between(hours.first().time.atZone(zone).toLocalDate().atStartOfDay(zone), now.atZone(zone).toLocalDate().atStartOfDay(zone))
+        val shift = app.northvane.core.time.Duration.between(hours.first().time.atZone(zone).toLocalDate().atStartOfDay(zone), now.atZone(zone).toLocalDate().atStartOfDay(zone))
         val moved = hours.map { it.copy(time = it.time.plus(shift)) }
         return UvForecast(moved, moved.maxOf { it.index }, source = "EPA UV Index", fetchedAt = now)
     }
 
     /** Captured Google Pollen API response, moved to today's dates. */
-    private fun pollen(today: java.time.LocalDate): PollenForecast {
+    private fun pollen(today: app.northvane.core.time.LocalDate): PollenForecast {
         val days = PollenClient.parse(resource("pollen.json"))
-        return PollenForecast(days.mapIndexed { i, d -> d.copy(date = today.plusDays(i.toLong())) }, Instant.now())
+        return PollenForecast(days.mapIndexed { i, d -> d.copy(date = today.plusDays(i.toLong())) }, kotlin.time.Clock.System.now())
     }
 
     /** Demo only: turns the third day into a late-October nor'easter to show the outage outlook. */
     private fun withNorEaster(s: WeatherSnapshot): WeatherSnapshot {
-        val zone = java.time.ZoneId.of(s.timeZoneId)
+        val zone = app.northvane.core.time.ZoneId.of(s.timeZoneId)
         val days = s.daily.toMutableList()
         days[2] = days[2].copy(
             gustMaxKph = Units.mphToKph(55.0), windMaxKph = Units.mphToKph(30.0), windDirectionDeg = 45.0,
@@ -169,9 +168,9 @@ class ScreenshotTest {
             allergies = mapOf(Allergen.BIRCH to Sensitivity.SEVERE, Allergen.GRASS to Sensitivity.MILD, Allergen.MOLD to Sensitivity.MODERATE),
             gardenEnabled = true,
             gardenPlan = listOf(
-                GardenCrop(Crop.TOMATO, plantedOn = java.time.LocalDate.now().withMonth(5).withDayOfMonth(20)),
-                GardenCrop(Crop.KALE, plantedOn = java.time.LocalDate.now().withMonth(4).withDayOfMonth(25)),
-                GardenCrop(Crop.WINTER_SQUASH, plantedOn = java.time.LocalDate.now().withMonth(5).withDayOfMonth(25)),
+                GardenCrop(Crop.TOMATO, plantedOn = app.northvane.core.time.LocalDate.now().withMonth(5).withDayOfMonth(20)),
+                GardenCrop(Crop.KALE, plantedOn = app.northvane.core.time.LocalDate.now().withMonth(4).withDayOfMonth(25)),
+                GardenCrop(Crop.WINTER_SQUASH, plantedOn = app.northvane.core.time.LocalDate.now().withMonth(5).withDayOfMonth(25)),
                 GardenCrop(Crop.GARLIC),
             ),
             heatingEnabled = true,
@@ -195,7 +194,7 @@ class ScreenshotTest {
         frostClimate = climate,
     )
 
-    private val climate by lazy { FrostClimate.compute(AcisClient.parseDailyLows(resource("mint30.json")), Instant.now()) }
+    private val climate by lazy { FrostClimate.compute(AcisClient.parseDailyLows(resource("mint30.json")), kotlin.time.Clock.System.now()) }
 
     private val noActions = HomeActions({}, {}, {}, {}, {}, {})
 
@@ -240,7 +239,7 @@ class ScreenshotTest {
         val base = snapshot()
         val warning = NwsParsers.parseAlerts(resource("nws_alerts_tx.json")).first().copy(
             event = "High Wind Warning", category = AlertCategory.WARNING,
-            ends = Instant.now().plusSeconds(6 * 3600), expires = Instant.now().plusSeconds(6 * 3600),
+            ends = kotlin.time.Clock.System.now().plusSeconds(6 * 3600), expires = kotlin.time.Clock.System.now().plusSeconds(6 * 3600),
         )
         render(dark = false) { HomeScreen(state(base.copy(alerts = listOf(warning))), noActions, {}, {}, {}) }
         save("today_warning_light")
@@ -252,7 +251,7 @@ class ScreenshotTest {
         val base = snapshot()
         val warning = NwsParsers.parseAlerts(resource("nws_alerts_tx.json")).first().copy(
             event = "Winter Storm Warning", category = AlertCategory.WARNING,
-            ends = Instant.now().plusSeconds(6 * 3600), expires = Instant.now().plusSeconds(6 * 3600),
+            ends = kotlin.time.Clock.System.now().plusSeconds(6 * 3600), expires = kotlin.time.Clock.System.now().plusSeconds(6 * 3600),
         )
         render(dark = true) { HomeScreen(state(base.copy(alerts = listOf(warning))), noActions, {}, {}, {}) }
         save("today_warning_dark")
@@ -263,7 +262,7 @@ class ScreenshotTest {
         val base = snapshot()
         val watch = NwsParsers.parseAlerts(resource("nws_alerts_tx.json")).first().copy(
             event = "Winter Storm Watch", category = AlertCategory.WATCH,
-            ends = Instant.now().plusSeconds(6 * 3600), expires = Instant.now().plusSeconds(6 * 3600),
+            ends = kotlin.time.Clock.System.now().plusSeconds(6 * 3600), expires = kotlin.time.Clock.System.now().plusSeconds(6 * 3600),
         )
         render(dark = false) { HomeScreen(state(base.copy(alerts = listOf(watch))), noActions, {}, {}, {}) }
         save("today_watch_light")
@@ -332,7 +331,7 @@ class ScreenshotTest {
     fun noreasterOutageDark() {
         val storm = withNorEaster(snapshot())
         render(dark = true) { HomeScreen(state(storm), noActions, {}, {}, {}) }
-        val name = java.time.format.TextStyle.SHORT.let { storm.daily[2].date.dayOfWeek.getDisplayName(it, java.util.Locale.getDefault()) }
+        val name = app.northvane.core.time.TextStyle.SHORT.let { storm.daily[2].date.dayOfWeek.getDisplayName(it) }
         compose.onAllNodesWithText(name)[0].performClick()
         save("today_noreaster_dark")
         compose.onAllNodesWithText("Tap for how to prepare")[0].performClick()
@@ -345,7 +344,7 @@ class ScreenshotTest {
         val local = base.current!!.copy(
             source = DataSource.WEEWX, stationName = "Backyard", temperatureC = 11.4, feelsLikeC = 10.2,
             humidityPercent = 71.0, windSpeedKph = 9.0, windGustKph = 24.0, windDirectionDeg = 290.0,
-            observedAt = Instant.now().minusSeconds(90), supplementedFrom = DataSource.NWS,
+            observedAt = kotlin.time.Clock.System.now().minusSeconds(90), supplementedFrom = DataSource.NWS,
         )
         render(dark = true) { HomeScreen(state(base.copy(current = local)), noActions, {}, {}, {}) }
         save("today_dark_weewx")
@@ -423,9 +422,9 @@ class ScreenshotTest {
 
     /** Demo: a nor'easter in the hourly forecast, wildfire smoke, and the water card. */
     private fun withStormSmokeAndWater(s: WeatherSnapshot): WeatherSnapshot {
-        val now = Instant.now()
+        val now = kotlin.time.Clock.System.now()
         // The recorded forecast is from late October: start its hours now so the storm is ahead.
-        val start = now.truncatedTo(java.time.temporal.ChronoUnit.HOURS)
+        val start = now.truncatedTo(app.northvane.core.time.ChronoUnit.HOURS)
         val hourly = s.hourly.mapIndexed { i, h0 ->
             val h = h0.copy(time = start.plusSeconds(i * 3600L))
             when (i) {
@@ -472,7 +471,7 @@ class ScreenshotTest {
     fun questionsCarryEverythingTheAppKnows() {
         val snap = withStormSmokeAndWater(snapshot())
         val settings = state(snap).settings.copy(laundryOutSince = null)
-        val now = Instant.now()
+        val now = kotlin.time.Clock.System.now()
         val extras = app.northvane.weather.ui.AiContext.extras(snap, settings, null, emptyList(), snap.latitude ?: location.latitude, now)
         val q = app.northvane.core.ai.AiPrompts.question("How muddy are the trails?", snap, "Portland, ME", settings.units, now, location.longitude, extras)
         File("build/outputs/ai_question_context.txt").apply { parentFile.mkdirs() }.writeText(q.system + "\n\n" + q.user)
@@ -515,7 +514,7 @@ class ScreenshotTest {
     /** Demo only: a cold snap on the second day with black ice that morning and a hard freeze that night. */
     private fun withColdSnap(s: WeatherSnapshot): WeatherSnapshot {
         val days = s.daily.toMutableList()
-        val zone = java.time.ZoneId.of(s.timeZoneId)
+        val zone = app.northvane.core.time.ZoneId.of(s.timeZoneId)
         days[1] = days[1].copy(
             highC = Units.fToC(17.0), lowC = Units.fToC(-2.0),
             pipeRisk = app.northvane.core.model.PipeRisk(
@@ -541,7 +540,7 @@ class ScreenshotTest {
         val snap = withColdSnap(snapshot())
         val st = state(snap)
         render(dark = true) { HomeScreen(st.copy(settings = st.settings.copy(pipeRiskEnabled = true, morningIceEnabled = true)), noActions, {}, {}, {}) }
-        val name = java.time.format.TextStyle.SHORT.let { snap.daily[1].date.dayOfWeek.getDisplayName(it, java.util.Locale.getDefault()) }
+        val name = app.northvane.core.time.TextStyle.SHORT.let { snap.daily[1].date.dayOfWeek.getDisplayName(it) }
         compose.onAllNodesWithText(name)[0].performClick()
         compose.onAllNodesWithText("Tap for how to prepare").let { it[it.fetchSemanticsNodes().size - 1] }.performClick()
         save("today_cold_snap_dark")
@@ -551,16 +550,16 @@ class ScreenshotTest {
     @Config(qualifiers = "w400dp-h900dp-xxhdpi")
     fun auroraCard() {
         val snap = snapshot()
-        val zone = java.time.ZoneId.of(snap.timeZoneId)
-        val now = Instant.now()
+        val zone = app.northvane.core.time.ZoneId.of(snap.timeZoneId)
+        val now = kotlin.time.Clock.System.now()
         // A G3 storm peaking after dark tonight.
-        val start = java.time.LocalDate.now(zone).atStartOfDay(java.time.ZoneOffset.UTC).toInstant()
+        val start = app.northvane.core.time.LocalDate.now(zone).atStartOfDay(app.northvane.core.time.ZoneOffset.UTC).toInstant()
         val kps = listOf(2.0, 2.33, 3.0, 4.0, 4.67, 5.33, 6.67, 7.33, 6.0, 5.0, 4.0, 3.33, 3.0, 2.67, 2.33, 2.0, 4.33, 5.0, 3.0, 2.0, 2.0, 2.0, 2.0, 2.0)
         val kp = app.northvane.core.model.KpForecast(
-            kps.mapIndexed { i, k -> app.northvane.core.model.KpPoint(start.plus(java.time.Duration.ofHours(3L * i)), k, app.northvane.core.model.KpPoint.Kind.PREDICTED) },
+            kps.mapIndexed { i, k -> app.northvane.core.model.KpPoint(start.plus(app.northvane.core.time.Duration.ofHours(3L * i)), k, app.northvane.core.model.KpPoint.Kind.PREDICTED) },
             now,
         )
-        val evening = java.time.LocalDate.now(zone).atTime(15, 0).atZone(zone).toInstant()
+        val evening = app.northvane.core.time.LocalDate.now(zone).atTime(15, 0).atZone(zone).toInstant()
         val report = app.northvane.core.aurora.AuroraAdvisor.report(kp, location.latitude, location.longitude, snap.hourly, zone, evening)
         val time = app.northvane.weather.ui.TimeFormat(zone, false)
         render(dark = true) { androidx.compose.foundation.layout.Column(Modifier.padding(16.dp)) { app.northvane.weather.ui.home.AuroraSection(report, time) } }
@@ -571,9 +570,9 @@ class ScreenshotTest {
     @Config(qualifiers = "w400dp-h1400dp-xxhdpi")
     fun sapAndBurnCards() {
         val snap = snapshot()
-        val zone = java.time.ZoneId.of(snap.timeZoneId)
+        val zone = app.northvane.core.time.ZoneId.of(snap.timeZoneId)
         val time = app.northvane.weather.ui.TimeFormat(zone, false)
-        val today = java.time.LocalDate.now(zone)
+        val today = app.northvane.core.time.LocalDate.now(zone)
         // A late-winter week for the sap card; the real forecast for burn days.
         val march = listOf(24.0 to 43.0, 27.0 to 46.0, 33.0 to 41.0, 18.0 to 30.0, 22.0 to 40.0, 35.0 to 52.0, 38.0 to 55.0)
         val sap = app.northvane.core.model.SapReport(march.mapIndexed { i, (low, high) ->
@@ -612,7 +611,7 @@ class ScreenshotTest {
     @Test
     @Config(qualifiers = "w400dp-h900dp-xxhdpi")
     fun aiCards() {
-        val now = Instant.now()
+        val now = kotlin.time.Clock.System.now()
         val ai = AiUiState(
             office = "GYX",
             discussion = AiTask(
@@ -653,7 +652,7 @@ class ScreenshotTest {
                 settings = it.settings.copy(aiEnabled = true, aiProvider = AiProvider.CLAUDE, aiModel = "claude-opus-5-5"),
                 ai = AiUiState(alerts = mapOf(alert.id to AiTask(AiReply(
                     "HEADLINE: Flooding possible from Thursday 11 AM to Friday afternoon\n- Avoid low spots and flooded roads\n- Turn around if water covers the road",
-                    "claude-opus-5-5", Instant.now(), alert.id,
+                    "claude-opus-5-5", kotlin.time.Clock.System.now(), alert.id,
                 )))),
             )
         }
@@ -675,7 +674,7 @@ class ScreenshotTest {
     @Test
     @Config(qualifiers = "w400dp-h1300dp-xxhdpi")
     fun staleDataHiddenOnSatellite() {
-        val now = Instant.now()
+        val now = kotlin.time.Clock.System.now()
         val old = now.minusSeconds(20 * 3600)
         val snap = snapshot().copy(
             sectionTimes = mapOf(
@@ -695,7 +694,7 @@ class ScreenshotTest {
     fun canadianForecast() {
         val f = EcccClient.parse(resource("eccc_nb29.json"), Instant.parse("2026-10-29T20:10:00Z"))
         val snap = WeatherSnapshot(
-            locationId = "fr", fetchedAt = Instant.now(), timeZoneId = f.zone.id, placeName = f.placeName,
+            locationId = "fr", fetchedAt = kotlin.time.Clock.System.now(), timeZoneId = f.zone.id, placeName = f.placeName,
             current = f.current, hourly = f.hourly, daily = f.daily, alerts = f.alerts, forecastSource = DataSource.ECCC,
             sunrise = f.sunrise, sunset = f.sunset,
         )

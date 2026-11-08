@@ -27,12 +27,9 @@ import app.northvane.weather.data.SatelliteFeature
 import app.northvane.weather.net.isAllowed
 import app.northvane.weather.notify.AlertNotifier
 import kotlinx.coroutines.flow.first
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import app.northvane.core.time.*
 
 /**
  * While laundry is out on the line, checks the hourly forecast every 20
@@ -46,7 +43,7 @@ class LaundryWatchWorker(appContext: Context, params: WorkerParameters) : Corout
         val container = (applicationContext as NorthvaneApp).container
         val settings = container.settings.settings.first()
         val since = settings.laundryOutSince ?: return Result.success()
-        val now = Instant.now()
+        val now = kotlin.time.Clock.System.now()
         if (Duration.between(Instant.ofEpochMilli(since), now) > Duration.ofHours(12)) {
             container.settings.setLaundryOut(null)
             return Result.success()
@@ -61,7 +58,7 @@ class LaundryWatchWorker(appContext: Context, params: WorkerParameters) : Corout
                 val rain = DryingAdvisor.rainSoon(snapshot.hourly, now, Duration.ofMinutes(100))
                 val rainKey = "rain-$since-${rain?.time?.epochSecond}"
                 if (rain != null && !prefs.getBoolean(rainKey, false)) {
-                    val time = DateTimeFormatter.ofPattern("h:mm a", Locale.getDefault()).withZone(zone).format(rain.time)
+                    val time = DateTimeFormatter.ofPattern("h:mm a").withZone(zone).format(rain.time)
                     val what = if ((rain.thunderChance ?: 0) >= 20) "Thunderstorms" else "Rain"
                     notify(applicationContext, "$what likely around $time", "Time to bring the laundry in at ${location.displayName}.")
                     prefs.edit { putBoolean(rainKey, true) }

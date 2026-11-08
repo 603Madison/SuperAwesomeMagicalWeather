@@ -7,8 +7,8 @@ Thanks for helping. Issues and pull requests are welcome.
 You need JDK 17+ (21 works), Android Studio with AGP 9.4 support and the Android 17 (API 37) SDK platform.
 
 ```bash
-./gradlew :core:test                      # data layer: parsers, fallbacks, security policy
-./gradlew :core:test -Pnorthvane.live=true # also hits the real NWS/NOAA/IEM services
+./gradlew :core:jvmTest                      # data layer: parsers, fallbacks, security policy
+./gradlew :core:jvmTest -Pnorthvane.live=true # also hits the real NWS/NOAA/IEM services
 ./gradlew :app:testDebugUnitTest          # renders screens to app/build/outputs/screenshots
 ./gradlew :app:lintDebug
 ./gradlew :app:assembleDebug

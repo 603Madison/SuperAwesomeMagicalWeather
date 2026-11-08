@@ -34,7 +34,7 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0"
 
       - name: Unit tests, screenshot tests, lint, debug build
-        run: ./gradlew --no-daemon :core:test :app:testDebugUnitTest :app:lintDebug :ui:lintDebug :app:assembleDebug :mini:testDebugUnitTest :mini:lintDebug :mini:assembleDebug
+        run: ./gradlew --no-daemon :core:jvmTest :app:testDebugUnitTest :app:lintDebug :ui:lintDebug :app:assembleDebug :mini:testDebugUnitTest :mini:lintDebug :mini:assembleDebug
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
@@ -68,4 +68,4 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
-      - run: ./gradlew --no-daemon :core:test -Pnorthvane.live=true
+      - run: ./gradlew --no-daemon :core:jvmTest -Pnorthvane.live=true

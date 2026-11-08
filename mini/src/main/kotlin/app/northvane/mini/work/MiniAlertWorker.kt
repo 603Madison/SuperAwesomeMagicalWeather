@@ -26,8 +26,8 @@ import app.northvane.mini.MainActivity
 import app.northvane.mini.MiniApp
 import app.northvane.mini.R
 import app.northvane.mini.data.MiniSettings
-import java.time.Instant
 import java.util.concurrent.TimeUnit
+import app.northvane.core.time.*
 
 /** Checks every saved place for new warnings, watches and advisories, and notifies once per alert. */
 class MiniAlertWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -49,7 +49,7 @@ class MiniAlertWorker(context: Context, params: WorkerParameters) : CoroutineWor
                 failures++
                 continue
             }
-            val (items, updated) = tracker.select(place.id, alerts, CATEGORIES, state, Instant.now())
+            val (items, updated) = tracker.select(place.id, alerts, CATEGORIES, state, kotlin.time.Clock.System.now())
             state = updated
             items.forEach { notify(applicationContext, place.displayName, it.alert.event, it.alert.headline ?: it.alert.description, it.alert.severity, it.alert.id) }
         }

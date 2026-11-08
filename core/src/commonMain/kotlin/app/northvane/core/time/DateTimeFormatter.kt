@@ -151,3 +151,7 @@ class DateTimeFormatter private constructor(private val tokens: List<Token>, pri
         }
     }
 }
+
+fun LocalDate.format(f: DateTimeFormatter): String = f.format(this)
+fun LocalDateTime.format(f: DateTimeFormatter): String = f.format(this)
+fun LocalTime.format(f: DateTimeFormatter): String = f.format(this)

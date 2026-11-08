@@ -10,8 +10,6 @@ import app.northvane.core.outlook.Outlooks
 import app.northvane.core.pollen.AndroidKeyRestriction
 import app.northvane.core.pollen.PollenPricing
 import app.northvane.core.weewx.WeeWxStation
-import java.time.LocalDate
-import java.time.ZoneId
 import app.northvane.core.repo.SourceConfig
 import app.northvane.core.repo.WeatherRepository
 import app.northvane.core.weewx.WeeWxAuth
@@ -22,8 +20,7 @@ import app.northvane.weather.net.fetchPlanFor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
-import java.time.Duration
-import java.time.Instant
+import app.northvane.core.time.*
 
 /** Glues user settings, secrets and network state to the platform-independent repository. */
 class WeatherService(
@@ -100,7 +97,7 @@ class WeatherService(
      */
     private fun throttled(plan: FetchPlan, previous: WeatherSnapshot?): FetchPlan {
         if (previous == null) return plan
-        val now = Instant.now()
+        val now = kotlin.time.Clock.System.now()
         val maxAge = Duration.ofHours(PollenPricing.MIN_REFRESH_HOURS)
         fun recent(t: Instant?) = t != null && Duration.between(t, now) < maxAge
         var sections = plan.sections
@@ -119,7 +116,7 @@ class WeatherService(
     /** Keeps the last pollen forecast and weather history when this refresh didn't fetch them. */
     private fun withSlowSections(fresh: WeatherSnapshot, previous: WeatherSnapshot?, pollenWanted: Boolean): WeatherSnapshot {
         if (previous == null) return fresh
-        val now = Instant.now()
+        val now = kotlin.time.Clock.System.now()
         val zone = runCatching { ZoneId.of(fresh.timeZoneId) }.getOrDefault(ZoneId.systemDefault())
         val today = LocalDate.now(zone)
         val history = fresh.history ?: previous.history?.takeIf { Duration.between(it.fetchedAt, now) < Duration.ofDays(3) }
@@ -150,7 +147,7 @@ class WeatherService(
      */
     private fun withCachedStandIns(fresh: WeatherSnapshot, previous: WeatherSnapshot?): WeatherSnapshot {
         if (previous == null || fresh.skippedSections.isEmpty()) return fresh
-        val now = Instant.now()
+        val now = kotlin.time.Clock.System.now()
         val zone = runCatching { ZoneId.of(fresh.timeZoneId) }.getOrDefault(ZoneId.systemDefault())
         val skipped = fresh.skippedSections
         var result = fresh

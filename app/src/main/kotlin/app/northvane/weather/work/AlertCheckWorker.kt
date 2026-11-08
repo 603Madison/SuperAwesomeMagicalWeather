@@ -22,8 +22,8 @@ import app.northvane.weather.data.SettingsRepository
 import app.northvane.weather.net.isAllowed
 import app.northvane.weather.notify.AlertNotifier
 import kotlinx.coroutines.flow.first
-import java.time.Instant
 import java.util.concurrent.TimeUnit
+import app.northvane.core.time.*
 
 /**
  * Periodically checks NWS active alerts for every saved location and posts a
@@ -62,7 +62,7 @@ class AlertCheckWorker(appContext: Context, params: WorkerParameters) : Coroutin
             container.weatherCache.updateAlerts(location.id, alerts)
             if (!canNotify) continue
             val gardenFrost = settings.gardenEnabled && settings.gardenFrostAlerts
-            val (items, updated) = tracker.select(location.id, alerts, settings.alertCategories, state, Instant.now()) { alert ->
+            val (items, updated) = tracker.select(location.id, alerts, settings.alertCategories, state, kotlin.time.Clock.System.now()) { alert ->
                 gardenFrost && (alert.event.contains("Frost", ignoreCase = true) || alert.event.contains("Freeze", ignoreCase = true))
             }
             state = updated

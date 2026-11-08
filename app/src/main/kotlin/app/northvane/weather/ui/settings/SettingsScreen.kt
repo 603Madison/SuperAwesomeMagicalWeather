@@ -90,6 +90,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.AlertDialog
 import app.northvane.core.outlook.Comfort
 import app.northvane.core.outlook.MyTime
+import app.northvane.core.time.*
 
 /** Literal so lint doesn't flag the API 33 constant; only requested on API 33+. */
 private const val POST_NOTIFICATIONS = "android.permission.POST_NOTIFICATIONS"
@@ -426,8 +427,8 @@ private fun AlertsPage(state: MainUiState, container: AppContainer, onBack: () -
             if (s.briefingEnabled) {
                 val times = (5 * 60..10 * 60 step 30).toList()
                 ChoiceDropdown("At", (times + s.briefingMinutes).distinct().sorted(), s.briefingMinutes, { m ->
-                    val t = java.time.LocalTime.of(m / 60, m % 60)
-                    java.time.format.DateTimeFormatter.ofPattern(if (android.text.format.DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm a").format(t)
+                    val t = app.northvane.core.time.LocalTime.of(m / 60, m % 60)
+                    app.northvane.core.time.DateTimeFormatter.ofPattern(if (android.text.format.DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm a").format(t)
                 }, { m -> updateDaily { setBriefingMinutes(m) } })
             }
             LabeledSwitch("Tonight", s.tonightEnabled, { on ->
@@ -437,8 +438,8 @@ private fun AlertsPage(state: MainUiState, container: AppContainer, onBack: () -
             if (s.tonightEnabled) {
                 val evening = (17 * 60..21 * 60 step 30).toList()
                 ChoiceDropdown("At", (evening + s.tonightMinutes).distinct().sorted(), s.tonightMinutes, { m ->
-                    val t = java.time.LocalTime.of(m / 60, m % 60)
-                    java.time.format.DateTimeFormatter.ofPattern(if (android.text.format.DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm a").format(t)
+                    val t = app.northvane.core.time.LocalTime.of(m / 60, m % 60)
+                    app.northvane.core.time.DateTimeFormatter.ofPattern(if (android.text.format.DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm a").format(t)
                 }, { m -> updateDaily { setTonightMinutes(m) } })
             }
             LabeledSwitch("Rain starting soon", s.rainSoonEnabled, { on ->
@@ -647,7 +648,7 @@ private fun CategoryRow(category: AlertCategory, title: String, subtitle: String
 private fun MyTimesEditor(times: List<MyTime>, onChange: (List<MyTime>) -> Unit) {
     val context = LocalContext.current
     val is24 = android.text.format.DateFormat.is24HourFormat(context)
-    fun clock(m: Int) = java.time.format.DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "h:mm a").format(java.time.LocalTime.of(m / 60, m % 60))
+    fun clock(m: Int) = app.northvane.core.time.DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "h:mm a").format(app.northvane.core.time.LocalTime.of(m / 60, m % 60))
     var editing by remember { mutableStateOf<Int?>(null) }
     times.forEachIndexed { i, t ->
         NavRow(t.label, "${clock(t.minutes)} · ${t.durationMinutes} min" + if (t.weekdaysOnly) " · weekdays" else "") { editing = i }

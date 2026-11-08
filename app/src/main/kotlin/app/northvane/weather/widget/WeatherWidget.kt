@@ -35,10 +35,8 @@ import app.northvane.weather.data.AppSettings
 import app.northvane.weather.ui.TimeFormat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneId
 import java.util.concurrent.TimeUnit
+import app.northvane.core.time.*
 
 /**
  * Home-screen widget in three sizes: small (temperature and icon), medium
@@ -137,7 +135,7 @@ class WeatherWidget : AppWidgetProvider() {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
             views.setOnClickPendingIntent(R.id.widget_root, open)
-            val now = Instant.now()
+            val now = kotlin.time.Clock.System.now()
             val zone = snapshot?.timeZoneId?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: ZoneId.systemDefault()
             val f = UnitFormatter(settings.units)
             val time = TimeFormat(zone, android.text.format.DateFormat.is24HourFormat(context))
@@ -232,7 +230,7 @@ class WidgetRefreshWorker(appContext: Context, params: WorkerParameters) : Corou
         val location = locations.firstOrNull { it.id == settings.selectedLocationId } ?: locations.firstOrNull()
         if (location != null) {
             val cached = container.weatherCache.read(location.id)
-            if (cached == null || Duration.between(cached.fetchedAt, Instant.now()) > Duration.ofMinutes(45)) {
+            if (cached == null || Duration.between(cached.fetchedAt, kotlin.time.Clock.System.now()) > Duration.ofMinutes(45)) {
                 attempt { container.weather.refresh(location) }
             }
         }

@@ -41,9 +41,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.Duration
-import java.time.Instant
 import java.util.UUID
+import app.northvane.core.time.*
 
 data class MainUiState(
     val ready: Boolean = false,
@@ -69,7 +68,7 @@ data class MainUiState(
      * Under satellite limits, cards only show data downloaded in the last 12
      * hours unless the user chose to see stale data.
      */
-    fun shows(section: Section, now: Instant = Instant.now()): Boolean {
+    fun shows(section: Section, now: Instant = kotlin.time.Clock.System.now()): Boolean {
         if (!liteMode || settings.showStaleData) return true
         val age = snapshot?.ageOf(section, now) ?: return false
         return age < STALE_AFTER
@@ -166,7 +165,7 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
             snapshots.update { it + (location.id to snapshot) }
         }
         val interval = container.weather.refreshInterval(container.weather.currentPlan(container.settings.settings.first()))
-        if (cached == null || Duration.between(cached.fetchedAt, Instant.now()) > interval) refresh(location)
+        if (cached == null || Duration.between(cached.fetchedAt, kotlin.time.Clock.System.now()) > interval) refresh(location)
     }
 
     /** Called when the app returns to the foreground. */
@@ -279,16 +278,16 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
     fun markPlanted(crop: app.northvane.core.garden.Crop) {
         viewModelScope.launch {
             val plan = state.value.settings.gardenPlan
-            container.settings.setGardenPlan(plan.map { if (it.crop == crop) it.copy(plantedOn = java.time.LocalDate.now()) else it })
+            container.settings.setGardenPlan(plan.map { if (it.crop == crop) it.copy(plantedOn = app.northvane.core.time.LocalDate.now()) else it })
         }
     }
 
     private fun loadAccuracy(location: SavedLocation) {
         val snapshot = snapshots.value[location.id] ?: return
         viewModelScope.launch {
-            val zone = runCatching { java.time.ZoneId.of(snapshot.timeZoneId) }.getOrDefault(java.time.ZoneId.systemDefault())
+            val zone = runCatching { app.northvane.core.time.ZoneId.of(snapshot.timeZoneId) }.getOrDefault(app.northvane.core.time.ZoneId.systemDefault())
             val summary = app.northvane.core.outlook.ForecastAccuracy.summarize(
-                container.weatherCache.forecastLog(location.id), snapshot.history, java.time.LocalDate.now(zone),
+                container.weatherCache.forecastLog(location.id), snapshot.history, app.northvane.core.time.LocalDate.now(zone),
             ) ?: return@launch
             val units = state.value.settings.units
             val text = app.northvane.core.outlook.ForecastAccuracy.describe(
@@ -301,11 +300,11 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
     /** About 1 KB, at most every 10 minutes per place; Backwoods mode decides as for rain notifications. */
     private fun loadNowcast(location: SavedLocation) {
         val last = nowcasts.value[location.id]?.first
-        if (last != null && Duration.between(last, Instant.now()) < Duration.ofMinutes(10)) return
+        if (last != null && Duration.between(last, kotlin.time.Clock.System.now()) < Duration.ofMinutes(10)) return
         if (!isAllowed(SatelliteFeature.RAIN_SOON, state.value.settings, state.value.network)) return
         viewModelScope.launch {
             attempt { container.nowcast.next(location.point) }.onSuccess { steps ->
-                nowcasts.update { it + (location.id to (Instant.now() to steps)) }
+                nowcasts.update { it + (location.id to (kotlin.time.Clock.System.now() to steps)) }
             }
         }
     }
@@ -359,7 +358,7 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         val snapshot = st.snapshot ?: return
         // Everything the app knows, not just the forecast: cards that depend on the reader's setup too.
         val extras = runCatching {
-            AiContext.extras(snapshot, st.settings, st.frostClimate, st.nowcast, snapshot.latitude ?: location.latitude, Instant.now()) +
+            AiContext.extras(snapshot, st.settings, st.frostClimate, st.nowcast, snapshot.latitude ?: location.latitude, kotlin.time.Clock.System.now()) +
                 (st.accuracy?.let { "\nHow the forecast has done here (forecast for each day made the day before, against NOAA observations): $it" } ?: "")
         }.getOrDefault("")
         aiJobs.ask(location, question, snapshot, st.settings, st.liteMode, extras)

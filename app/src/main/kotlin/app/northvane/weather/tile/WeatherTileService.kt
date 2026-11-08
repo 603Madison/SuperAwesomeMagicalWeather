@@ -15,8 +15,7 @@ import app.northvane.weather.NorthvaneApp
 import app.northvane.weather.ui.TimeFormat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.time.Instant
-import java.time.ZoneId
+import app.northvane.core.time.*
 
 /**
  * Quick Settings tile: the temperature and the headline's first sentence for
@@ -61,7 +60,7 @@ class WeatherTileService : TileService() {
             val location = locations.firstOrNull { it.id == settings.selectedLocationId } ?: locations.firstOrNull()
                 ?: return "Weather" to "Add a place"
             val snapshot = container.weatherCache.read(location.id) ?: return location.displayName to "Open the app to load"
-            val now = Instant.now()
+            val now = kotlin.time.Clock.System.now()
             val zone = runCatching { ZoneId.of(snapshot.timeZoneId) }.getOrDefault(ZoneId.systemDefault())
             val f = UnitFormatter(settings.units)
             val time = TimeFormat(zone, android.text.format.DateFormat.is24HourFormat(context))

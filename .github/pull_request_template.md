@@ -1,7 +1,7 @@
 ## What and why
 
 ## How I tested it
-- [ ] `./gradlew :core:test :app:testDebugUnitTest :app:lintDebug`
+- [ ] `./gradlew :core:jvmTest :app:testDebugUnitTest :app:lintDebug`
 - [ ] Tried it on a device or emulator (say which)
 
 ## Checklist

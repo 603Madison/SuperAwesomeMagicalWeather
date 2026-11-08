@@ -210,12 +210,12 @@ You need Android Studio with AGP 9.4 support, JDK 17+ and Android SDK
 platform 37.
 
 ```bash
-./gradlew :core:test                    # data layer and security tests
+./gradlew :core:jvmTest                    # data layer and security tests
 ./gradlew :app:testDebugUnitTest        # app tests; renders screenshots to app/build/outputs/screenshots
 ./gradlew :mini:testDebugUnitTest       # Mini tests, driven by keys only
 ./gradlew :app:lintDebug :ui:lintDebug :mini:lintDebug
 ./gradlew :app:assembleDebug :mini:assembleDebug   # installable debug APKs
-./gradlew :core:test -Pnorthvane.live=true          # also hit the real NWS, NOAA and IEM services
+./gradlew :core:jvmTest -Pnorthvane.live=true          # also hit the real NWS, NOAA and IEM services
 ```
 
 To build signed release APKs, put your key details in a git-ignored

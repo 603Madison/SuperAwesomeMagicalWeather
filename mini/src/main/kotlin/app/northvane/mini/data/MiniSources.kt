@@ -25,15 +25,11 @@ import kotlinx.serialization.json.doubleOrNull
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.math.cos
+import app.northvane.core.time.*
 
 /**
  * Place search by name or ZIP/postal code through Open-Meteo's free geocoder,
@@ -51,7 +47,7 @@ class PlaceSearch(private val http: OkHttpClient) {
             .addQueryParameter("language", Locale.getDefault().language.ifBlank { "en" })
             .addQueryParameter("format", "json")
             .build()
-        val response = http.fetch(Request.Builder().url(url).build(), maxBytes = 256L * 1024)
+        val response = http.fetch(app.northvane.core.net.Request.Builder().url(url.toString()).build(), maxBytes = 256L * 1024)
         if (response.code !in 200..299) return emptyList()
         val results = ((NorthvaneJson.parseToJsonElement(response.body) as? JsonObject)?.get("results") as? JsonArray).orEmpty()
         fun JsonObject.text(key: String) = (this[key] as? JsonPrimitive)?.contentOrNull

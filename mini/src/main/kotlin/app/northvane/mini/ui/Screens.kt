@@ -77,8 +77,6 @@ import app.northvane.mini.MiniViewModel
 import app.northvane.mini.data.MiniTheme
 import app.northvane.mini.data.RadarImages
 import kotlinx.coroutines.delay
-import java.time.Duration
-import java.time.Instant
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.luminance
@@ -89,11 +87,8 @@ import app.northvane.ui.TemperatureRange
 import app.northvane.ui.WeatherIcon
 import app.northvane.ui.skyGradient
 import app.northvane.ui.warningGradient
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
 import java.util.Locale
+import app.northvane.core.time.*
 
 /** Screen routes; the back stack is a list of these. */
 object Route {
@@ -115,18 +110,18 @@ object Route {
 
 /** Times and dates in the place's own time zone. */
 class Fmt(val zone: ZoneId, is24: Boolean, val units: UnitFormatter) {
-    private val hour = DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "h a", Locale.getDefault())
-    private val time = DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "h:mm a", Locale.getDefault())
-    private val dayTime = DateTimeFormatter.ofPattern(if (is24) "EEE HH:mm" else "EEE h:mm a", Locale.getDefault())
+    private val hour = DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "h a")
+    private val time = DateTimeFormatter.ofPattern(if (is24) "HH:mm" else "h:mm a")
+    private val dayTime = DateTimeFormatter.ofPattern(if (is24) "EEE HH:mm" else "EEE h:mm a")
     fun hour(t: Instant): String = hour.format(t.atZone(zone))
     fun time(t: Instant): String = time.format(t.atZone(zone))
     fun dayTime(t: Instant): String = dayTime.format(t.atZone(zone))
-    private val date = DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault())
+    private val date = DateTimeFormatter.ofPattern("EEE, MMM d")
     fun date(d: LocalDate): String = date.format(d)
     fun weekday(d: LocalDate): String = when (d) {
         LocalDate.now(zone) -> "Today"
         LocalDate.now(zone).plusDays(1) -> "Tmrw"
-        else -> d.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+        else -> d.dayOfWeek.getDisplayName(TextStyle.SHORT)
     }
 }
 
@@ -284,7 +279,7 @@ private fun HomeScreen(state: MiniState, fmt: Fmt, go: (String) -> Unit, refresh
 private fun NowHeader(state: MiniState, snapshot: WeatherSnapshot?, fmt: Fmt) {
     val f = fmt.units
     val current = snapshot?.current
-    val now = Instant.now()
+    val now = kotlin.time.Clock.System.now()
     val hour = snapshot?.hourly?.firstOrNull { it.time.plusSeconds(3600) > now }
     val todayDate = LocalDate.now(fmt.zone)
     val today = snapshot?.daily?.firstOrNull { !it.date.isBefore(todayDate) && (it.highC != null || it.lowC != null) }
@@ -364,7 +359,7 @@ private fun NowHeader(state: MiniState, snapshot: WeatherSnapshot?, fmt: Fmt) {
 @Composable
 private fun HourlyScreen(state: MiniState, fmt: Fmt, refresh: () -> Unit) {
     // A cached forecast can be hours old: start at the current hour.
-    val hours = state.snapshot?.hourly.orEmpty().filter { it.time.plusSeconds(3600) > Instant.now() }.take(48)
+    val hours = state.snapshot?.hourly.orEmpty().filter { it.time.plusSeconds(3600) > kotlin.time.Clock.System.now() }.take(48)
     ScreenKeysEffect(ScreenKeys(left = refreshKey(state, refresh)))
     if (hours.isEmpty()) return Hint(if (state.loading) "Loading…" else "No hourly forecast for this place.")
     MiniList(screen = Route.HOURLY, count = hours.size) { i, focus, onFocused ->
@@ -527,7 +522,7 @@ private fun RadarScreen(state: MiniState, fmt: Fmt) {
     var panY by rememberSaveable { mutableIntStateOf(0) }
     var frame by rememberSaveable { mutableIntStateOf(6) }
     var playing by rememberSaveable { mutableStateOf(false) }
-    val times = remember { radar.frameTimes(Instant.now()) }
+    val times = remember { radar.frameTimes(kotlin.time.Clock.System.now()) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     val half = radar.zooms[zoom]
@@ -798,8 +793,8 @@ private fun SettingsScreen(state: MiniState, vm: MiniViewModel, go: (String) -> 
             vm.setAlerts(s.alertsEnabled, intervals[(intervals.indexOf(s.alertCheckMinutes) + 1).mod(intervals.size)])
         },
         "Morning briefing: ${s.briefingMinutes?.let { m ->
-            java.time.LocalTime.of(m / 60, m % 60).format(
-                java.time.format.DateTimeFormatter.ofPattern(if (android.text.format.DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm a"),
+            app.northvane.core.time.LocalTime.of(m / 60, m % 60).format(
+                app.northvane.core.time.DateTimeFormatter.ofPattern(if (android.text.format.DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm a"),
             )
         } ?: "Off"}" to { vm.cycleBriefing() },
         "Keys & help" to { go(Route.HELP) },

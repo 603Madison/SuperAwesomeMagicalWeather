@@ -72,6 +72,7 @@ fun kotlin.time.Duration.Companion.ofSeconds(n: Long): Duration = n.seconds
 fun kotlin.time.Duration.Companion.ofSeconds(n: Int): Duration = n.seconds
 fun kotlin.time.Duration.Companion.ofMillis(n: Long): Duration = n.milliseconds
 fun kotlin.time.Duration.Companion.between(start: Instant, end: Instant): Duration = end - start
+fun kotlin.time.Duration.Companion.between(start: ZonedDateTime, end: ZonedDateTime): Duration = end.toInstant() - start.toInstant()
 
 fun Duration.toDays(): Long = inWholeDays
 fun Duration.toHours(): Long = inWholeHours
@@ -120,6 +121,7 @@ fun LocalDate.withYear(year: Int): LocalDate {
     return LocalDate(year, month, minOf(day, last))
 }
 fun LocalDate.withDayOfMonth(d: Int): LocalDate = LocalDate(year, month, d)
+fun LocalDate.withMonth(m: Int): LocalDate = LocalDate(year, m, minOf(day, lengthOfMonth(year, m)))
 inline fun LocalDate.isBefore(other: LocalDate): Boolean = this < other
 inline fun LocalDate.isAfter(other: LocalDate): Boolean = this > other
 inline fun LocalDate.isEqual(other: LocalDate): Boolean = this == other
@@ -227,6 +229,9 @@ class ZonedDateTime private constructor(private val instant: Instant, val zone: 
     fun withSecond(s: Int): ZonedDateTime = of(LocalDateTime(local.date, LocalTime(local.hour, local.minute, s, local.nanosecond)), zone)
     fun withNano(n: Int): ZonedDateTime = of(LocalDateTime(local.date, LocalTime(local.hour, local.minute, local.second, n)), zone)
     fun withDayOfMonth(d: Int): ZonedDateTime = of(LocalDateTime(local.date.withDayOfMonth(d), local.time), zone)
+    fun with(time: LocalTime): ZonedDateTime = of(LocalDateTime(local.date, time), zone)
+    fun with(date: LocalDate): ZonedDateTime = of(LocalDateTime(date, local.time), zone)
+    fun format(f: DateTimeFormatter): String = f.format(this)
     fun withZoneSameInstant(z: ZoneId): ZonedDateTime = ofInstant(instant, z)
     fun truncatedTo(unit: ChronoUnit): ZonedDateTime = when (unit) {
         ChronoUnit.DAYS -> of(LocalDateTime(local.date, LocalTime(0, 0)), zone)
@@ -246,7 +251,7 @@ class ZonedDateTime private constructor(private val instant: Instant, val zone: 
         fun ofInstant(instant: Instant, zone: ZoneId): ZonedDateTime = ZonedDateTime(instant, zone)
         fun of(local: LocalDateTime, zone: ZoneId): ZonedDateTime = ZonedDateTime(local.toInstant(zone), zone)
         fun of(date: LocalDate, time: LocalTime, zone: ZoneId): ZonedDateTime = of(LocalDateTime(date, time), zone)
-        fun now(zone: ZoneId): ZonedDateTime = ofInstant(kotlin.time.Clock.System.now(), zone)
+        fun now(zone: ZoneId = TimeZone.currentSystemDefault()): ZonedDateTime = ofInstant(kotlin.time.Clock.System.now(), zone)
     }
 }
 

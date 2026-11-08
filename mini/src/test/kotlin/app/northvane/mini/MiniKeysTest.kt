@@ -33,10 +33,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
+import app.northvane.core.time.*
 
 /**
  * Drives SuperAwesomeMagicalWeather Mini with keys only, the way a flip phone without a
@@ -55,7 +52,7 @@ class MiniKeysTest {
     private val place = SavedLocation("home", "Concord, NH", 43.2081, -71.5376)
 
     private fun snapshot(): WeatherSnapshot {
-        val now = Instant.now()
+        val now = kotlin.time.Clock.System.now()
         val today = LocalDate.now(zone)
         return WeatherSnapshot(
             locationId = place.id,
@@ -88,7 +85,7 @@ class MiniKeysTest {
                     description = "Southwest winds 20 to 30 mph with gusts up to 50 mph. Gusty winds will blow around unsecured objects.",
                     instruction = "Use extra caution when driving, especially if operating a high profile vehicle.",
                     severity = AlertSeverity.MODERATE, urgency = null, certainty = null, category = AlertCategory.ADVISORY,
-                    ends = Instant.now().plus(Duration.ofHours(6)),
+                    ends = kotlin.time.Clock.System.now().plus(Duration.ofHours(6)),
                 ),
             ),
         )

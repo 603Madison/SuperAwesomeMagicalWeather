@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
 import app.northvane.core.net.UrlPolicy
+import app.northvane.core.net.isLocalNetworkAddress
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
@@ -40,7 +41,7 @@ object LocalNetworkAccess {
         if (UrlPolicy.isIpLiteral(host)) return false
         // The lookup itself can't be interrupted, so wait for it with a timeout instead of inside one.
         val lookup = kotlinx.coroutines.CoroutineScope(Dispatchers.IO).async {
-            runCatching { InetAddress.getAllByName(host).any(UrlPolicy::isLocalNetworkAddress) }.getOrDefault(false)
+            runCatching { InetAddress.getAllByName(host).any { UrlPolicy.isLocalNetworkAddress(it) } }.getOrDefault(false)
         }
         return withTimeoutOrNull(3_000) { lookup.await() } ?: false
     }

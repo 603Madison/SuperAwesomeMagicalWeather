@@ -17,13 +17,12 @@ import app.northvane.core.model.AlertCategory
 import app.northvane.core.model.AlertSeverity
 import app.northvane.weather.MainActivity
 import app.northvane.weather.R
-import java.time.Duration
-import java.time.Instant
 import app.northvane.core.alerts.AlertAreas
 import app.northvane.core.alerts.describe
 import app.northvane.core.model.GeoPoint
 import app.northvane.core.model.UnitSystem
 import app.northvane.core.util.UnitFormatter
+import app.northvane.core.time.*
 
 object AlertNotifier {
     const val CHANNEL_WARNINGS = "alerts_warnings"
@@ -74,7 +73,7 @@ object AlertNotifier {
     /** Posts a sample warning so the user can check sound, vibration and lock-screen behavior. */
     fun sendTest(context: Context, locationId: String?, locationName: String?): Boolean {
         if (!canNotify(context)) return false
-        val now = Instant.now()
+        val now = kotlin.time.Clock.System.now()
         val sample = app.northvane.core.model.WeatherAlert(
             id = "test-" + now.toEpochMilli(),
             threadId = "northvane-test",
@@ -106,7 +105,7 @@ object AlertNotifier {
     ) {
         if (items.isEmpty() || !canNotify(context)) return
         val manager = NotificationManagerCompat.from(context)
-        val now = Instant.now()
+        val now = kotlin.time.Clock.System.now()
         for (item in items) {
             val alert = item.alert
             val place = locationNames[item.locationId]
@@ -147,7 +146,7 @@ object AlertNotifier {
 
             (alert.ends ?: alert.expires)?.let { end ->
                 val remaining = Duration.between(now, end)
-                if (!remaining.isNegative) builder.setTimeoutAfter(remaining.toMillis())
+                if (!remaining.isNegative()) builder.setTimeoutAfter(remaining.toMillis())
             }
             // Same tag+id per alert thread, so an update replaces the earlier notification.
             manager.notify(TAG, notificationId, builder.build())

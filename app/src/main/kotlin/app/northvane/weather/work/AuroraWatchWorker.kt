@@ -31,13 +31,9 @@ import app.northvane.weather.data.SatelliteFeature
 import app.northvane.weather.net.isAllowed
 import app.northvane.weather.notify.AlertNotifier
 import kotlinx.coroutines.flow.first
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import app.northvane.core.time.*
 
 /**
  * Every few hours, downloads NOAA's geomagnetic forecast (one ~7 KB file for
@@ -55,7 +51,7 @@ class AuroraWatchWorker(appContext: Context, params: WorkerParameters) : Corouti
         val locations = container.locations.locations.first().filter { it.notify }.take(MAX_LOCATIONS)
         if (locations.isEmpty()) return Result.success()
 
-        val now = Instant.now()
+        val now = kotlin.time.Clock.System.now()
         val forecast = attempt { container.aurora.forecast(now) }.getOrNull() ?: return Result.retry()
         val prefs = applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         for (location in locations) {
@@ -117,7 +113,7 @@ class AuroraWatchWorker(appContext: Context, params: WorkerParameters) : Corouti
         @SuppressLint("MissingPermission") // checked by canNotify
         private fun notify(context: Context, locationId: String, place: String, headsUp: AuroraHeadsUp, zone: ZoneId): Boolean {
             if (!AlertNotifier.canNotify(context)) return false
-            val hour = DateTimeFormatter.ofPattern("h a", Locale.getDefault()).withZone(zone)
+            val hour = DateTimeFormatter.ofPattern("h a").withZone(zone)
             val today = LocalDate.now(zone)
             val title = if (headsUp.now) {
                 "Aurora may be visible now"
@@ -126,7 +122,7 @@ class AuroraWatchWorker(appContext: Context, params: WorkerParameters) : Corouti
                 val day = when (night.date) {
                     today -> "tonight"
                     today.plusDays(1) -> "tomorrow night"
-                    else -> night.date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, Locale.getDefault()) + " night"
+                    else -> night.date.dayOfWeek.getDisplayName(app.northvane.core.time.TextStyle.FULL) + " night"
                 }
                 "Northern lights possible $day"
             }

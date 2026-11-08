@@ -61,10 +61,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.AlertDialog
-import java.time.Instant
-import java.time.ZoneId
 import app.northvane.core.model.HourlyForecast
 import app.northvane.core.outlook.BestWindow
+import app.northvane.core.time.*
 
 internal fun bandColor(band: ScoreBand): Color = when (band) {
     ScoreBand.GREAT -> Color(0xFF2E9E5B)
@@ -147,7 +146,7 @@ internal fun ActivitiesSection(
                     }
                 }
                 val rows = day.activities.filter { it.activity in activities }
-                val now = Instant.now()
+                val now = kotlin.time.Clock.System.now()
                 rows.forEachIndexed { i, score ->
                     val window = remember(hourly, day.date, score.activity) { BestWindow.find(score.activity, hourly, day.date, zone, now) }
                     ActivityRow(score, window, f, time)

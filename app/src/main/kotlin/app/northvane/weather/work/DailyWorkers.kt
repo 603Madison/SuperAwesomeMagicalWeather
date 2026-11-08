@@ -34,12 +34,8 @@ import app.northvane.weather.notify.AlertNotifier
 import app.northvane.weather.ui.TimeFormat
 import app.northvane.weather.widget.WeatherWidget
 import kotlinx.coroutines.flow.first
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalTime
-import java.time.ZoneId
-import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
+import app.northvane.core.time.*
 
 /**
  * The morning briefing: today's forecast for the place on the Today screen,
@@ -57,7 +53,7 @@ class BriefingWorker(appContext: Context, params: WorkerParameters) : CoroutineW
             val location = locations.firstOrNull { it.id == settings.selectedLocationId } ?: locations.firstOrNull() ?: return Result.success()
             // A fresh forecast if the network allows (Backwoods limits apply); otherwise the last one, if recent.
             val snapshot = attempt { container.weather.refresh(location) }.getOrNull()
-                ?: container.weatherCache.read(location.id)?.takeIf { Duration.between(it.fetchedAt, Instant.now()) < Duration.ofHours(12) }
+                ?: container.weatherCache.read(location.id)?.takeIf { Duration.between(it.fetchedAt, kotlin.time.Clock.System.now()) < Duration.ofHours(12) }
                 ?: return Result.success()
             WeatherWidget.updateAll(applicationContext)
             notify(applicationContext, location.id, location.displayName, snapshot, settings)
@@ -96,11 +92,11 @@ class BriefingWorker(appContext: Context, params: WorkerParameters) : CoroutineW
             val f = UnitFormatter(settings.units)
             val time = TimeFormat(zone, android.text.format.DateFormat.is24HourFormat(context))
             val base = BriefingWriter.write(
-                place, snapshot.daily, snapshot.hourly, snapshot.alerts, zone, Instant.now(),
+                place, snapshot.daily, snapshot.hourly, snapshot.alerts, zone, kotlin.time.Clock.System.now(),
                 temperature = f::temperature, wind = f::windSpeed, hour = time::hour,
             )
             // The day's clothing and the user's own times, after the forecast sentences.
-            val now = Instant.now()
+            val now = kotlin.time.Clock.System.now()
             val extra = listOfNotNull(
                 app.northvane.core.outlook.MyTimes.sentence(
                     app.northvane.core.outlook.MyTimes.upcoming(settings.myTimes, now, zone), snapshot.hourly, f, time::hour, now,
@@ -146,7 +142,7 @@ class TonightWorker(appContext: Context, params: WorkerParameters) : CoroutineWo
         try {
             val settings = container.settings.settings.first()
             if (!settings.tonightEnabled || !AlertNotifier.canNotify(applicationContext)) return Result.success()
-            val now = Instant.now()
+            val now = kotlin.time.Clock.System.now()
             for (location in container.locations.locations.first().filter { it.notify }.take(5)) {
                 // The last forecast if it's recent, otherwise a fresh one (within Backwoods limits).
                 val snapshot = container.weatherCache.read(location.id)?.takeIf { Duration.between(it.fetchedAt, now) < Duration.ofHours(3) }
@@ -234,7 +230,7 @@ class RainSoonWorker(appContext: Context, params: WorkerParameters) : CoroutineW
         if (!isAllowed(SatelliteFeature.RAIN_SOON, settings, container.connectivity.current())) return Result.success()
         val locations = container.locations.locations.first().filter { it.notify }.take(MAX_LOCATIONS)
         val prefs = applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val now = Instant.now()
+        val now = kotlin.time.Clock.System.now()
         for (location in locations) {
             val zone = container.weatherCache.read(location.id)?.timeZoneId?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: ZoneId.systemDefault()
             // Nobody wants a drizzle notification at 3 AM.
@@ -273,7 +269,7 @@ class RainSoonWorker(appContext: Context, params: WorkerParameters) : CoroutineW
             .setContentText(text)
             .setContentIntent(pending)
             .setAutoCancel(true)
-            .setTimeoutAfter(Duration.between(Instant.now(), soon.start.plus(Duration.ofMinutes(30))).toMillis().coerceAtLeast(60_000))
+            .setTimeoutAfter(Duration.between(kotlin.time.Clock.System.now(), soon.start.plus(Duration.ofMinutes(30))).toMillis().coerceAtLeast(60_000))
             .build()
         NotificationManagerCompat.from(context).notify("rain_soon", locationId.hashCode(), notification)
     }

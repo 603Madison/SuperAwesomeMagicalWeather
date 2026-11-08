@@ -22,8 +22,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import java.time.Duration
-import java.time.Instant
+import app.northvane.core.time.*
 
 data class RadarUiState(
     val frames: List<RadarFrame> = emptyList(),
@@ -53,7 +52,7 @@ class RadarViewModel(private val container: AppContainer) : ViewModel() {
         val s = _state.value
         val moved = s.center != null && s.center != at
         center = at
-        val stale = s.loadedAt == null || Duration.between(s.loadedAt, Instant.now()) > Duration.ofMinutes(5)
+        val stale = s.loadedAt == null || Duration.between(s.loadedAt, kotlin.time.Clock.System.now()) > Duration.ofMinutes(5)
         if ((s.frames.isEmpty() || stale || moved) && (loadJob?.isActive != true || moved)) load()
     }
 
@@ -67,7 +66,7 @@ class RadarViewModel(private val container: AppContainer) : ViewModel() {
             _state.update {
                 it.copy(loading = true, source = settings.radarSource, futureCast = settings.futureCastEnabled, message = null)
             }
-            val now = Instant.now()
+            val now = kotlin.time.Clock.System.now()
             val at = center
             val past = attempt { container.radar.pastFrames(settings.radarSource, now) }.getOrDefault(emptyList())
             val future = if (futureAllowed) {
@@ -77,7 +76,7 @@ class RadarViewModel(private val container: AppContainer) : ViewModel() {
                 val after = past.lastOrNull()?.time ?: now
                 // A scan about 20 minutes before the newest shows how the rain is moving.
                 val earlier = past.lastOrNull()?.time?.let { last ->
-                    past.dropLast(1).minByOrNull { kotlin.math.abs(java.time.Duration.between(it.time, last).toMinutes() - 20) }?.time
+                    past.dropLast(1).minByOrNull { kotlin.math.abs(app.northvane.core.time.Duration.between(it.time, last).toMinutes() - 20) }?.time
                 }
                 attempt { container.radar.futureFrames(now, settings.futureCastMinutes, after, area, ::decodePng, earlier) }.getOrDefault(emptyList())
             } else {

@@ -24,14 +24,9 @@ import app.northvane.mini.MiniApp
 import app.northvane.mini.MiniViewModel
 import app.northvane.mini.R
 import app.northvane.mini.data.MiniSettings
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalTime
-import java.time.ZoneId
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import app.northvane.core.time.*
 
 /** Today's forecast for the selected place as one notification each morning, at the time chosen in Settings. */
 class MiniBriefingWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -44,7 +39,7 @@ class MiniBriefingWorker(context: Context, params: WorkerParameters) : Coroutine
             val place = settings.selected ?: return Result.success()
             val fresh = attempt { container.repository.fetch(place, SourceConfig(), MiniViewModel.PLAN) }.getOrNull()
             fresh?.let { container.store.saveSnapshot(it) }
-            val snapshot = fresh ?: container.store.snapshot(place.id)?.takeIf { Duration.between(it.fetchedAt, Instant.now()) < Duration.ofHours(12) }
+            val snapshot = fresh ?: container.store.snapshot(place.id)?.takeIf { Duration.between(it.fetchedAt, kotlin.time.Clock.System.now()) < Duration.ofHours(12) }
                 ?: return Result.success()
             notify(applicationContext, briefing(applicationContext, snapshot, place.displayName, settings))
             return Result.success()
@@ -76,9 +71,9 @@ class MiniBriefingWorker(context: Context, params: WorkerParameters) : Coroutine
         fun briefing(context: Context, snapshot: WeatherSnapshot, place: String, settings: MiniSettings): Briefing {
             val zone = runCatching { ZoneId.of(snapshot.timeZoneId) }.getOrDefault(ZoneId.systemDefault())
             val f = UnitFormatter(settings.units)
-            val hour = DateTimeFormatter.ofPattern(if (android.text.format.DateFormat.is24HourFormat(context)) "HH:mm" else "h a", Locale.getDefault())
+            val hour = DateTimeFormatter.ofPattern(if (android.text.format.DateFormat.is24HourFormat(context)) "HH:mm" else "h a")
             return BriefingWriter.write(
-                place, snapshot.daily, snapshot.hourly, snapshot.alerts, zone, Instant.now(),
+                place, snapshot.daily, snapshot.hourly, snapshot.alerts, zone, kotlin.time.Clock.System.now(),
                 temperature = f::temperature, wind = f::windSpeed, hour = { hour.format(it.atZone(zone)) },
             )
         }

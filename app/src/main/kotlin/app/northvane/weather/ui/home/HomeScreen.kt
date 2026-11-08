@@ -111,8 +111,6 @@ import app.northvane.core.outlook.DryingAdvisor
 import app.northvane.core.outlook.HeatingAdvisor
 import app.northvane.core.garden.GardenAdvisor
 import app.northvane.core.garden.Crop
-import java.time.Instant
-import java.time.ZoneId
 import kotlin.math.roundToInt
 import app.northvane.weather.data.TodayCard
 import androidx.compose.material3.SnackbarHostState
@@ -147,6 +145,7 @@ import app.northvane.core.model.GeoPoint
 import app.northvane.core.outlook.WhatToWear
 import app.northvane.core.outlook.MyTimes
 import app.northvane.core.outlook.AskSuggestions
+import app.northvane.core.time.*
 
 /** Everything the Today screen can ask the app to do. */
 class HomeActions(
@@ -185,7 +184,7 @@ fun HomeScreen(
 ) {
     val snapshot = state.snapshot
     // A warning (not a watch, advisory or statement) turns the Today screen red.
-    val warning = remember(snapshot?.alerts, snapshot?.fetchedAt) { snapshot?.hasActiveWarning(Instant.now()) == true }
+    val warning = remember(snapshot?.alerts, snapshot?.fetchedAt) { snapshot?.hasActiveWarning(kotlin.time.Clock.System.now()) == true }
     WarningTheme(active = warning) {
         HomeContent(state, actions, warning, onOpenAlerts, onOpenLocations, onOpenSettings, onOpenSources, onOpenAllergies, onOpenHeating)
     }
@@ -232,7 +231,7 @@ private fun HomeContent(
     // The next big storm, worked out once per forecast.
     val storm = remember(snapshot, zone, state.settings.stormEnabled) {
         snapshot?.takeIf { state.settings.stormEnabled }?.let {
-            app.northvane.core.outlook.StormTotals.find(it.hourly, it.daily, it.alerts, Instant.now(), zone)
+            app.northvane.core.outlook.StormTotals.find(it.hourly, it.daily, it.alerts, kotlin.time.Clock.System.now(), zone)
         }
     }
     val time = remember(zone) { TimeFormat(zone, DateFormat.is24HourFormat(context)) }
@@ -334,7 +333,7 @@ private fun HomeContent(
                         item { LoadingCard(state.refreshing) }
                     } else {
                         val settings = state.settings
-                        val now = Instant.now()
+                        val now = kotlin.time.Clock.System.now()
                         val hidden = mutableListOf<String>()
                         val showCurrent = state.shows(Section.CURRENT_CONDITIONS)
                         val headline = if (state.shows(Section.HOURLY_FORECAST)) {

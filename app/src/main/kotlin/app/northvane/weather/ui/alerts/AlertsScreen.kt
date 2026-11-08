@@ -64,10 +64,10 @@ import app.northvane.weather.ui.AiTask
 import app.northvane.weather.ui.MainUiState
 import app.northvane.weather.ui.home.TaskText
 import app.northvane.weather.ui.TimeFormat
-import java.time.ZoneId
 import app.northvane.core.alerts.AlertAreas
 import app.northvane.core.alerts.describe
 import app.northvane.core.util.UnitFormatter
+import app.northvane.core.time.*
 
 @Composable
 fun AlertsScreen(state: MainUiState, onRefresh: () -> Unit, onOpenSettings: () -> Unit, onExplain: (WeatherAlert) -> Unit = {}) {

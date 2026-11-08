@@ -56,13 +56,12 @@ import app.northvane.core.outlook.OutlookText
 import app.northvane.core.util.UnitFormatter
 import app.northvane.weather.data.AppSettings
 import app.northvane.weather.ui.TimeFormat
-import java.time.LocalDate
-import java.time.temporal.ChronoUnit
 import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.background
+import app.northvane.core.time.*
 
 @Composable
 internal fun SeasonCard(content: @Composable () -> Unit) {

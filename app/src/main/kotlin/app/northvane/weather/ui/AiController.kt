@@ -22,9 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneId
+import app.northvane.core.time.*
 
 /** One AI job's progress: the reply, or that it's being written, or what went wrong. */
 data class AiTask(val reply: AiReply? = null, val loading: Boolean = false, val error: String? = null)
@@ -97,7 +95,7 @@ class AiController(private val container: AppContainer, private val scope: Corou
             val storeKey = "v2|$office|$place"
             val stored = container.aiReplies.discussion(storeKey)?.takeIf { it.model == config.model }
             update(location.id) { it.copy(office = office, discussion = it.discussion.copy(reply = it.discussion.reply ?: stored)) }
-            val now = Instant.now()
+            val now = kotlin.time.Clock.System.now()
             val recent = checkedAt[office]?.let { Duration.between(it, now) < RECHECK } == true
             if (!force && recent && stored != null) return@launch
             blocked(config, settings, liteMode)?.let { reason ->
@@ -112,7 +110,7 @@ class AiController(private val container: AppContainer, private val scope: Corou
                 val discussion = container.nws.discussion(office, id)
                 val zone = snapshot?.timeZoneId?.let { runCatching { ZoneId.of(it) }.getOrNull() } ?: ZoneId.systemDefault()
                 val text = container.ai.complete(config, AiPrompts.discussion(discussion, place, zone))
-                AiReply(text, config.model, Instant.now(), id, discussion.issued).also { container.aiReplies.putDiscussion(storeKey, it) }
+                AiReply(text, config.model, kotlin.time.Clock.System.now(), id, discussion.issued).also { container.aiReplies.putDiscussion(storeKey, it) }
             }
             result.onSuccess { reply -> update(location.id) { it.copy(discussion = AiTask(reply)) } }
                 .onFailure { e -> update(location.id) { it.copy(discussion = it.discussion.copy(loading = false, error = e.toUserMessage())) } }
@@ -137,9 +135,9 @@ class AiController(private val container: AppContainer, private val scope: Corou
             }
             update(location.id) { it.copy(alerts = it.alerts + (alert.id to AiTask(loading = true))) }
             val zone = runCatching { ZoneId.of(snapshot.timeZoneId) }.getOrDefault(ZoneId.systemDefault())
-            val result = attempt { container.ai.complete(config, AiPrompts.alert(alert, place, zone, Instant.now())) }
+            val result = attempt { container.ai.complete(config, AiPrompts.alert(alert, place, zone, kotlin.time.Clock.System.now())) }
             result.onSuccess { text ->
-                val reply = AiReply(text, config.model, Instant.now(), alert.id, alert.sent)
+                val reply = AiReply(text, config.model, kotlin.time.Clock.System.now(), alert.id, alert.sent)
                 container.aiReplies.putAlert(storeKey, reply)
                 update(location.id) { it.copy(alerts = it.alerts + (alert.id to AiTask(reply))) }
             }.onFailure { e ->
@@ -161,8 +159,8 @@ class AiController(private val container: AppContainer, private val scope: Corou
                 return@launch
             }
             update(location.id) { it.copy(answer = AiTask(loading = true)) }
-            val result = attempt { container.ai.complete(config, AiPrompts.question(q, snapshot, placeFor(location, snapshot), settings.units, Instant.now(), location.longitude, extras)) }
-            result.onSuccess { text -> update(location.id) { it.copy(answer = AiTask(AiReply(text, config.model, Instant.now(), "question"))) } }
+            val result = attempt { container.ai.complete(config, AiPrompts.question(q, snapshot, placeFor(location, snapshot), settings.units, kotlin.time.Clock.System.now(), location.longitude, extras)) }
+            result.onSuccess { text -> update(location.id) { it.copy(answer = AiTask(AiReply(text, config.model, kotlin.time.Clock.System.now(), "question"))) } }
                 .onFailure { e -> update(location.id) { it.copy(answer = AiTask(error = e.toUserMessage())) } }
         }
     }

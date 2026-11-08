@@ -28,6 +28,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
+import app.northvane.core.time.*
 
 /** The next significant storm: when, how much, and its heaviest stretch. */
 @Composable
@@ -128,7 +129,7 @@ internal fun WaterSection(report: WaterReport, f: UnitFormatter, time: TimeForma
             if (report.river != null) Spacer(Modifier.padding(top = 10.dp))
             Text("Tides at ${t.name}", style = MaterialTheme.typography.titleMedium)
             Note("NOAA station, ${f.distance(t.distanceKm)} away" + (t.waterTempC?.let { " · water ${f.temperature(it)}" } ?: ""))
-            t.events.filter { it.time.isAfter(java.time.Instant.now()) }.take(4).forEach { e ->
+            t.events.filter { it.time.isAfter(kotlin.time.Clock.System.now()) }.take(4).forEach { e ->
                 Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
                     Text(if (e.high) "High" else "Low", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(56.dp))
                     Text(time.smart(e.time), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))

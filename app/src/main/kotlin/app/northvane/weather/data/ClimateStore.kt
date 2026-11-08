@@ -8,10 +8,8 @@ import app.northvane.core.model.GeoPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.time.Duration
-import java.time.Instant
-import java.time.LocalDate
 import java.util.Locale
+import app.northvane.core.time.*
 
 /**
  * Frost-date climatology per place (about 5 km grid), computed once from 30
@@ -30,10 +28,10 @@ class ClimateStore(context: Context, private val acis: AcisClient) {
     /** Cached value if under a year old, otherwise downloads and computes it. */
     suspend fun get(point: GeoPoint, allowDownload: Boolean): FrostClimate? {
         val cached = cached(point)
-        if (cached != null && Duration.between(cached.computedAt, Instant.now()) < Duration.ofDays(365)) return cached
+        if (cached != null && Duration.between(cached.computedAt, kotlin.time.Clock.System.now()) < Duration.ofDays(365)) return cached
         if (!allowDownload) return cached
         val lows = runCatching { acis.dailyLows(point, LocalDate.now().year - 1) }.getOrNull() ?: return cached
-        val climate = FrostClimate.compute(lows, Instant.now()) ?: return cached
+        val climate = FrostClimate.compute(lows, kotlin.time.Clock.System.now()) ?: return cached
         withContext(Dispatchers.IO) {
             dir.mkdirs()
             file(point).writeText(NorthvaneJson.encodeToString(FrostClimate.serializer(), climate))

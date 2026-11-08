@@ -67,13 +67,11 @@ import app.northvane.core.util.Solar
 import app.northvane.core.util.UnitFormatter
 import app.northvane.weather.ui.TimeFormat
 import kotlinx.coroutines.delay
-import java.time.Duration
-import java.time.Instant
-import java.time.ZoneId
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import app.northvane.core.time.*
 
 private val RainBlue = Color(0xFF3B8EEA)
 
@@ -126,7 +124,7 @@ internal fun HourlySection(
             }
             LazyRow(contentPadding = PaddingValues(end = 8.dp)) {
                 items(shown, key = { it.time.toEpochMilli() }) { hour ->
-                    val isNow = hour == shown.first() && hour.time.isBefore(Instant.now())
+                    val isNow = hour == shown.first() && hour.time.isBefore(kotlin.time.Clock.System.now())
                     HourColumn(hour, rows, if (isNow) "Now" else time.hour(hour.time), f)
                 }
             }
@@ -479,11 +477,11 @@ private fun DetailParagraph(label: String?, text: String) {
  */
 @Composable
 internal fun SunCard(location: SavedLocation, zone: ZoneId, time: TimeFormat) {
-    var now by remember { mutableStateOf(Instant.now()) }
+    var now by remember { mutableStateOf(kotlin.time.Clock.System.now()) }
     LaunchedEffect(Unit) {
         while (true) {
             delay(60_000)
-            now = Instant.now()
+            now = kotlin.time.Clock.System.now()
         }
     }
     val today = now.atZone(zone).toLocalDate()

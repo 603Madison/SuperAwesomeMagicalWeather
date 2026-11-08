@@ -13,6 +13,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import java.io.File
+import app.northvane.core.time.*
 
 /**
  * Last-known weather per location, so the app opens instantly and still shows
@@ -59,8 +60,8 @@ class WeatherCache(context: Context) {
     /** Call with [mutex] held. */
     private fun recordForecast(snapshot: WeatherSnapshot) {
         runCatching {
-            val zone = java.time.ZoneId.of(snapshot.timeZoneId)
-            val today = java.time.LocalDate.now(zone)
+            val zone = app.northvane.core.time.ZoneId.of(snapshot.timeZoneId)
+            val today = app.northvane.core.time.LocalDate.now(zone)
             val log = app.northvane.core.outlook.ForecastAccuracy.record(readLog(snapshot.locationId), snapshot, zone, today)
             logFile(snapshot.locationId).writeText(NorthvaneJson.encodeToString(recordList, log))
         }

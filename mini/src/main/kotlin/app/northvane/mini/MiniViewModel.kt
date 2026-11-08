@@ -21,9 +21,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.Duration
-import java.time.Instant
 import java.util.UUID
+import app.northvane.core.time.*
 
 data class MiniState(
     val ready: Boolean = false,
@@ -67,7 +66,7 @@ class MiniViewModel(app: Application) : AndroidViewModel(app) {
         }
         val cached = store.snapshot(place.id)
         _state.update { it.copy(snapshot = cached, message = null) }
-        val stale = cached == null || refreshIfOlderThan == null || Duration.between(cached.fetchedAt, Instant.now()) > refreshIfOlderThan
+        val stale = cached == null || refreshIfOlderThan == null || Duration.between(cached.fetchedAt, kotlin.time.Clock.System.now()) > refreshIfOlderThan
         if (stale) refresh()
     }
 

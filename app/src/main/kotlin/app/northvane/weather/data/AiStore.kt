@@ -11,8 +11,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import java.io.File
-import java.time.Duration
-import java.time.Instant
+import app.northvane.core.time.*
 
 /** Something the AI wrote, and what it was written from. */
 @Serializable
@@ -50,7 +49,7 @@ class AiStore(context: Context) {
 
     private suspend fun put(kind: String, key: String, reply: AiReply) = withContext(Dispatchers.IO) {
         lock.withLock {
-            val cutoff = Instant.now().minus(KEEP)
+            val cutoff = kotlin.time.Clock.System.now().minus(KEEP)
             val kept = (load(kind) + (key to reply)).filterValues { it.createdAt.isAfter(cutoff) }
                 .entries.sortedByDescending { it.value.createdAt }.take(MAX_ENTRIES).associate { it.key to it.value }
             dir.mkdirs()

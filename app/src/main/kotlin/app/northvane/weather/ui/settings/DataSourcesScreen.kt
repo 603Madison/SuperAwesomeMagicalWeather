@@ -94,8 +94,8 @@ import app.northvane.weather.ui.components.SecureWindow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.time.ZoneId
 import java.util.UUID
+import app.northvane.core.time.*
 
 @Composable
 fun DataSourcesScreen(
@@ -797,7 +797,7 @@ private fun PollenSection(
                             val result = attempt {
                                 val key = withContext(Dispatchers.IO) { container.secrets.get(SecretStore.POLLEN_API_KEY) }
                                     ?: throw IllegalStateException("No key saved")
-                                container.pollen.forecast(place.point, key, java.time.Instant.now(), AppSignature.restriction(context))
+                                container.pollen.forecast(place.point, key, kotlin.time.Clock.System.now(), AppSignature.restriction(context))
                             }
                             testResult = result.fold(
                                 onSuccess = { f ->

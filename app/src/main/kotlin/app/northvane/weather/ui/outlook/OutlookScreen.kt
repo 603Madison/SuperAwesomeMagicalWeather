@@ -41,8 +41,7 @@ import app.northvane.weather.ui.home.DryingSection
 import app.northvane.weather.ui.home.FoliageSection
 import app.northvane.weather.ui.home.GardenCard
 import app.northvane.weather.ui.home.HeatingSection
-import java.time.Instant
-import java.time.ZoneId
+import app.northvane.core.time.*
 
 /** Whether the Outlook tab has anything turned on. */
 fun AppSettings.hasOutlookFeatures(): Boolean =
@@ -116,7 +115,7 @@ fun OutlookScreen(
                 }
                 if (settings.dryingEnabled && hourlyFresh && snapshot.hourly.isNotEmpty()) {
                     home += {
-                        val drying = remember(snapshot) { DryingAdvisor.report(snapshot.hourly, snapshot.daily, Instant.now(), zone) }
+                        val drying = remember(snapshot) { DryingAdvisor.report(snapshot.hourly, snapshot.daily, kotlin.time.Clock.System.now(), zone) }
                         DryingSection(drying, settings.laundryOutSince != null, f, time, onLaundry)
                     }
                 }

@@ -64,14 +64,13 @@ import app.northvane.core.radar.RadarFrame
 import app.northvane.core.radar.RadarSource
 import app.northvane.core.radar.SatelliteImagery
 import app.northvane.core.util.Solar
-import java.time.Instant
 import app.northvane.weather.AppContainer
 import app.northvane.weather.data.SatelliteFeature
 import app.northvane.weather.ui.MainUiState
 import app.northvane.weather.ui.TimeFormat
 import app.northvane.weather.ui.components.NorthvaneIcons
-import java.time.ZoneId
 import kotlin.math.roundToInt
+import app.northvane.core.time.*
 
 @Composable
 fun RadarScreen(state: MainUiState, container: AppContainer, onOpenSettings: () -> Unit) {
@@ -141,7 +140,7 @@ fun RadarScreen(state: MainUiState, container: AppContainer, onOpenSettings: () 
                     val imagery = remember(settings.satelliteImagery, location.latitude, location.longitude, radar.loadedAt) {
                         SatelliteImagery.resolve(
                             settings.satelliteImagery,
-                            Solar.isDaylight(location.latitude, location.longitude, Instant.now()),
+                            Solar.isDaylight(location.latitude, location.longitude, kotlin.time.Clock.System.now()),
                         )
                     }
                     RadarMap(
@@ -273,7 +272,7 @@ private fun Controls(
                     if (forecast.isNotEmpty()) {
                         // Newest run first; later frames may come from the run before while the newest is still publishing.
                         val runs = forecast.mapNotNull { it.run }.distinct().sortedDescending()
-                            .joinToString(", ") { "%02dZ".format(it.atOffset(java.time.ZoneOffset.UTC).hour) }
+                            .joinToString(", ") { "%02dZ".format(it.atOffset(app.northvane.core.time.ZoneOffset.UTC).hour) }
                         append(" · Forecast: NOAA HRRR model" + (if (runs.isNotEmpty()) " ($runs run)" else "") +
                             (if (forecast.first().image != null) ", from NOAA open data" else " via Iowa Environmental Mesonet") +
                             if (forecast.any { it.calibrated }) ", calibrated to the latest radar, which leads the first two hours" else "")

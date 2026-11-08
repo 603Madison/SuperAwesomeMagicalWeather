@@ -37,8 +37,8 @@ import app.northvane.core.model.UvLevel
 import app.northvane.core.outlook.OutlookText
 import app.northvane.core.util.UnitFormatter
 import app.northvane.weather.ui.TimeFormat
-import java.time.Instant
 import kotlin.math.roundToInt
+import app.northvane.core.time.*
 
 internal fun aqiColor(category: AqiCategory): Color = when (category) {
     AqiCategory.GOOD -> Color(0xFF3FA34D)
@@ -157,7 +157,7 @@ private fun AqiScale(aqi: Int) {
 
 @Composable
 internal fun UvSection(uv: UvForecast, time: TimeFormat) {
-    val now = Instant.now()
+    val now = kotlin.time.Clock.System.now()
     val current = uv.at(now) ?: return
     val level = UvLevel.of(current)
     val peak = uv.peak()

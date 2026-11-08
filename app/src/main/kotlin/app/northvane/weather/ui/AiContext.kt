@@ -15,11 +15,9 @@ import app.northvane.core.outlook.MyTimes
 import app.northvane.core.outlook.WhatToWear
 import app.northvane.core.util.UnitFormatter
 import app.northvane.weather.data.AppSettings
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
+import app.northvane.core.time.*
 
 /**
  * The app's outlooks that depend on the user's own setup (garden, heating,
@@ -40,10 +38,10 @@ object AiContext {
     ): String {
         val zone = runCatching { ZoneId.of(snapshot.timeZoneId) }.getOrDefault(ZoneId.systemDefault())
         val f = UnitFormatter(settings.units)
-        val hour = DateTimeFormatter.ofPattern("EEE h a", Locale.US).withZone(zone)
-        val clock = DateTimeFormatter.ofPattern("h:mm a", Locale.US).withZone(zone)
-        val day = DateTimeFormatter.ofPattern("EEE", Locale.US)
-        val date = DateTimeFormatter.ofPattern("MMM d", Locale.US)
+        val hour = DateTimeFormatter.ofPattern("EEE h a").withZone(zone)
+        val clock = DateTimeFormatter.ofPattern("h:mm a").withZone(zone)
+        val day = DateTimeFormatter.ofPattern("EEE")
+        val date = DateTimeFormatter.ofPattern("MMM d")
         val today = now.atZone(zone).toLocalDate()
         fun words(e: Enum<*>) = e.name.lowercase().replace('_', ' ')
         return buildString {
