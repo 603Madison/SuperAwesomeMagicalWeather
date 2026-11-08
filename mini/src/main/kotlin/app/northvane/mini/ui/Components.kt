@@ -1,5 +1,7 @@
 package app.northvane.mini.ui
 
+import app.northvane.ui.lexendFamily
+import app.northvane.ui.withFamily
 import android.view.KeyEvent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -78,7 +80,7 @@ private val MiniType = Typography(
 /** The main app's default theme (shared through :ui), with type sized for flip phones. */
 @Composable
 fun MiniTheme(dark: Boolean, content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = if (dark) BrandDarkColors else BrandLightColors, typography = MiniType, content = content)
+    MaterialTheme(colorScheme = if (dark) BrandDarkColors else BrandLightColors, typography = MiniType.withFamily(lexendFamily()), content = content)
 }
 
 /** The soft page background the main app uses behind its cards. */

@@ -1,5 +1,7 @@
 package app.northvane.weather.ui.theme
 
+import app.northvane.ui.lexendFamily
+import app.northvane.ui.withFamily
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -75,7 +77,7 @@ fun NorthvaneTheme(
         )
     }
     CompositionLocalProvider(LocalIsDark provides darkTheme, LocalBackdrop provides backdrop) {
-        MaterialTheme(colorScheme = colors, typography = NorthvaneTypography, content = content)
+        MaterialTheme(colorScheme = colors, typography = NorthvaneTypography.withFamily(lexendFamily()), content = content)
     }
 }
 
