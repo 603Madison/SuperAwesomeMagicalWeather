@@ -5,9 +5,8 @@ import Shared
 /// Starts the shared app: background refresh and notifications must be set up before launch finishes.
 final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        IosApp.shared.reloadWidgets = {
+        NotificationCenter.default.addObserver(forName: Notification.Name(IosApp.shared.WIDGETS_CHANGED), object: nil, queue: .main) { _ in
             WidgetCenter.shared.reloadAllTimelines()
-            return KotlinUnit()
         }
         IosApp.shared.onLaunch()
         return true

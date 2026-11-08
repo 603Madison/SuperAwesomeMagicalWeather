@@ -74,12 +74,14 @@ jobs:
             exit 1
           fi
           echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
-          set -o pipefail
           xcodebuild -project iosApp/SuperAwesomeMagicalWeather.xcodeproj -scheme SuperAwesomeMagicalWeather \
             -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build/ios \
             MARKETING_VERSION="$VERSION_NAME" CURRENT_PROJECT_VERSION="$VERSION_CODE" \
-            CODE_SIGNING_ALLOWED=NO build | tee build/xcodebuild.log | grep -E 'error:|warning: .*Kotlin|BUILD' || true
-          test -d build/ios/Build/Products/Release-iphoneos/SuperAwesomeMagicalWeather.app
+            CODE_SIGNING_ALLOWED=NO build > xcodebuild.log 2>&1 || {
+              grep -nE 'error:|^e: |What went wrong' -A3 xcodebuild.log | head -80
+              exit 1
+            }
+          grep -E '\*\* BUILD' xcodebuild.log
 
       - name: Package the .ipa
         run: |
@@ -105,5 +107,5 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: xcodebuild-log
-          path: build/xcodebuild.log
+          path: xcodebuild.log
           if-no-files-found: ignore

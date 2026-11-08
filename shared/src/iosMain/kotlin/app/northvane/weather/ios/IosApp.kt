@@ -46,6 +46,7 @@ import platform.Foundation.NSApplicationSupportDirectory
 import platform.Foundation.NSBundle
 import platform.Foundation.NSDate
 import platform.Foundation.NSFileManager
+import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSSearchPathForDirectoriesInDomains
 import platform.Foundation.NSUserDomainMask
 import platform.Foundation.dateWithTimeIntervalSinceNow
@@ -133,8 +134,8 @@ object IosApp {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     internal val navRequests = MutableStateFlow<NavRequest?>(null)
 
-    /** Set from Swift: asks WidgetKit to redraw (WidgetKit has no Objective-C API). */
-    var reloadWidgets: (() -> Unit)? = null
+    /** Posted when the widget data changes; the Swift app asks WidgetKit to redraw (it has no Objective-C API). */
+    const val WIDGETS_CHANGED = "app.northvane.weather.widgetsChanged"
 
     private val notificationDelegate = object : NSObject(), UNUserNotificationCenterDelegateProtocol {
         override fun userNotificationCenter(
@@ -277,7 +278,7 @@ object IosApp {
         val dir = NSFileManager.defaultManager.containerURLForSecurityApplicationGroupIdentifier(APP_GROUP)?.path ?: return
         val path = "$dir/widget.json".toPath()
         FileSystem.SYSTEM.write(path) { writeUtf8(NorthvaneJson.encodeToString(WidgetData.serializer(), data)) }
-        reloadWidgets?.invoke()
+        NSNotificationCenter.defaultCenter.postNotificationName(WIDGETS_CHANGED, `object` = null)
     }
 
     private fun sfSymbol(c: WeatherCondition, day: Boolean): String = when (c) {
