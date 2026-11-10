@@ -167,16 +167,19 @@ object IosNotifications : Notifications {
  * don't take each other's answers. Core Location is used from the main thread.
  */
 object IosLocation : DeviceLocation {
+    // Held here: the manager keeps only a weak reference to its delegate. (A class rather than
+    // an object: Kotlin/Native can't compile an object declaration that extends NSObject.)
+    private val delegate by lazy { Delegate() }
     private val manager by lazy {
         CLLocationManager().apply {
             desiredAccuracy = kCLLocationAccuracyKilometer
-            delegate = Delegate
+            delegate = this@IosLocation.delegate
         }
     }
     private val authWaiters = mutableListOf<(Boolean) -> Unit>()
     private val locationWaiters = mutableListOf<(CLLocation?) -> Unit>()
 
-    private object Delegate : NSObject(), CLLocationManagerDelegateProtocol {
+    private class Delegate : NSObject(), CLLocationManagerDelegateProtocol {
         override fun locationManagerDidChangeAuthorization(manager: CLLocationManager) {
             if (manager.authorizationStatus == kCLAuthorizationStatusNotDetermined) return
             val ok = authorized()
