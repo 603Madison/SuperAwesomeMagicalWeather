@@ -57,7 +57,8 @@ fun <T> ReorderableColumn(
                             if (index < local.lastIndex) add(CustomAccessibilityAction("Move down") { onReorder(move(index, index + 1)); true })
                         }
                     }
-                    .pointerInput(k) {
+                    // Keyed on the list too: the gesture must see the current order, not the one from its first composition.
+                    .pointerInput(k, items) {
                         detectDragGesturesAfterLongPress(
                             onDragStart = {
                                 draggingKey = k

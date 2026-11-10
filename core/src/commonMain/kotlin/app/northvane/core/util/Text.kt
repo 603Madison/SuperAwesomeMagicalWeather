@@ -2,8 +2,6 @@ package app.northvane.core.util
 
 import kotlin.math.PI
 import kotlin.math.abs
-import kotlin.math.pow
-import kotlin.math.roundToLong
 
 /**
  * printf-style formatting that works on every platform, always with "." as
@@ -69,16 +67,39 @@ fun String.fmt(vararg args: Any?): String {
     return out.toString()
 }
 
-/** [value] with exactly [decimals] digits after the point, rounded half up. */
+/**
+ * [value] with exactly [decimals] digits after the point, rounded half up on
+ * the decimal value as written (its shortest form), the way java's
+ * `String.format` and `BigDecimal.valueOf` round: 1.005 → "1.01", not the
+ * "1.00" that rounding the binary double gives.
+ */
 fun fixed(value: Double, decimals: Int): String {
     if (value.isNaN()) return "NaN"
     if (value.isInfinite()) return if (value > 0) "Infinity" else "-Infinity"
-    val factor = 10.0.pow(decimals)
-    val scaled = (abs(value) * factor).roundToLong()
-    val neg = value < 0 && scaled != 0L
-    val digits = scaled.toString().padStart(decimals + 1, '0')
-    val whole = digits.dropLast(decimals)
-    val frac = digits.takeLast(decimals)
+    // Digits and the position of the decimal point, from the shortest representation ("1.0E-5" included).
+    val text = abs(value).toString()
+    val mantissa = text.substringBefore('E').substringBefore('e')
+    val exponent = text.substringAfter('E', text.substringAfter('e', "0")).toInt()
+    var digits = mantissa.replace(".", "")
+    var point = mantissa.substringBefore('.').length + exponent
+    if (point < 0) {
+        digits = "0".repeat(-point) + digits
+        point = 0
+    }
+    if (digits.length < point) digits = digits.padEnd(point, '0')
+    val keep = point + decimals
+    var kept = digits.take(keep).padEnd(keep, '0')
+    if (digits.length > keep && digits[keep] >= '5') {
+        // Add one in the last kept place, carrying as needed.
+        val chars = kept.toCharArray()
+        var i = chars.lastIndex
+        while (i >= 0 && chars[i] == '9') { chars[i] = '0'; i-- }
+        if (i >= 0) chars[i] = chars[i] + 1 else { point++ }
+        kept = (if (i < 0) "1" else "") + chars.concatToString()
+    }
+    val whole = kept.take(point).trimStart('0').ifEmpty { "0" }
+    val frac = kept.drop(point)
+    val neg = value < 0 && kept.any { it != '0' }
     return (if (neg) "-" else "") + whole + if (decimals > 0) ".$frac" else ""
 }
 

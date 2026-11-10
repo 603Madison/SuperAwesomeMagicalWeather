@@ -30,7 +30,10 @@ import app.northvane.weather.ui.theme.NorthvaneTheme
 import app.northvane.weather.ui.theme.ThemeWeather
 import app.northvane.weather.ui.theme.isAppInDarkTheme
 import app.northvane.weather.work.Background
+import app.northvane.core.repo.attempt
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,6 +60,8 @@ import platform.UserNotifications.UNNotificationPresentationOptionList
 import platform.UserNotifications.UNNotificationPresentationOptionSound
 import platform.UserNotifications.UNNotificationPresentationOptions
 import platform.UserNotifications.UNNotificationResponse
+import platform.Foundation.NSURL
+import platform.Foundation.NSURLIsExcludedFromBackupKey
 import platform.UserNotifications.UNUserNotificationCenter
 import platform.UserNotifications.UNUserNotificationCenterDelegateProtocol
 import platform.darwin.NSObject
@@ -75,6 +80,8 @@ class IosPlatform : Platform {
         val dir = (NSSearchPathForDirectoriesInDomains(NSApplicationSupportDirectory, NSUserDomainMask, true).firstOrNull() as? String)
             ?: error("No Application Support directory")
         NSFileManager.defaultManager.createDirectoryAtPath(dir, withIntermediateDirectories = true, attributes = null, error = null)
+        // Places, settings and cached forecasts stay on this phone, as on Android: not in iCloud or computer backups.
+        NSURL.fileURLWithPath(dir).setResourceValue(true, forKey = NSURLIsExcludedFromBackupKey, error = null)
         dir
     }
     override val settingsDir: String = support
@@ -168,9 +175,14 @@ object IosApp {
         platform.iosConnectivity.start()
         BGTaskScheduler.sharedScheduler.registerForTaskWithIdentifier(REFRESH_TASK, usingQueue = null) { task ->
             val refresh = task as? BGAppRefreshTask ?: return@registerForTaskWithIdentifier
-            val job = scope.launch {
-                runCatching { backgroundRefresh() }
-                refresh.setTaskCompletedWithSuccess(true)
+            // ATOMIC: even if iOS ends the task before it starts, the body runs far enough to report back.
+            val job = scope.launch(start = CoroutineStart.ATOMIC) {
+                var ok = false
+                try {
+                    ok = backgroundRefresh()
+                } finally {
+                    refresh.setTaskCompletedWithSuccess(ok)
+                }
             }
             refresh.expirationHandler = { job.cancel() }
         }
@@ -180,9 +192,13 @@ object IosApp {
         }
     }
 
+    /** Each return to the app, for the screen to refresh a forecast that has gone stale meanwhile. */
+    internal val foregrounds = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
     /** From the scene becoming active. */
     fun onForeground() {
         IosNotifications.refresh { bookReminders() }
+        foregrounds.tryEmit(Unit)
         scope.launch { scheduleRefresh() }
     }
 
@@ -201,16 +217,19 @@ object IosApp {
     }
 
     private suspend fun checkAlerts() {
-        Background.checkAlerts(container, IosNotifications.authorized).forEach { IosNotifications.show(it) }
+        Background.checkAlerts(container, IosNotifications.currentlyAuthorized()).forEach { IosNotifications.show(it) }
     }
 
-    private suspend fun backgroundRefresh() {
+    /** One background run; each step on its own, so a failed alert check still leaves fresh widgets. True if all went well. */
+    private suspend fun backgroundRefresh(): Boolean {
         scheduleRefresh()
-        checkAlerts()
-        val settings = container.settings.settings.first()
-        Background.todayPlace(container, settings, refresh = true)
-        bookRemindersNow()
-        updateWidgetsNow()
+        val steps = listOf(
+            suspend { checkAlerts() },
+            suspend { Background.todayPlace(container, container.settings.settings.first(), refresh = true); Unit },
+            suspend { bookRemindersNow() },
+            suspend { updateWidgetsNow() },
+        )
+        return steps.map { step -> attempt { step() }.isSuccess }.all { it }
     }
 
     fun bookReminders() {
@@ -231,7 +250,7 @@ object IosApp {
             val at = today.atTime(minutes / 60, minutes % 60).atZone(zone).toInstant()
             return if (at > now.plusSeconds(60)) at else today.plusDays(1).atTime(minutes / 60, minutes % 60).atZone(zone).toInstant()
         }
-        if (!IosNotifications.authorized) return
+        if (!IosNotifications.currentlyAuthorized()) return
         val place = Background.todayPlace(container, settings, refresh = false)
         if (settings.briefingEnabled && place != null) {
             val at = next(settings.briefingMinutes)
@@ -240,6 +259,8 @@ object IosApp {
             IosNotifications.cancel("briefing")
         }
         val locations = container.locations.locations.first().filter { it.notify }
+        // Places removed, or with notifications turned off, keep nothing booked.
+        IosNotifications.cancelOthers("tonight-", locations.map { "tonight-${it.id}" }.toSet())
         for (location in locations) {
             val id = "tonight-${location.id}"
             val snapshot = if (settings.tonightEnabled) container.weatherCache.read(location.id) else null
@@ -276,8 +297,11 @@ object IosApp {
             updatedEpoch = snapshot.fetchedAt.epochSecond,
         )
         val dir = NSFileManager.defaultManager.containerURLForSecurityApplicationGroupIdentifier(APP_GROUP)?.path ?: return
+        // Through a temp file and a rename, so the widget never reads half a file.
         val path = "$dir/widget.json".toPath()
-        FileSystem.SYSTEM.write(path) { writeUtf8(NorthvaneJson.encodeToString(WidgetData.serializer(), data)) }
+        val tmp = "$dir/widget.json.tmp".toPath()
+        FileSystem.SYSTEM.write(tmp) { writeUtf8(NorthvaneJson.encodeToString(WidgetData.serializer(), data)) }
+        FileSystem.SYSTEM.atomicMove(tmp, path)
         NSNotificationCenter.defaultCenter.postNotificationName(WIDGETS_CHANGED, `object` = null)
     }
 
@@ -304,7 +328,10 @@ object IosApp {
     internal fun Content() {
         val vm: MainViewModel = viewModel(factory = MainViewModel.factory(container))
         val state by vm.state.collectAsStateWithLifecycle()
-        LaunchedEffect(Unit) { vm.onForeground() }
+        LaunchedEffect(vm) {
+            vm.onForeground()
+            foregrounds.collect { vm.onForeground() }
+        }
         val settings = state.settings
         val current = state.snapshot?.current
         val weather = ThemeWeather(

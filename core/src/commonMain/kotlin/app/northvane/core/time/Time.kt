@@ -215,29 +215,39 @@ class ZonedDateTime private constructor(private val instant: Instant, val zone: 
     fun toLocalTime(): LocalTime = local.time
     fun toLocalDateTime(): LocalDateTime = local
 
-    fun plusDays(n: Long): ZonedDateTime = of(LocalDateTime(local.date.plusDays(n), local.time), zone)
+    /**
+     * [l] in this zone. In the repeated hour when clocks fall back, keeps this
+     * moment's offset when it still fits, as java.time does: 1:30 EDT
+     * truncated to the hour is 1:00 EDT, not an hour and a half earlier.
+     */
+    private fun resolve(l: LocalDateTime): ZonedDateTime {
+        val sameOffset = l.toInstant(UtcOffset(seconds = offsetSeconds))
+        return if (sameOffset.toLocalDateTime(zone) == l) ofInstant(sameOffset, zone) else of(l, zone)
+    }
+
+    fun plusDays(n: Long): ZonedDateTime = resolve(LocalDateTime(local.date.plusDays(n), local.time))
     fun minusDays(n: Long): ZonedDateTime = plusDays(-n)
     fun plusWeeks(n: Long): ZonedDateTime = plusDays(n * 7)
-    fun plusMonths(n: Long): ZonedDateTime = of(LocalDateTime(local.date.plusMonths(n), local.time), zone)
+    fun plusMonths(n: Long): ZonedDateTime = resolve(LocalDateTime(local.date.plusMonths(n), local.time))
     fun plusHours(n: Long): ZonedDateTime = ofInstant(instant + n.hours, zone)
     fun minusHours(n: Long): ZonedDateTime = plusHours(-n)
     fun plusMinutes(n: Long): ZonedDateTime = ofInstant(instant + n.minutes, zone)
     fun minusMinutes(n: Long): ZonedDateTime = plusMinutes(-n)
     fun plusSeconds(n: Long): ZonedDateTime = ofInstant(instant + n.seconds, zone)
-    fun withHour(h: Int): ZonedDateTime = of(LocalDateTime(local.date, LocalTime(h, local.minute, local.second, local.nanosecond)), zone)
-    fun withMinute(m: Int): ZonedDateTime = of(LocalDateTime(local.date, LocalTime(local.hour, m, local.second, local.nanosecond)), zone)
-    fun withSecond(s: Int): ZonedDateTime = of(LocalDateTime(local.date, LocalTime(local.hour, local.minute, s, local.nanosecond)), zone)
-    fun withNano(n: Int): ZonedDateTime = of(LocalDateTime(local.date, LocalTime(local.hour, local.minute, local.second, n)), zone)
-    fun withDayOfMonth(d: Int): ZonedDateTime = of(LocalDateTime(local.date.withDayOfMonth(d), local.time), zone)
-    fun with(time: LocalTime): ZonedDateTime = of(LocalDateTime(local.date, time), zone)
-    fun with(date: LocalDate): ZonedDateTime = of(LocalDateTime(date, local.time), zone)
+    fun withHour(h: Int): ZonedDateTime = resolve(LocalDateTime(local.date, LocalTime(h, local.minute, local.second, local.nanosecond)))
+    fun withMinute(m: Int): ZonedDateTime = resolve(LocalDateTime(local.date, LocalTime(local.hour, m, local.second, local.nanosecond)))
+    fun withSecond(s: Int): ZonedDateTime = resolve(LocalDateTime(local.date, LocalTime(local.hour, local.minute, s, local.nanosecond)))
+    fun withNano(n: Int): ZonedDateTime = resolve(LocalDateTime(local.date, LocalTime(local.hour, local.minute, local.second, n)))
+    fun withDayOfMonth(d: Int): ZonedDateTime = resolve(LocalDateTime(local.date.withDayOfMonth(d), local.time))
+    fun with(time: LocalTime): ZonedDateTime = resolve(LocalDateTime(local.date, time))
+    fun with(date: LocalDate): ZonedDateTime = resolve(LocalDateTime(date, local.time))
     fun format(f: DateTimeFormatter): String = f.format(this)
     fun withZoneSameInstant(z: ZoneId): ZonedDateTime = ofInstant(instant, z)
     fun truncatedTo(unit: ChronoUnit): ZonedDateTime = when (unit) {
-        ChronoUnit.DAYS -> of(LocalDateTime(local.date, LocalTime(0, 0)), zone)
-        ChronoUnit.HOURS -> of(LocalDateTime(local.date, LocalTime(local.hour, 0)), zone)
-        ChronoUnit.MINUTES -> of(LocalDateTime(local.date, LocalTime(local.hour, local.minute)), zone)
-        else -> of(LocalDateTime(local.date, LocalTime(local.hour, local.minute, local.second)), zone)
+        ChronoUnit.DAYS -> resolve(LocalDateTime(local.date, LocalTime(0, 0)))
+        ChronoUnit.HOURS -> resolve(LocalDateTime(local.date, LocalTime(local.hour, 0)))
+        ChronoUnit.MINUTES -> resolve(LocalDateTime(local.date, LocalTime(local.hour, local.minute)))
+        else -> resolve(LocalDateTime(local.date, LocalTime(local.hour, local.minute, local.second)))
     }
     fun isBefore(other: ZonedDateTime): Boolean = instant < other.instant
     fun isAfter(other: ZonedDateTime): Boolean = instant > other.instant
@@ -258,9 +268,13 @@ class ZonedDateTime private constructor(private val instant: Instant, val zone: 
 /** ISO date-time with an offset ("2026-11-06T10:00:00-05:00"), keeping the offset. */
 object OffsetDateTime {
     fun parse(text: String): ZonedDateTime {
-        val c = DateTimeComponents.Formats.ISO_DATE_TIME_OFFSET.parse(text)
+        // Seconds are optional in ISO 8601 ("2026-11-06T10:00-05:00"), as java.time accepted.
+        val full = NO_SECONDS.find(text)?.let { m -> text.substring(0, m.range.first) + m.value + ":00" + text.substring(m.range.last + 1) } ?: text
+        val c = DateTimeComponents.Formats.ISO_DATE_TIME_OFFSET.parse(full)
         return ZonedDateTime.ofInstant(c.toInstantUsingOffset(), FixedOffsetTimeZone(c.toUtcOffset()))
     }
+
+    private val NO_SECONDS = Regex("""(?<=T)\d{2}:\d{2}(?=[Zz+-]|$)""")
 }
 
 /** Month and day without a year, for seasonal windows. */
@@ -278,8 +292,15 @@ enum class ChronoUnit(internal val millis: Long) {
     MILLIS(1), SECONDS(1_000), MINUTES(60_000), HOURS(3_600_000), DAYS(86_400_000);
 
     fun between(start: Instant, end: Instant): Long = (end - start).inWholeMilliseconds / millis
-    fun between(start: ZonedDateTime, end: ZonedDateTime): Long =
-        if (this == DAYS) start.toLocalDate().daysUntil(end.toLocalDate()).toLong() else between(start.toInstant(), end.toInstant())
+    /** As java.time: whole days, counted in [start]'s zone (23:00 to 01:00 the next day is 0 days). */
+    fun between(start: ZonedDateTime, end: ZonedDateTime): Long {
+        if (this != DAYS) return between(start.toInstant(), end.toInstant())
+        val e = end.withZoneSameInstant(start.zone)
+        var days = start.toLocalDate().daysUntil(e.toLocalDate()).toLong()
+        if (days > 0 && e.toLocalTime() < start.toLocalTime()) days--
+        if (days < 0 && e.toLocalTime() > start.toLocalTime()) days++
+        return days
+    }
     fun between(start: LocalDate, end: LocalDate): Long = when (this) {
         DAYS -> start.daysUntil(end).toLong()
         else -> start.daysUntil(end).toLong() * (86_400_000 / millis)

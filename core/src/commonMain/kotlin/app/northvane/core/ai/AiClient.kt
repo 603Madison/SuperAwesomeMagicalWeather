@@ -100,7 +100,7 @@ class AiClient(clients: LocalServerClients, private val claude: ClaudeClient = C
 
     private fun request(config: AiConfig, url: HttpUrl, cleartext: Boolean): Request.Builder =
         Request.Builder().url(url).header("Accept", "application/json").header("Cache-Control", "no-store").apply {
-            config.apiKey?.takeIf { it.isNotBlank() }?.let { header("Authorization", "Bearer $it") }
+            config.apiKey?.takeIf { it.isNotBlank() }?.let { secretHeader("Authorization", "Bearer $it") }
             if (cleartext) allowLanCleartext()
         }
 

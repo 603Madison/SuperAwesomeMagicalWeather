@@ -46,6 +46,16 @@ class AlertCheckWorker(appContext: Context, params: WorkerParameters) : Coroutin
         // Without permission nothing can be shown: keep alerts un-notified so they still appear once
         // notifications are allowed (the cached alerts for each place are refreshed either way).
         val canNotify = AlertNotifier.canNotify(applicationContext)
+        return container.alertState.exclusive { check(container, settings, locations, tracker, canNotify) }
+    }
+
+    private suspend fun check(
+        container: app.northvane.weather.AppContainer,
+        settings: app.northvane.weather.data.AppSettings,
+        locations: List<app.northvane.core.model.SavedLocation>,
+        tracker: AlertTracker,
+        canNotify: Boolean,
+    ): Result {
         var state = container.alertState.read()
         val toNotify = mutableListOf<AlertToNotify>()
         var failures = 0

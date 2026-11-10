@@ -24,6 +24,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val openAlerts = intent?.getBooleanExtra(EXTRA_OPEN_ALERTS, false) == true
+        // Only on a fresh start: after a rotation the user may have moved on to another place.
+        if (savedInstanceState == null) {
+            intent?.getStringExtra(EXTRA_PLACE_ID)?.takeIf { it.length <= 64 }?.let { vm.select(it) }
+        }
         setContent { MiniRoot(vm, openAlerts, onExit = ::finish, hub = hub) }
     }
 
@@ -47,5 +51,6 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_OPEN_ALERTS = "open_alerts"
+        const val EXTRA_PLACE_ID = "place_id"
     }
 }

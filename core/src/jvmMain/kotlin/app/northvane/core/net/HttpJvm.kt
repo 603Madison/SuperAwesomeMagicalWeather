@@ -19,12 +19,24 @@ fun Request.toOkHttp(): okhttp3.Request = okhttp3.Request.Builder()
         headers.forEach { (n, v) -> header(n, v) }
         body?.let { method(method, it.bytes.toRequestBody(it.contentType.toMediaType())) }
         if (lanCleartext) tag(LanCleartextAllowed::class.java, LanCleartextAllowed)
+        if (carriesSecrets) tag(CarriesSecrets::class.java, CarriesSecrets)
     }
     .build()
 
+/** OkHttp request tag for requests with a key, token or password in a header. */
+object CarriesSecrets
+
+/**
+ * The client to send [request] with: one that doesn't follow redirects when it
+ * carries credentials (OkHttp only drops Authorization on a redirect to
+ * another host; API-key headers would go along).
+ */
+private fun OkHttpClient.forRequest(request: Request): OkHttpClient =
+    if (request.carriesSecrets) newBuilder().followRedirects(false).build() else this
+
 actual suspend fun HttpEngine.fetch(request: Request, maxBytes: Long): HttpResponse =
     runInterruptible(Dispatchers.IO) {
-        newCall(request.toOkHttp()).execute().use { response ->
+        forRequest(request).newCall(request.toOkHttp()).execute().use { response ->
             val source = response.body.source()
             if (source.request(maxBytes + 1)) throw ResponseTooLargeException(maxBytes)
             HttpResponse(
@@ -37,7 +49,7 @@ actual suspend fun HttpEngine.fetch(request: Request, maxBytes: Long): HttpRespo
 
 actual suspend fun HttpEngine.fetchBytes(request: Request, maxBytes: Long): HttpBytes =
     runInterruptible(Dispatchers.IO) {
-        newCall(request.toOkHttp()).execute().use { response ->
+        forRequest(request).newCall(request.toOkHttp()).execute().use { response ->
             val source = response.body.source()
             if (source.request(maxBytes + 1)) throw ResponseTooLargeException(maxBytes)
             HttpBytes(response.code, source.buffer.readByteArray())

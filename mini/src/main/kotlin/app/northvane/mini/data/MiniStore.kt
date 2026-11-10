@@ -108,7 +108,8 @@ class MiniStore(context: Context) {
 
     private fun <T> read(file: File, serializer: KSerializer<T>): T? {
         val atomic = AtomicFile(file)
-        if (!file.exists() && !atomic.baseFile.exists()) return null
+        // No exists() check first: after a crash mid-write the data may be only in AtomicFile's backup,
+        // which readFully restores. A file that isn't there at all reads as null.
         return runCatching { NorthvaneJson.decodeFromString(serializer, atomic.readFully().decodeToString()) }.getOrNull()
     }
 

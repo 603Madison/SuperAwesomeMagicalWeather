@@ -23,16 +23,28 @@ class LocationStore(private val store: DataStore<Preferences>) {
 
     private val data = store.data.catch { if (it is IOException) emit(emptyPreferences()) else throw it }
 
-    val locations: Flow<List<SavedLocation>> = data.map { p ->
-        p[locationsKey]?.let { runCatching { NorthvaneJson.decodeFromString(locationList, it) }.getOrNull() }.orEmpty()
+    val locations: Flow<List<SavedLocation>> = data.map { p -> savedLocations(p).orEmpty() }
+
+    val stations: Flow<List<WeeWxStation>> = data.map { p -> savedStations(p).orEmpty() }
+
+    /**
+     * The saved places: empty when there are none, null when they can't be
+     * read. Changes are skipped when they can't be read, so a list this
+     * version doesn't understand (say, from a newer one) is never replaced by
+     * an empty one.
+     */
+    private fun savedLocations(p: Preferences): List<SavedLocation>? {
+        val raw = p[locationsKey] ?: return emptyList()
+        return runCatching { NorthvaneJson.decodeFromString(locationList, raw) }.getOrNull()
     }
 
-    val stations: Flow<List<WeeWxStation>> = data.map { p ->
-        p[stationsKey]?.let { runCatching { NorthvaneJson.decodeFromString(stationList, it) }.getOrNull() }.orEmpty()
+    private fun savedStations(p: Preferences): List<WeeWxStation>? {
+        val raw = p[stationsKey] ?: return emptyList()
+        return runCatching { NorthvaneJson.decodeFromString(stationList, raw) }.getOrNull()
     }
 
     suspend fun upsertLocation(location: SavedLocation) = store.edit { p ->
-        val current = p[locationsKey]?.let { runCatching { NorthvaneJson.decodeFromString(locationList, it) }.getOrNull() }.orEmpty()
+        val current = savedLocations(p) ?: return@edit
         val updated = if (current.any { it.id == location.id }) {
             // Refreshing a place (e.g. the device position) keeps the user's nickname and notification choice.
             current.map { if (it.id == location.id) location.copy(nickname = location.nickname ?: it.nickname, notify = it.notify) else it }
@@ -46,13 +58,13 @@ class LocationStore(private val store: DataStore<Preferences>) {
 
     /** Applies [change] to the saved location [id], if it exists. */
     suspend fun updateLocation(id: String, change: (SavedLocation) -> SavedLocation) = store.edit { p ->
-        val current = p[locationsKey]?.let { runCatching { NorthvaneJson.decodeFromString(locationList, it) }.getOrNull() }.orEmpty()
+        val current = savedLocations(p) ?: return@edit
         p[locationsKey] = NorthvaneJson.encodeToString(locationList, current.map { if (it.id == id) change(it) else it })
     }
 
     /** Puts the saved locations in the order of [ids]; unknown IDs are ignored, unlisted places keep their place at the end. */
     suspend fun reorder(ids: List<String>) = store.edit { p ->
-        val current = p[locationsKey]?.let { runCatching { NorthvaneJson.decodeFromString(locationList, it) }.getOrNull() }.orEmpty()
+        val current = savedLocations(p) ?: return@edit
         val byId = current.associateBy { it.id }
         val ordered = ids.mapNotNull { byId[it] } + current.filter { it.id !in ids }
         p[locationsKey] = NorthvaneJson.encodeToString(locationList, ordered)
@@ -64,9 +76,9 @@ class LocationStore(private val store: DataStore<Preferences>) {
     suspend fun setNotify(id: String, enabled: Boolean) = updateLocation(id) { it.copy(notify = enabled) }
 
     suspend fun removeLocation(id: String) = store.edit { p ->
-        val current = p[locationsKey]?.let { runCatching { NorthvaneJson.decodeFromString(locationList, it) }.getOrNull() }.orEmpty()
+        val current = savedLocations(p) ?: return@edit
         p[locationsKey] = NorthvaneJson.encodeToString(locationList, current.filterNot { it.id == id })
-        val stations = p[stationsKey]?.let { runCatching { NorthvaneJson.decodeFromString(stationList, it) }.getOrNull() }.orEmpty()
+        val stations = savedStations(p) ?: return@edit
         p[stationsKey] = NorthvaneJson.encodeToString(
             stationList,
             stations.map { if (it.linkedLocationId == id) it.copy(linkedLocationId = null) else it },
@@ -74,7 +86,7 @@ class LocationStore(private val store: DataStore<Preferences>) {
     }
 
     suspend fun upsertStation(station: WeeWxStation) = store.edit { p ->
-        val current = p[stationsKey]?.let { runCatching { NorthvaneJson.decodeFromString(stationList, it) }.getOrNull() }.orEmpty()
+        val current = savedStations(p) ?: return@edit
         val updated = if (current.any { it.id == station.id }) {
             current.map { if (it.id == station.id) station else it }
         } else {
@@ -84,7 +96,7 @@ class LocationStore(private val store: DataStore<Preferences>) {
     }
 
     suspend fun removeStation(id: String) = store.edit { p ->
-        val current = p[stationsKey]?.let { runCatching { NorthvaneJson.decodeFromString(stationList, it) }.getOrNull() }.orEmpty()
+        val current = savedStations(p) ?: return@edit
         p[stationsKey] = NorthvaneJson.encodeToString(stationList, current.filterNot { it.id == id })
     }
 

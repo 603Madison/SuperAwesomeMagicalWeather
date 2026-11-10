@@ -30,7 +30,9 @@ import platform.CoreLocation.CLLocationCoordinate2DMake
 import platform.Foundation.NSCache
 import platform.Foundation.NSHTTPURLResponse
 import platform.Foundation.NSString
+import platform.Foundation.NSDate
 import platform.Foundation.NSURL
+import platform.Foundation.timeIntervalSince1970
 import platform.Foundation.NSURLSession
 import platform.Foundation.dataTaskWithURL
 import platform.MapKit.MKCoordinateRegionMakeWithDistance
@@ -108,6 +110,10 @@ private val tileCache = NSCache().apply { countLimit = 600u }
 private val loadingLock = SynchronizedObject()
 private val loading = mutableSetOf<String>()
 
+/** Tiles that failed for a passing reason (offline, timeout, server error), with when: tried again after a while. */
+private val failedAt = mutableMapOf<String, Double>()
+private const val RETRY_SECONDS = 30.0
+
 /**
  * Draws a [RasterOverlay]: tiles fetched on demand (MapKit calls this on
  * background threads), or the forecast picture stretched over its area.
@@ -137,8 +143,12 @@ private class RasterRenderer(private val layer: RasterOverlay) : MKOverlayRender
         forTiles(mapRect, z) { x, y, rect ->
             val url = tileUrl(tiles.template, x, y, z)
             if (tileCache.objectForKey(url) == null) {
-                ready = false
-                load(url, rect, zoomScale)
+                val failed = synchronized(loadingLock) { failedAt[url] }
+                // Failed a moment ago: draw what there is rather than ask again and again.
+                if (failed == null || NSDate().timeIntervalSince1970 - failed > RETRY_SECONDS) {
+                    ready = false
+                    load(url, rect, zoomScale)
+                }
             }
         }
         return ready
@@ -147,14 +157,25 @@ private class RasterRenderer(private val layer: RasterOverlay) : MKOverlayRender
     private fun load(url: String, rect: CValue<MKMapRect>, zoomScale: Double) {
         val first = synchronized(loadingLock) { loading.add(url) }
         if (!first) return
-        val nsUrl = NSURL.URLWithString(url) ?: return
+        val nsUrl = NSURL.URLWithString(url)
+        if (nsUrl == null) {
+            synchronized(loadingLock) { loading.remove(url); failedAt[url] = Double.MAX_VALUE }
+            return
+        }
         NSURLSession.sharedSession.dataTaskWithURL(nsUrl) { data, response, _ ->
-            val ok = (response as? NSHTTPURLResponse)?.statusCode?.let { it in 200L..299L } ?: false
-            val image = if (ok) data?.let { UIImage(data = it) } else null
-            // An empty image marks a missing tile, so it isn't fetched again and again.
-            tileCache.setObject(image ?: UIImage(), forKey = url)
-            synchronized(loadingLock) { loading.remove(url) }
-            dispatch_async(dispatch_get_main_queue()) { setNeedsDisplayInMapRect(rect, zoomScale) }
+            val code = (response as? NSHTTPURLResponse)?.statusCode ?: 0L
+            val image = if (code in 200L..299L) data?.let { UIImage(data = it) } else null
+            // A tile that doesn't exist (404, 204, or not an image) is remembered as empty, so it isn't
+            // fetched again and again; a passing failure (offline, timeout, 5xx) is tried again later.
+            val settled = image != null || code == 404L || code == 204L || code in 200L..299L
+            synchronized(loadingLock) {
+                loading.remove(url)
+                if (settled) failedAt.remove(url) else failedAt[url] = NSDate().timeIntervalSince1970
+            }
+            if (settled) {
+                tileCache.setObject(image ?: UIImage(), forKey = url)
+                dispatch_async(dispatch_get_main_queue()) { setNeedsDisplayInMapRect(rect, zoomScale) }
+            }
         }.resume()
     }
 

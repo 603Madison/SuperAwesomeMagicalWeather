@@ -50,7 +50,7 @@ class PollenClient(
             .build()
         val request = Request.Builder()
             .url(url)
-            .header("X-Goog-Api-Key", apiKey)
+            .secretHeader("X-Goog-Api-Key", apiKey)
             .header("Cache-Control", "no-store")
             .apply {
                 if (restriction != null) {

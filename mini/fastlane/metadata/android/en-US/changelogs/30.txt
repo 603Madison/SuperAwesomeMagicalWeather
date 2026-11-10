@@ -1,0 +1,1 @@
+Bug fixes: tapping an alert opens that place's alerts, scanning the QR code no longer freezes the screen, settings survive a crash mid-save, and radar stays on the map.

@@ -13,7 +13,8 @@ import app.northvane.weather.AppContainer
 import app.northvane.weather.data.AiReply
 import app.northvane.weather.data.AppSettings
 import app.northvane.weather.data.SatelliteFeature
-import app.northvane.weather.SecretStore
+import app.northvane.weather.data.AiKeys
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -54,7 +55,10 @@ class AiController(private val container: AppContainer, private val scope: Corou
     /** The provider settings with the saved key, or null when AI isn't set up. */
     private suspend fun config(settings: AppSettings): AiConfig? {
         if (!settings.aiEnabled) return null
-        val key = withContext(Dispatchers.Default) { container.secrets.get(SecretStore.aiKeyName(settings.aiProvider)) }
+        val key = withContext(Dispatchers.IO) {
+            AiKeys.migrate(container.secrets, settings.aiBaseUrl)
+            AiKeys.get(container.secrets, settings.aiProvider, settings.aiBaseUrl)
+        }
         return AiConfig(settings.aiProvider, settings.aiBaseUrl, settings.aiModel, key).takeIf { it.isComplete }
     }
 

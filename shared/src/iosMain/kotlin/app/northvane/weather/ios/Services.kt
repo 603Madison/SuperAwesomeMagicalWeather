@@ -97,6 +97,27 @@ object IosNotifications : Notifications {
 
     override fun canNotify(): Boolean = authorized
 
+    /**
+     * The permission as it is now. A background launch can't rely on
+     * [authorized]: it's filled in asynchronously, and starts out false.
+     */
+    suspend fun currentlyAuthorized(): Boolean = kotlinx.coroutines.suspendCancellableCoroutine { cont ->
+        center.getNotificationSettingsWithCompletionHandler { settings ->
+            val status = settings?.authorizationStatus
+            authorized = status == UNAuthorizationStatusAuthorized || status == UNAuthorizationStatusProvisional || status == UNAuthorizationStatusEphemeral
+            if (cont.isActive) cont.resume(authorized)
+        }
+    }
+
+    /** Removes booked notifications whose id starts with [prefix], except those in [keep]. */
+    fun cancelOthers(prefix: String, keep: Set<String>) {
+        center.getPendingNotificationRequestsWithCompletionHandler { pending ->
+            val stale = pending.orEmpty().mapNotNull { (it as? UNNotificationRequest)?.identifier }
+                .filter { it.startsWith(prefix) && it !in keep }
+            if (stale.isNotEmpty()) center.removePendingNotificationRequestsWithIdentifiers(stale)
+        }
+    }
+
     override fun sendTest(locationId: String?, place: String?): Boolean {
         if (!authorized) return false
         show(
@@ -139,27 +160,37 @@ object IosNotifications : Notifications {
     fun cancel(id: String) = center.removePendingNotificationRequestsWithIdentifiers(listOf(id))
 }
 
-/** The phone's position through Core Location ("while using the app"). */
+/**
+ * The phone's position through Core Location ("while using the app"). One
+ * delegate for the app's lifetime, with everyone waiting on it answered
+ * together, so overlapping requests (a refresh while asking for permission)
+ * don't take each other's answers. Core Location is used from the main thread.
+ */
 object IosLocation : DeviceLocation {
-    private val manager by lazy { CLLocationManager().apply { desiredAccuracy = kCLLocationAccuracyKilometer } }
-    private var delegate: Delegate? = null
+    private val manager by lazy {
+        CLLocationManager().apply {
+            desiredAccuracy = kCLLocationAccuracyKilometer
+            delegate = Delegate
+        }
+    }
+    private val authWaiters = mutableListOf<(Boolean) -> Unit>()
+    private val locationWaiters = mutableListOf<(CLLocation?) -> Unit>()
 
-    private class Delegate(
-        val onAuth: ((Boolean) -> Unit)?,
-        val onLocation: ((CLLocation?) -> Unit)?,
-    ) : NSObject(), CLLocationManagerDelegateProtocol {
+    private object Delegate : NSObject(), CLLocationManagerDelegateProtocol {
         override fun locationManagerDidChangeAuthorization(manager: CLLocationManager) {
             if (manager.authorizationStatus == kCLAuthorizationStatusNotDetermined) return
-            onAuth?.invoke(authorized())
+            val ok = authorized()
+            authWaiters.toList().also { authWaiters.clear() }.forEach { it(ok) }
         }
 
         override fun locationManager(manager: CLLocationManager, didUpdateLocations: List<*>) {
-            onLocation?.invoke(didUpdateLocations.lastOrNull() as? CLLocation)
+            answer(didUpdateLocations.lastOrNull() as? CLLocation)
         }
 
-        override fun locationManager(manager: CLLocationManager, didFailWithError: NSError) {
-            onLocation?.invoke(null)
-        }
+        override fun locationManager(manager: CLLocationManager, didFailWithError: NSError) = answer(null)
+
+        private fun answer(location: CLLocation?) =
+            locationWaiters.toList().also { locationWaiters.clear() }.forEach { it(location) }
     }
 
     private fun status(): CLAuthorizationStatus = manager.authorizationStatus
@@ -169,23 +200,20 @@ object IosLocation : DeviceLocation {
     fun requestPermission(onResult: (Boolean) -> Unit) {
         if (authorized()) return onResult(true)
         if (status() != kCLAuthorizationStatusNotDetermined) return onResult(false)
-        delegate = Delegate(onAuth = { ok -> onResult(ok); delegate = null }, onLocation = null)
-        manager.delegate = delegate
+        authWaiters += onResult
         manager.requestWhenInUseAuthorization()
     }
 
     override fun hasPermission(): Boolean = authorized()
 
-    override suspend fun current(): GeoPoint? {
-        if (!authorized()) return null
-        manager.location?.takeIf { -it.timestamp.timeIntervalSinceNow() < 10 * 60 }?.let { return it.toPoint() }
-        return withTimeoutOrNull(20_000) {
+    override suspend fun current(): GeoPoint? = withContext(Dispatchers.Main) {
+        if (!authorized()) return@withContext null
+        manager.location?.takeIf { -it.timestamp.timeIntervalSinceNow() < 10 * 60 }?.let { return@withContext it.toPoint() }
+        withTimeoutOrNull(20_000) {
             suspendCancellableCoroutine { cont ->
-                delegate = Delegate(onAuth = null, onLocation = { loc ->
-                    delegate = null
-                    if (cont.isActive) cont.resume(loc?.toPoint())
-                })
-                manager.delegate = delegate
+                val waiter: (CLLocation?) -> Unit = { loc -> if (cont.isActive) cont.resume(loc?.toPoint()) }
+                locationWaiters += waiter
+                cont.invokeOnCancellation { dispatch_async(dispatch_get_main_queue()) { locationWaiters.remove(waiter) } }
                 manager.requestLocation()
             }
         }
@@ -199,8 +227,13 @@ class IosConnectivity : Connectivity {
     private val _status = MutableStateFlow(NetworkStatus())
     override val status: StateFlow<NetworkStatus> = _status.asStateFlow()
 
+    /** Held here: a monitor nothing refers to may be released, and the updates would stop. */
+    private var monitor: platform.Network.nw_path_monitor_t = null
+
     fun start() {
+        if (monitor != null) return
         val monitor = nw_path_monitor_create()
+        this.monitor = monitor
         nw_path_monitor_set_update_handler(monitor) { path ->
             _status.value = NetworkStatus(
                 connected = nw_path_get_status(path) == nw_path_status_satisfied,
@@ -276,7 +309,8 @@ class IosThemeBackground(private val dir: String) : ThemeBackground {
         }.getOrNull()
     }
 
-    override suspend fun save(bytes: ByteArray): Boolean = withContext(Dispatchers.Main) {
+    // Off the main thread: a full-size phone photo takes a moment to decode and shrink.
+    override suspend fun save(bytes: ByteArray): Boolean = withContext(Dispatchers.Default) {
         runCatching {
             val image = UIImage(data = bytes.toNSData())
             val (w, h) = image.size.useContents { width to height }

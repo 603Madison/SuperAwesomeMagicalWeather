@@ -11,6 +11,7 @@ import app.northvane.core.outlook.BriefingWriter
 import app.northvane.core.outlook.MyTimes
 import app.northvane.core.outlook.TonightDigest
 import app.northvane.core.outlook.WhatToWear
+import app.northvane.core.repo.attempt
 import app.northvane.core.time.*
 import app.northvane.core.util.UnitFormatter
 import app.northvane.weather.AppContainer
@@ -49,11 +50,15 @@ object Background {
         val locations = container.locations.locations.first().filter { it.notify }.take(MAX_LOCATIONS)
         if (locations.isEmpty()) return emptyList()
 
+        return container.alertState.exclusive { check(container, settings, locations, canNotify) }
+    }
+
+    private suspend fun check(container: AppContainer, settings: AppSettings, locations: List<SavedLocation>, canNotify: Boolean): List<AppNotification> {
         val tracker = AlertTracker()
         var state = container.alertState.read()
         val found = mutableListOf<AlertToNotify>()
         for (location in locations) {
-            val result = runCatching { container.repository.alerts(location.point) }
+            val result = attempt { container.repository.alerts(location.point) }
             val error = result.exceptionOrNull()
             // A 4xx means NWS doesn't cover this point (e.g. outside the US): nothing to alert on, not a failure.
             val outsideCoverage = error is HttpStatusException && error.code in 400..499
@@ -93,7 +98,7 @@ object Background {
     suspend fun todayPlace(container: AppContainer, settings: AppSettings, refresh: Boolean): Pair<SavedLocation, WeatherSnapshot>? {
         val locations = container.locations.locations.first()
         val location = locations.firstOrNull { it.id == settings.selectedLocationId } ?: locations.firstOrNull() ?: return null
-        val snapshot = (if (refresh) runCatching { container.weather.refresh(location) }.getOrNull() else null)
+        val snapshot = (if (refresh) attempt { container.weather.refresh(location) }.getOrNull() else null)
             ?: container.weatherCache.read(location.id)?.takeIf { Duration.between(it.fetchedAt, kotlin.time.Clock.System.now()) < Duration.ofHours(12) }
             ?: return null
         return location to snapshot

@@ -27,6 +27,8 @@ import platform.Foundation.dataUsingEncoding
 import platform.Security.SecItemAdd
 import platform.Security.SecItemCopyMatching
 import platform.Security.SecItemDelete
+import platform.Security.SecItemUpdate
+import platform.Security.errSecItemNotFound
 import platform.Security.errSecSuccess
 import platform.Security.kSecAttrAccessible
 import platform.Security.kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
@@ -78,11 +80,26 @@ class KeychainSecretStore(private val service: String) : SecretStore {
     override fun has(name: String): Boolean = get(name) != null
 
     override fun put(name: String, value: String?) {
-        val q = query(name)
-        SecItemDelete(q)
-        CFRelease(q)
-        if (value.isNullOrEmpty()) return
+        if (value.isNullOrEmpty()) {
+            val q = query(name)
+            SecItemDelete(q)
+            CFRelease(q)
+            return
+        }
         val data = value.encodeToByteArray().toNSData()
+        // Change the item in place, so a failed write never loses the key that was there.
+        val match = query(name)
+        val changes = CFDictionaryCreateMutable(null, 0, kCFTypeDictionaryKeyCallBacks.ptr, kCFTypeDictionaryValueCallBacks.ptr)
+        put(changes, kSecValueData, data)
+        val updated = SecItemUpdate(match, changes)
+        CFRelease(changes)
+        if (updated == errSecSuccess) {
+            CFRelease(match)
+            return
+        }
+        // Not there yet, or stored with other attributes: add it afresh.
+        if (updated != errSecItemNotFound) SecItemDelete(match)
+        CFRelease(match)
         val add = query(name) {
             put(it, kSecValueData, data)
             CFDictionaryAddValue(it, kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)

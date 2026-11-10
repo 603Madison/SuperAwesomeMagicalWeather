@@ -61,7 +61,7 @@ class BriefingWorker(appContext: Context, params: WorkerParameters) : CoroutineW
         } finally {
             // Even if this run was stopped, tomorrow's briefing must still be booked.
             kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                schedule(applicationContext, container.settings.settings.first())
+                schedule(applicationContext, container.settings.settings.first(), afterRun = true)
             }
         }
     }
@@ -70,11 +70,17 @@ class BriefingWorker(appContext: Context, params: WorkerParameters) : CoroutineW
         private const val WORK = "morning-briefing"
         private const val CHANNEL = "briefing"
 
-        /** Schedules the next briefing (or cancels it when switched off). */
-        fun schedule(context: Context, settings: AppSettings) {
+        /**
+         * Schedules the next briefing (or cancels it when switched off). Only
+         * the run itself ([afterRun]) or a change of time or zone rebooks it,
+         * so the app starting up at briefing time doesn't cancel the briefing
+         * that is about to be posted.
+         */
+        fun schedule(context: Context, settings: AppSettings, afterRun: Boolean = false) {
             val work = WorkManager.getInstance(context)
             if (!settings.briefingEnabled) {
                 work.cancelUniqueWork(WORK)
+                Booking.clear(context, WORK)
                 return
             }
             val now = ZonedDateTime.now()
@@ -83,7 +89,7 @@ class BriefingWorker(appContext: Context, params: WorkerParameters) : CoroutineW
             val request = OneTimeWorkRequestBuilder<BriefingWorker>()
                 .setInitialDelay(Duration.between(now, next).toMillis(), TimeUnit.MILLISECONDS)
                 .build()
-            work.enqueueUniqueWork(WORK, ExistingWorkPolicy.REPLACE, request)
+            work.enqueueUniqueWork(WORK, Booking.policy(context, WORK, settings.briefingMinutes, afterRun), request)
         }
 
         @SuppressLint("MissingPermission") // checked by canNotify
@@ -166,7 +172,7 @@ class TonightWorker(appContext: Context, params: WorkerParameters) : CoroutineWo
             return Result.success()
         } finally {
             kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
-                schedule(applicationContext, container.settings.settings.first())
+                schedule(applicationContext, container.settings.settings.first(), afterRun = true)
             }
         }
     }
@@ -198,10 +204,12 @@ class TonightWorker(appContext: Context, params: WorkerParameters) : CoroutineWo
         private const val WORK = "tonight"
         private const val CHANNEL = "tonight"
 
-        fun schedule(context: Context, settings: AppSettings) {
+        /** As [BriefingWorker.schedule]. */
+        fun schedule(context: Context, settings: AppSettings, afterRun: Boolean = false) {
             val work = WorkManager.getInstance(context)
             if (!settings.tonightEnabled) {
                 work.cancelUniqueWork(WORK)
+                Booking.clear(context, WORK)
                 return
             }
             val now = ZonedDateTime.now()
@@ -211,9 +219,31 @@ class TonightWorker(appContext: Context, params: WorkerParameters) : CoroutineWo
                 .setInitialDelay(Duration.between(now, next).toMillis(), TimeUnit.MILLISECONDS)
                 .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.NOT_REQUIRED).build())
                 .build()
-            work.enqueueUniqueWork(WORK, ExistingWorkPolicy.REPLACE, request)
+            work.enqueueUniqueWork(WORK, Booking.policy(context, WORK, settings.tonightMinutes, afterRun), request)
         }
     }
+}
+
+/**
+ * What a daily notification was last booked for (its time of day and the
+ * phone's time zone). A booked run is kept unless one of those changed: the
+ * app calls schedule on every start, including the start WorkManager makes to
+ * run the briefing, and replacing the work then would cancel that very run.
+ */
+internal object Booking {
+    private const val PREFS = "daily_bookings"
+
+    fun policy(context: Context, work: String, minutes: Int, afterRun: Boolean): ExistingWorkPolicy {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val booked = "$minutes@${java.util.TimeZone.getDefault().id}"
+        val same = prefs.getString(work, null) == booked
+        prefs.edit { putString(work, booked) }
+        // KEEP still enqueues when the earlier run has finished or was cancelled.
+        return if (afterRun || !same) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP
+    }
+
+    fun clear(context: Context, work: String) =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { remove(work) }
 }
 
 /**

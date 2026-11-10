@@ -39,11 +39,15 @@ class WeatherService(
     fun refreshInterval(plan: FetchPlan): Duration =
         if (plan.limited) Duration.ofMinutes(30) else Duration.ofMinutes(10)
 
-    private val zipLookups = mutableSetOf<String>()
+    // Used from the screen and from background work at once.
+    private val zipLookups = app.northvane.core.util.SyncMap<String, Boolean>()
 
     /** Looks up (once per run) and saves the location's US ZIP code for EPA's UV forecast. */
     private suspend fun withPostalCode(location: SavedLocation): SavedLocation {
-        if (location.postalCode != null || !zipLookups.add("${location.id}@${location.latitude},${location.longitude}")) return location
+        if (location.postalCode != null) return location
+        var first = false
+        zipLookups.getOrPut("${location.id}@${location.latitude},${location.longitude}") { first = true; true }
+        if (!first) return location
         val zip = placeSearch.postalCode(location.latitude, location.longitude) ?: return location
         locations.updateLocation(location.id) { it.copy(postalCode = zip) }
         return location.copy(postalCode = zip)

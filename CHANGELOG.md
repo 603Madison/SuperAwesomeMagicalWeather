@@ -5,6 +5,30 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-11-10
+
+Bug fixes and security hardening from a full review of the app, Mini and the new iPhone version.
+
+### Security
+- **Keys and passwords never follow a redirect.** Requests that carry a key, token or password in a header (WeeWX logins, the Pollen key, AI keys) no longer follow redirects, and are never sent over plain HTTP. Before, only `Authorization` was dropped when a server redirected elsewhere; API-key headers went along.
+- **A self-hosted AI server's key only goes to that server.** The key is now saved with the server's address; changing the address (or mistyping it) no longer sends the old key to the new one. Settings › AI says when the saved key belongs to another address.
+- **Addresses written as bare numbers are refused** (`134744072`, `127.1`, `0x7f.1`): resolvers read them as IP addresses, so they could pass for a local name.
+- **iPhone:** plain HTTP to a "local" server name now requires every address it resolves to to be private (as on Android); every redirect hop is checked by the app; nothing is kept in the system's URL cache or cookie store; app data is excluded from iCloud and computer backups; saving a key updates the Keychain item in place, so a failed write can't lose it.
+
+### Fixed
+- **The morning briefing and Tonight were often skipped** when the app wasn't already running at that time: starting the app to post them rebooked them for tomorrow and cancelled the run. They're now rebooked only when their time or your time zone changes.
+- **Custom background photo** couldn't be set on Android 8–12.
+- **Reordering places a second time** in one visit could be ignored.
+- A refresh error or spinner from one place could show on another after switching places.
+- Two overlapping alert checks could notify the same alert twice or fail; one now waits for the other.
+- A saved-places list the app can't read is left alone instead of being replaced by an empty one, and a damaged settings file no longer crashes the app on every change.
+- Widget and Quick Settings tile updates can no longer crash the app.
+- **Your times** were an hour off on the two days a year clocks change.
+- A WeeWX `realtime.txt` with a four-digit year was read as year 4026, so a station that stopped reporting looked current.
+- Times without seconds (`10:00-05:00`) are read again; numbers like 1.005 round as before 2.2.0 (1.01).
+- **iPhone:** the forecast refreshes when you come back to the app; alerts and reminders no longer go missing when iOS starts the app in the background; background refresh reports back properly and does each step on its own; the widget never reads a half-written file; "Tonight" for removed places is cancelled; radar tiles that failed to load are tried again; location requests can't hang each other; long AI answers have more time.
+- **Mini:** tapping an alert opens that place's alerts; scanning the QR code no longer freezes the screen; places past the 10th say their alerts aren't checked; settings survive a crash mid-save on Android 10 and earlier; radar can't be panned off the map, and a whole loop fits in memory.
+
 ## [2.2.0] - 2026-11-08
 
 SuperAwesomeMagicalWeather on iPhone, and one typeface everywhere.

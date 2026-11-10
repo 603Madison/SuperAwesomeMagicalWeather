@@ -37,7 +37,17 @@ weather services described below.
     anything is sent.
 - `CleartextGuardInterceptor` is a final in-app check on every request, and
   runs again on every redirect hop. An `http://` request must be explicitly
-  tagged as a local-server request and must not carry an `Authorization` header.
+  tagged as a local-server request and must not carry an `Authorization` header
+  or any other header holding a key or password.
+- **Requests that carry a key or password in a header never follow
+  redirects** (WeeWX logins, the Pollen and AI keys). OkHttp only drops
+  `Authorization` when a redirect changes host; API-key headers would go along.
+- The key for a self-hosted AI server is saved together with the server's
+  address (scheme, host and port) and only sent to that address. Changing the
+  address, or mistyping it, never hands the old key to another server.
+- Host names written as bare or partial numbers (`134744072`, `127.1`,
+  `0x7f.1`) are refused: resolvers read them as IP addresses, so they could
+  pass for a local name.
 - The app targets API 37, so **Certificate Transparency** is enforced and
   **Encrypted Client Hello** is used where servers support it.
 - Redirects between http and https are never followed (`followSslRedirects(false)`).
@@ -69,8 +79,8 @@ weather services described below.
   `X-Android-Cert`, both public), so users can restrict their key to this
   app in Google Cloud Console. Settings recommends restricting the key to the
   Pollen API and setting a daily quota so a leaked key can't run up a bill.
-- No secrets, URLs or coordinates are logged, and R8 strips `Log.v/d/i` from
-  release builds.
+- No secrets, URLs or coordinates are logged: the app has no logging calls at
+  all, and error messages never include URLs or response text.
 
 ## Data at rest and backups
 
@@ -191,3 +201,29 @@ mesonet.agron.iastate.edu (radar map pictures, which include the map area
 around the place being viewed) and geocoding-api.open-meteo.com (place search;
 only the typed town or ZIP code is sent). Location is used only when the user
 picks "Use my location", and only while the app is open.
+
+## iPhone
+
+The iPhone app shares the network rules above through `core`, with iOS doing
+the platform parts:
+
+- App Transport Security allows plain HTTP only to the local network
+  (`NSAllowsLocalNetworking`); everything else must be HTTPS.
+- The app's own guard (`HttpIos.kt`) runs on every request and every redirect
+  hop, which the app follows itself rather than leaving to the system. Plain
+  HTTP needs the local-server marker, no credentials, and a host that is a
+  private address or a local-looking name **whose every DNS address is
+  private** (checked with `getaddrinfo` before the request goes out).
+  Redirects from HTTPS to HTTP aren't followed.
+- No URL cache and no cookies: responses (and URLs with API keys in them)
+  aren't written to `Library/Caches`.
+- Keys and passwords live in the Keychain as
+  `AfterFirstUnlockThisDeviceOnly`: never synced to iCloud, never in backups,
+  readable by background refresh after the first unlock. Writes update the
+  item in place, so a failed write can't lose the saved key.
+- Places, settings and cached data in Application Support are excluded from
+  iCloud and computer backups, as on Android.
+- The widget gets a small JSON summary through the App Group; it never sees
+  keys.
+- Unlike Android, iOS lets a root CA the user installs and fully trusts in
+  Settings intercept the built-in services too.

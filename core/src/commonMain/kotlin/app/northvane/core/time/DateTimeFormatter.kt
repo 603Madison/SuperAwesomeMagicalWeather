@@ -82,12 +82,22 @@ class DateTimeFormatter private constructor(private val tokens: List<Token>, pri
                         pos += names[idx].length
                         return@forEachIndexed
                     }
-                    // Fixed width when the next token is another number (yyyyMMdd); otherwise as many digits as there are.
+                    // Widths as java.time reads them: fixed when the next token is another number (yyyyMMdd)
+                    // or the letter is doubled ("dd", "HH", and "yy" is exactly two digits); one letter
+                    // takes one or two digits; a long year as many as there are. So a four-digit year
+                    // in a "yy" field is rejected rather than read as 2000 + 2026.
                     val nextIsNumber = (tokens.getOrNull(i + 1) as? Token.Field)?.let { it.letter != 'a' } ?: false
-                    val end = if (nextIsNumber) pos + tok.count else {
-                        var e = pos
-                        while (e < text.length && text[e].isDigit()) e++
-                        e
+                    val isLongYear = (tok.letter == 'y' || tok.letter == 'u') && tok.count != 2
+                    fun digitsFrom(start: Int, max: Int): Int {
+                        var e = start
+                        while (e < text.length && e - start < max && text[e].isDigit()) e++
+                        return e
+                    }
+                    val end = when {
+                        nextIsNumber -> pos + tok.count
+                        isLongYear -> digitsFrom(pos, 9).also { require(it - pos >= tok.count) { "Unparseable date: $text" } }
+                        tok.count >= 2 -> pos + tok.count
+                        else -> digitsFrom(pos, 2)
                     }
                     require(end > pos && end <= text.length) { "Unparseable date: $text" }
                     val v = text.substring(pos, end).toIntOrNull() ?: throw IllegalArgumentException("Unparseable date: $text")

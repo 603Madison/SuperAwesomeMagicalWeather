@@ -206,7 +206,8 @@ class RadarImages(private val http: OkHttpClient) {
     private companion object {
         const val MAX_BYTES = 1024L * 1024
         const val MAX_EDGE = 2048
-        const val CACHE_BYTES = 8 * 1024 * 1024
+        // Room for a whole loop (7 frames) on the biggest Mini screens, so playing it doesn't download frames again.
+        const val CACHE_BYTES = 12 * 1024 * 1024
         val STAMP: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMddHHmm").withZone(ZoneOffset.UTC)
     }
 }

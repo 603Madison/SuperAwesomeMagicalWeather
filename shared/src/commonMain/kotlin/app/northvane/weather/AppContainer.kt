@@ -35,11 +35,21 @@ import okio.Path.Companion.toPath
 
 /** Manual dependency container; one instance per process, built by the platform's app class. */
 class AppContainer(val platform: Platform) {
-    val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    /**
+     * For work that outlives a screen (widget and tile updates, background
+     * refreshes). A failure there is dropped rather than taking the whole app
+     * down: each job shows what it can and the next one tries again.
+     */
+    val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default + kotlinx.coroutines.CoroutineExceptionHandler { _, _ -> })
 
     /** Preferences files where Android's preferencesDataStore(name) keeps them, so updates keep the user's settings. */
     private fun dataStore(name: String): DataStore<Preferences> =
-        PreferenceDataStoreFactory.createWithPath(produceFile = { "${platform.settingsDir}/datastore/$name.preferences_pb".toPath() })
+        PreferenceDataStoreFactory.createWithPath(
+            // A file that can't be read at all (a crash mid-write on an old phone, a full disk) starts over
+            // empty instead of making every later save throw and close the app.
+            corruptionHandler = androidx.datastore.core.handlers.ReplaceFileCorruptionHandler { androidx.datastore.preferences.core.emptyPreferences() },
+            produceFile = { "${platform.settingsDir}/datastore/$name.preferences_pb".toPath() },
+        )
 
     val files = TextFiles(platform.privateDir)
     val settings = SettingsRepository(dataStore("settings"))
@@ -52,6 +62,7 @@ class AppContainer(val platform: Platform) {
     val themeBackground get() = platform.themeBackground
     val alertScheduler get() = platform.alertScheduler
 
+    @kotlin.concurrent.Volatile
     private var nwsContact: String? = null
 
     private val http get() = platform.http

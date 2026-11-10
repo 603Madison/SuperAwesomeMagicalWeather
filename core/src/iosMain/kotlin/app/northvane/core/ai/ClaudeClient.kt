@@ -12,6 +12,7 @@ import app.northvane.core.net.RateLimitedException
 import app.northvane.core.net.Request
 import app.northvane.core.net.WeatherApiException
 import app.northvane.core.net.fetch
+import app.northvane.core.net.withTimeouts
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.addJsonObject
@@ -28,7 +29,8 @@ import kotlinx.serialization.json.putJsonObject
  * the same short error messages.
  */
 actual class ClaudeClient actual constructor(private val baseUrl: String) {
-    private val http: HttpEngine by lazy { HttpEngine.create("SuperAwesomeMagicalWeather (iOS)") }
+    // Answers can take a while with thinking (the Android SDK allows minutes, too).
+    private val http: HttpEngine by lazy { HttpEngine.create("SuperAwesomeMagicalWeather (iOS)").withTimeouts(readSeconds = 180, callSeconds = 300) }
 
     actual suspend fun complete(apiKey: String, model: String, request: AiRequest): String {
         val fallbacks = ClaudeModels.supportsFallbacks(model)
@@ -78,7 +80,7 @@ actual class ClaudeClient actual constructor(private val baseUrl: String) {
         while (true) {
             val request = Request.Builder()
                 .url(baseUrl.trimEnd('/') + path)
-                .header("x-api-key", apiKey)
+                .secretHeader("x-api-key", apiKey)
                 .header("anthropic-version", API_VERSION)
                 .header("Accept", "application/json")
                 .apply {

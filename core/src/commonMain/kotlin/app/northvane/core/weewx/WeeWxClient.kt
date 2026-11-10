@@ -30,15 +30,15 @@ class WeeWxClient(private val clients: LocalServerClients) {
         val builder = Request.Builder().url(validated.url).header("Accept", "application/json, text/plain, */*")
         when (station.auth) {
             WeeWxAuth.NONE -> Unit
-            WeeWxAuth.BASIC -> builder.header(
+            WeeWxAuth.BASIC -> builder.secretHeader(
                 "Authorization",
                 Credentials.basic(station.username.orEmpty(), secret?.value.orEmpty()),
             )
-            WeeWxAuth.BEARER -> builder.header("Authorization", "Bearer ${secret?.value.orEmpty()}")
+            WeeWxAuth.BEARER -> builder.secretHeader("Authorization", "Bearer ${secret?.value.orEmpty()}")
             WeeWxAuth.HEADER -> {
                 val name = station.headerName?.trim().orEmpty()
                 if (!HEADER_NAME.matches(name)) throw InsecureConfigurationException("Invalid custom header name")
-                builder.header(name, secret?.value.orEmpty())
+                builder.secretHeader(name, secret?.value.orEmpty())
             }
         }
         val client = if (validated.isCleartext) {

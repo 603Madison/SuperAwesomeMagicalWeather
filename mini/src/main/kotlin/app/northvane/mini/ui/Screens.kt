@@ -36,6 +36,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -527,7 +529,11 @@ private fun RadarScreen(state: MiniState, fmt: Fmt) {
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     val half = radar.zooms[zoom]
     val view = RadarImages.View(place.latitude + panY * half * 0.5, place.longitude + panX * half * 0.7, zoom)
-    fun pan(dx: Int, dy: Int) { panX += dx; panY += dy }
+    fun pan(dx: Int, dy: Int) {
+        // Stay on the map: past the poles or the date line there's nothing to draw.
+        if (place.latitude + (panY + dy) * half * 0.5 in -85.0..85.0) panY += dy
+        if (place.longitude + (panX + dx) * half * 0.7 in -180.0..180.0) panX += dx
+    }
     fun zoomBy(d: Int) { zoom = (zoom + d).coerceIn(radar.zooms.indices) }
     ScreenKeysEffect(
         ScreenKeys(left = SoftKey("Reset") { zoom = 1; panX = 0; panY = 0; frame = times.lastIndex }, center = if (playing) "Pause" else "Play", onKey = { code ->
@@ -628,6 +634,7 @@ private fun ZoomChip(label: String, onTap: () -> Unit) {
 @Composable
 private fun PlacesScreen(state: MiniState, go: (String) -> Unit, onUse: (String) -> Unit) {
     val places = state.settings.places
+    val checked = places.filter { it.notify }.take(app.northvane.mini.work.MiniAlertWorker.MAX_PLACES).map { it.id }.toSet()
     ScreenKeysEffect(ScreenKeys(left = SoftKey("Add") { go(Route.ADD) }, center = "Options"))
     MiniList(screen = Route.PLACES, count = places.size + 1) { i, focus, onFocused ->
         if (i == places.size) {
@@ -641,7 +648,11 @@ private fun PlacesScreen(state: MiniState, go: (String) -> Unit, onUse: (String)
                 Text(if (selected) "●" else "○", color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(18.dp))
                 Column(Modifier.weight(1f)) {
                     Text(p.displayName, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text((if (p.isDeviceLocation) "GPS · " else "") + "Alerts " + if (p.notify) "on" else "off", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text((if (p.isDeviceLocation) "GPS · " else "") + "Alerts " + when {
+                        !p.notify -> "off"
+                        p.id in checked -> "on"
+                        else -> "on, but only the first ${app.northvane.mini.work.MiniAlertWorker.MAX_PLACES} are checked"
+                    }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -692,9 +703,14 @@ private fun AddPlaceScreen(state: MiniState, vm: MiniViewModel, onAdded: () -> U
         photo.parentFile?.mkdirs()
         androidx.core.content.FileProvider.getUriForFile(context, context.packageName + ".scan", photo)
     }.getOrNull()
+    val scanScope = rememberCoroutineScope()
     val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { taken ->
-        if (taken) vm.importPlaces(QrScan.read(photo)) { ok -> if (ok) onAdded() }
-        photo.delete()
+        // Decoding a camera photo takes a while on a flip phone's CPU: off the main thread.
+        scanScope.launch {
+            val code = if (taken) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { QrScan.read(photo) } else null
+            photo.delete()
+            if (taken) vm.importPlaces(code) { ok -> if (ok) onAdded() }
+        }
     }
     LaunchedEffect(Unit) { vm.clearSearch(); runCatching { fieldFocus.requestFocus() } }
     ScreenKeysEffect(ScreenKeys(left = SoftKey("Search") { vm.search(query) }, center = "Select"))

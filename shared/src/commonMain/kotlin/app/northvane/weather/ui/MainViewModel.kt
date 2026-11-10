@@ -154,6 +154,8 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         viewModelScope.launch {
             state.map { it.selected }.filterNotNull().distinctUntilChanged { a, b -> a.id == b.id }.collect { location ->
                 error.value = null
+                // Another place may still be loading in the background; its spinner isn't this place's.
+                if (refreshJob?.isActive == true && refreshingId != location.id) refreshing.value = false
                 loadCachedThenMaybeRefresh(location)
             }
         }
@@ -208,7 +210,8 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error.value = e.toUserMessage()
+                // Only for the place on screen: a failure for one you've moved away from isn't news here.
+                if (state.value.selected?.id == location.id) error.value = e.toUserMessage()
             } finally {
                 // A cancelled refresh finishing late must not hide the spinner of the one that replaced it.
                 if (refreshJob === coroutineContext[kotlinx.coroutines.Job]) refreshing.value = false

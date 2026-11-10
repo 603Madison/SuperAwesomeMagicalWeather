@@ -18,9 +18,14 @@ class TextFiles(root: String) {
     /** Writes through a temporary file and a rename, so a crash never leaves half a file. */
     fun write(path: Path, text: String) {
         path.parent?.let { fs.createDirectories(it) }
-        val tmp = path.parent!! / (path.name + ".tmp")
-        fs.write(tmp) { writeUtf8(text) }
-        fs.atomicMove(tmp, path)
+        // A temp name of its own, so two writers of the same file never share one.
+        val tmp = path.parent!! / (path.name + "." + app.northvane.core.util.randomUuid().take(8) + ".tmp")
+        try {
+            fs.write(tmp) { writeUtf8(text) }
+            fs.atomicMove(tmp, path)
+        } finally {
+            runCatching { fs.delete(tmp) }
+        }
     }
 
     fun delete(path: Path) = runCatching { fs.delete(path) }.let { }

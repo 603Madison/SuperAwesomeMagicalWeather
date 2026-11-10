@@ -49,6 +49,8 @@ AltServer is on the same Wi-Fi.
 | Alert checks | Every 15–60 min (WorkManager) | When iOS allows background refresh, usually within the hour; and every time you open the app |
 | Morning briefing, Tonight | Written at the time you pick | Written from the latest forecast and delivered at the time you pick |
 | Rain starting soon, laundry watch, northern-lights alerts | Background notifications | Not yet: iOS doesn't let apps wake up often enough |
+| Warnings during Do Not Disturb / Focus | Can break through if you allow it for the warnings channel | Held back by Focus like other notifications: breaking through needs an extra Apple entitlement that free sideloading may not allow, so the app doesn't ask for it |
+| Backups | Not backed up | Not backed up (places and settings stay on the phone; keys never leave it) |
 | Voice questions | Mic button | The keyboard's dictation key |
 | Wallpaper colors | Android 12+ | Not on iOS |
 | Home-screen widget | Small, medium, large | Small, medium, and Lock Screen |

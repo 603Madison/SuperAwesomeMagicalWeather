@@ -1,0 +1,1 @@
+Bug fixes and security improvements: keys never follow redirects, an AI server's key only goes to that server, the morning briefing and Tonight no longer get skipped, the custom background photo works on Android 8–12, and more.

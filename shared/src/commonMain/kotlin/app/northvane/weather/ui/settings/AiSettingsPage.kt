@@ -30,7 +30,8 @@ import app.northvane.core.net.UrlPolicy
 import app.northvane.core.net.toUserMessage
 import app.northvane.core.repo.attempt
 import app.northvane.weather.AppContainer
-import app.northvane.weather.SecretStore
+import app.northvane.weather.data.AiKeys
+import kotlinx.coroutines.IO
 import app.northvane.weather.ui.MainUiState
 import app.northvane.weather.ui.components.ChoiceDropdown
 import app.northvane.weather.ui.components.LabeledSwitch
@@ -53,6 +54,8 @@ internal fun AiSettingsPage(state: MainUiState, container: AppContainer, onBack:
     var model by remember(s.aiModel) { mutableStateOf(s.aiModel) }
     var newKey by remember { mutableStateOf("") }
     var hasKey by remember { mutableStateOf(false) }
+    // A self-hosted server's key is only sent to the address it was saved for.
+    var keyFor by remember { mutableStateOf<String?>(null) }
     var models by remember { mutableStateOf<List<String>>(emptyList()) }
     var status by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
@@ -62,10 +65,16 @@ internal fun AiSettingsPage(state: MainUiState, container: AppContainer, onBack:
         afterPermission = null
     }
     val hosted = provider.hostedUrl != null
-    LaunchedEffect(provider) { hasKey = withContext(Dispatchers.Default) { container.secrets.has(SecretStore.aiKeyName(provider)) } }
+    LaunchedEffect(provider, baseUrl) {
+        withContext(Dispatchers.IO) {
+            AiKeys.migrate(container.secrets, s.aiBaseUrl)
+            hasKey = AiKeys.get(container.secrets, provider, baseUrl) != null
+            keyFor = AiKeys.savedFor(container.secrets, provider)
+        }
+    }
 
     suspend fun config(): AiConfig {
-        val key = newKey.ifBlank { withContext(Dispatchers.Default) { container.secrets.get(SecretStore.aiKeyName(provider)) }.orEmpty() }
+        val key = newKey.ifBlank { withContext(Dispatchers.IO) { AiKeys.get(container.secrets, provider, baseUrl) }.orEmpty() }
         return AiConfig(provider, baseUrl, model, key.ifBlank { null })
     }
 
@@ -92,9 +101,10 @@ internal fun AiSettingsPage(state: MainUiState, container: AppContainer, onBack:
     fun save(enable: Boolean? = null) = scope.launch {
         container.settings.setAiServer(provider, baseUrl, model)
         if (newKey.isNotBlank()) {
-            withContext(Dispatchers.Default) { container.secrets.put(SecretStore.aiKeyName(provider), newKey.trim()) }
+            withContext(Dispatchers.IO) { AiKeys.put(container.secrets, provider, baseUrl, newKey.trim()) }
             newKey = ""
             hasKey = true
+            keyFor = if (hosted) null else AiKeys.origin(baseUrl)
         }
         enable?.let { container.settings.setAiEnabled(it) }
     }
@@ -144,6 +154,10 @@ internal fun AiSettingsPage(state: MainUiState, container: AppContainer, onBack:
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, autoCorrectEnabled = false),
                 modifier = Modifier.fillMaxWidth(),
             )
+            if (!hosted && !hasKey) keyFor?.let { origin ->
+                val host = origin.substringAfter("://").removeSuffix(":443").removeSuffix(":80")
+                Hint("Your saved key is for $host and is only sent there. Enter it again to use it with this address.")
+            }
             if (models.isNotEmpty()) {
                 ChoiceDropdown("Model", models, models.firstOrNull { it == model } ?: models.first(), { it }, { model = it })
             } else {
@@ -188,11 +202,12 @@ internal fun AiSettingsPage(state: MainUiState, container: AppContainer, onBack:
                         }
                     }
                 }) { Text("Test & save") }
-                if (hasKey) {
+                if (hasKey || keyFor != null) {
                     TextButton(onClick = {
                         scope.launch {
-                            withContext(Dispatchers.Default) { container.secrets.remove(SecretStore.aiKeyName(provider)) }
+                            withContext(Dispatchers.IO) { AiKeys.remove(container.secrets, provider) }
                             hasKey = false
+                            keyFor = null
                         }
                     }) { Text("Remove key") }
                 }

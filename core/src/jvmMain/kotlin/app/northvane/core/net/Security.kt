@@ -27,7 +27,7 @@ class CleartextGuardInterceptor : Interceptor {
             if (UrlPolicy.isIpLiteral(request.url.host) && !UrlPolicy.isPrivateIpLiteral(request.url.host)) {
                 throw IOException("Blocked insecure request to a public address")
             }
-            if (request.header("Authorization") != null) {
+            if (request.header("Authorization") != null || request.tag(CarriesSecrets::class.java) != null) {
                 throw IOException("Blocked credentials over insecure connection")
             }
         }

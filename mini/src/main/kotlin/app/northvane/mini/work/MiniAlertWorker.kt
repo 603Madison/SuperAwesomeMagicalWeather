@@ -42,7 +42,7 @@ class MiniAlertWorker(context: Context, params: WorkerParameters) : CoroutineWor
         var state = settings.notified
         var failures = 0
         val tracker = AlertTracker()
-        val checked = settings.places.filter { it.notify }.take(10)
+        val checked = settings.places.filter { it.notify }.take(MAX_PLACES)
         for (place in checked) {
             val alerts = attempt { container.repository.alerts(place.point) }.getOrNull()
             if (alerts == null) {
@@ -51,13 +51,16 @@ class MiniAlertWorker(context: Context, params: WorkerParameters) : CoroutineWor
             }
             val (items, updated) = tracker.select(place.id, alerts, CATEGORIES, state, kotlin.time.Clock.System.now())
             state = updated
-            items.forEach { notify(applicationContext, place.displayName, it.alert.event, it.alert.headline ?: it.alert.description, it.alert.severity, it.alert.id) }
+            items.forEach { notify(applicationContext, place.id, place.displayName, it.alert.event, it.alert.headline ?: it.alert.description, it.alert.severity, it.alert.id) }
         }
         container.store.update { it.copy(notified = state) }
         return if (failures > 0 && failures == checked.size) Result.retry() else Result.success()
     }
 
     companion object {
+        /** How many places with alerts on are checked. */
+        const val MAX_PLACES = 10
+
         private const val CHANNEL = "alerts"
         private const val WORK = "mini-alerts"
         private val CATEGORIES = setOf(AlertCategory.WARNING, AlertCategory.WATCH, AlertCategory.ADVISORY)
@@ -87,12 +90,15 @@ class MiniAlertWorker(context: Context, params: WorkerParameters) : CoroutineWor
                     ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
 
         @android.annotation.SuppressLint("MissingPermission") // checked by canNotify
-        private fun notify(context: Context, place: String, event: String, text: String?, severity: AlertSeverity, id: String) {
+        private fun notify(context: Context, placeId: String, place: String, event: String, text: String?, severity: AlertSeverity, id: String) {
             if (!canNotify(context)) return
             val intent = Intent(context, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 .putExtra(MainActivity.EXTRA_OPEN_ALERTS, true)
-            val pending = PendingIntent.getActivity(context, 1, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+                // Opens this place's alerts, not whichever place happens to be selected.
+                .putExtra(MainActivity.EXTRA_PLACE_ID, placeId)
+            // One request code per place, so each notification keeps its own place.
+            val pending = PendingIntent.getActivity(context, placeId.hashCode(), intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             val notification = NotificationCompat.Builder(context, CHANNEL)
                 .setSmallIcon(R.drawable.ic_stat_alert)
                 .setContentTitle("$event · $place")

@@ -26,7 +26,8 @@ object MyTimes {
         val today = now.atZone(zone).toLocalDate()
         return listOf(today, today.plusDays(1)).flatMap { date ->
             times.filter { it.occursOn(date) }.map { t ->
-                val start = date.atStartOfDay(zone).plusMinutes(t.minutes.toLong()).toInstant()
+                // The clock time on that day, so a 5 PM drive stays at 5 PM on the days clocks change.
+                val start = date.atTime(LocalTime.ofSecondOfDay(t.minutes.coerceIn(0, 1439) * 60L)).atZone(zone).toInstant()
                 TimeSlot(t.label, start, start.plus(Duration.ofMinutes(t.durationMinutes.toLong().coerceIn(15, 240))))
             }
         }.filter { it.end.isAfter(now) && it.start.isBefore(now.plus(ahead)) }.sortedBy { it.start }

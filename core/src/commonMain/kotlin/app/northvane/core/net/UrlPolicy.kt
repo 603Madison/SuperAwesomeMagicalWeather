@@ -34,6 +34,9 @@ object UrlPolicy {
         if (url.username.isNotEmpty() || url.password.isNotEmpty()) {
             return Validation.Invalid("Don't put a username or password in the URL; use the login fields instead")
         }
+        if (isObscureNumericHost(url.host)) {
+            return Validation.Invalid("Write the server's address as four numbers, like 192.168.1.20, or use its name")
+        }
         if (url.isHttps) return Validation.Valid(url, isCleartext = false)
 
         if (sendsCredentials) {
@@ -58,6 +61,18 @@ object UrlPolicy {
             return !isLoopback(bytes) && isPrivate(bytes)
         }
         return '.' !in h || LOCAL_SUFFIXES.any { h.endsWith(it) }
+    }
+
+    /**
+     * A host that's a number but not a plain dotted IPv4 address ("134744072",
+     * "0x7f.1", "127.1"). Resolvers read these as IP addresses, so they could
+     * pass for a local name while pointing anywhere.
+     */
+    fun isObscureNumericHost(host: String): Boolean {
+        val h = host.lowercase().trimEnd('.')
+        if (h.isEmpty() || ':' in h || IPV4.matches(h)) return false
+        val labels = h.split('.')
+        return labels.last().let { it.isNotEmpty() && (it.all(Char::isDigit) || (it.startsWith("0x") && it.drop(2).all { c -> c.isDigit() || c in 'a'..'f' })) }
     }
 
     private val LOCAL_SUFFIXES = listOf(".local", ".lan", ".home.arpa", ".internal", ".localdomain", ".home")

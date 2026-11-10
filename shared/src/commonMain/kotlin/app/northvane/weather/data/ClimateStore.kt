@@ -1,5 +1,6 @@
 package app.northvane.weather.data
 
+import app.northvane.core.repo.attempt
 import app.northvane.core.garden.FrostClimate
 import app.northvane.core.history.AcisClient
 import app.northvane.core.json.NorthvaneJson
@@ -28,7 +29,7 @@ class ClimateStore(private val files: TextFiles, private val acis: AcisClient) {
         val cached = cached(point)
         if (cached != null && Duration.between(cached.computedAt, kotlin.time.Clock.System.now()) < Duration.ofDays(365)) return cached
         if (!allowDownload) return cached
-        val lows = runCatching { acis.dailyLows(point, LocalDate.now().year - 1) }.getOrNull() ?: return cached
+        val lows = attempt { acis.dailyLows(point, LocalDate.now().year - 1) }.getOrNull() ?: return cached
         val climate = FrostClimate.compute(lows, kotlin.time.Clock.System.now()) ?: return cached
         withContext(Dispatchers.Default) {
             files.write(file(point), NorthvaneJson.encodeToString(FrostClimate.serializer(), climate))

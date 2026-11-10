@@ -76,8 +76,15 @@ actual fun rememberPhotoPicker(onPicked: (ByteArray?) -> Unit): () -> Unit {
             runCatching {
                 context.contentResolver.openInputStream(u)?.use { input ->
                     // A phone photo is a few MB; refuse anything absurd rather than run out of memory.
-                    val bytes = input.readNBytes(MAX_PHOTO_BYTES + 1)
-                    bytes.takeIf { it.size <= MAX_PHOTO_BYTES }
+                    // (Read in a loop: InputStream.readNBytes needs Android 13.)
+                    val out = java.io.ByteArrayOutputStream()
+                    val buffer = ByteArray(64 * 1024)
+                    while (out.size() <= MAX_PHOTO_BYTES) {
+                        val n = input.read(buffer)
+                        if (n < 0) break
+                        out.write(buffer, 0, n)
+                    }
+                    out.toByteArray().takeIf { it.size <= MAX_PHOTO_BYTES }
                 }
             }.getOrNull()
         })

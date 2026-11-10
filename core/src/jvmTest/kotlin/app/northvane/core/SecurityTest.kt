@@ -8,6 +8,7 @@ import app.northvane.core.net.UrlPolicy.Validation
 import app.northvane.core.nws.NwsClient
 import okhttp3.Dns
 import app.northvane.core.net.HttpEngine
+import app.northvane.core.net.fetch
 import okhttp3.Request
 import java.io.IOException
 import java.net.InetAddress
@@ -127,5 +128,60 @@ class SecurityTest {
         assertEquals("SuperAwesomeMagicalWeather/1.0 (me@example.com)", NwsClient.userAgent("1.0", "me@example.com\r\nX-Evil: 1"
             .substringBefore('\r')))
         assertEquals("SuperAwesomeMagicalWeather/1.0 (a@b.cX-Evil:1)", NwsClient.userAgent("1.0", "a@b.c\r\nX-Evil: 1"))
+    }
+    @Test
+    fun rejectsNumericHostsThatArentDottedQuads() {
+        listOf("http://134744072/x.json", "http://0x7f.1/x.json", "http://127.1/x.json", "http://10.1/x.json")
+            .forEach { assertIs<Validation.Invalid>(valid(it), it) }
+        assertIs<Validation.Valid>(valid("http://192.168.1.20/x.json"))
+        assertIs<Validation.Valid>(valid("http://pi4.lan/x.json"))
+    }
+
+    /** A server on loopback that redirects /start to /end and records the headers that reach /end. */
+    private fun redirectServer(seen: MutableList<String?>): com.sun.net.httpserver.HttpServer =
+        com.sun.net.httpserver.HttpServer.create(java.net.InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0).apply {
+            createContext("/start") { ex -> ex.responseHeaders.add("Location", "/end"); ex.sendResponseHeaders(302, -1); ex.close() }
+            createContext("/end") { ex ->
+                seen += ex.requestHeaders.getFirst("X-Api-Key")
+                val body = "ok".toByteArray(); ex.sendResponseHeaders(200, body.size.toLong()); ex.responseBody.use { it.write(body) }
+            }
+            start()
+        }
+
+    @Test
+    fun requestsWithKeysDontFollowRedirects() = kotlinx.coroutines.runBlocking {
+        val seen = mutableListOf<String?>()
+        val server = redirectServer(seen)
+        try {
+            val http = app.northvane.core.net.HttpClients.create("test", cacheDir = null)
+            val base = "http://127.0.0.1:${server.address.port}"
+            val plain = app.northvane.core.net.Request.Builder().url("$base/start").allowLanCleartext().build()
+            assertEquals(200, http.fetch(plain).code)
+            // Over plain HTTP a key isn't sent at all.
+            val keyed = app.northvane.core.net.Request.Builder().url("$base/start").allowLanCleartext().secretHeader("X-Api-Key", "k").build()
+            assertTrue(keyed.carriesSecrets)
+            assertFailsWith<IOException> { http.fetch(keyed) }
+            assertEquals(listOf<String?>(null), seen)
+        } finally {
+            server.stop(0)
+        }
+    }
+
+    @Test
+    fun keyedRequestsAreNotRedirected() = kotlinx.coroutines.runBlocking {
+        val seen = mutableListOf<String?>()
+        val server = redirectServer(seen)
+        try {
+            // Without the cleartext guard, to see the redirect rule on its own.
+            val http = okhttp3.OkHttpClient.Builder().build()
+            val keyed = app.northvane.core.net.Request.Builder().url("http://127.0.0.1:${server.address.port}/start")
+                .secretHeader("X-Api-Key", "k").build()
+            assertEquals(302, http.fetch(keyed).code)
+            assertTrue(seen.isEmpty())
+            val authorized = app.northvane.core.net.Request.Builder().url("http://x.example/").header("authorization", "Bearer t").build()
+            assertTrue(authorized.carriesSecrets)
+        } finally {
+            server.stop(0)
+        }
     }
 }

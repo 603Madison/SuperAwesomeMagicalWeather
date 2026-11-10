@@ -48,8 +48,22 @@ class Request private constructor(
     val headers: List<Pair<String, String>>,
     val body: RequestBody?,
     val lanCleartext: Boolean,
+    /** Lower-case names of headers that carry a key, token or password ([Builder.secretHeader], and Authorization). */
+    val secretHeaders: Set<String>,
 ) {
     fun header(name: String): String? = headers.lastOrNull { it.first.equals(name, ignoreCase = true) }?.second
+
+    /**
+     * Whether the request carries credentials. Such requests never go over
+     * plain HTTP and never follow redirects, so a server can't pass a key on
+     * to another host.
+     */
+    val carriesSecrets: Boolean get() = secretHeaders.isNotEmpty()
+
+    /** This request sent on to [url] after a redirect: same headers, and GET without a body unless [keepMethod]. */
+    internal fun redirectedTo(url: String, keepMethod: Boolean): Request =
+        if (keepMethod) Request(url, method, headers, body, lanCleartext, secretHeaders)
+        else Request(url, "GET", headers.filterNot { it.first.equals("Content-Type", ignoreCase = true) }, null, lanCleartext, secretHeaders)
 
     class Builder {
         private var url: String? = null
@@ -57,6 +71,7 @@ class Request private constructor(
         private val headers = mutableListOf<Pair<String, String>>()
         private var body: RequestBody? = null
         private var lan = false
+        private val secrets = mutableSetOf<String>()
 
         fun url(url: String) = apply { this.url = url }
         fun url(url: HttpUrl) = apply { this.url = url.toString() }
@@ -69,13 +84,23 @@ class Request private constructor(
             headers += name to value
         }
 
+        /** Sets [name] to a key, token or password: never sent over plain HTTP or along a redirect. */
+        fun secretHeader(name: String, value: String) = apply {
+            header(name, value)
+            secrets += name.lowercase()
+        }
+
         fun post(body: RequestBody) = apply { method = "POST"; this.body = body }
         fun post(body: String, contentType: String) = post(RequestBody(body.encodeToByteArray(), contentType))
 
         /** Marks the request as one to the user's own server on the LAN, which may use plain HTTP. */
         fun allowLanCleartext() = apply { lan = true }
 
-        fun build(): Request = Request(requireNotNull(url) { "url == null" }, method, headers.toList(), body, lan)
+        fun build(): Request {
+            val names = headers.map { it.first.lowercase() }.toSet()
+            val secret = names.filter { it in secrets || it == "authorization" }.toSet()
+            return Request(requireNotNull(url) { "url == null" }, method, headers.toList(), body, lan, secret)
+        }
     }
 }
 
