@@ -37,7 +37,7 @@ jobs:
       commit: ${{ steps.pick.outputs.commit }}
       latest: ${{ steps.notes.outputs.latest }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           # Don't leave the write token in .git/config, where the Gradle build (and its plugins) could read it.
