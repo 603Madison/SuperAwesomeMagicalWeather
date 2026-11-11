@@ -1,0 +1,30 @@
+<resources>
+    <settings>
+        <setting propertyKey="@Properties.source" title="@Strings.SourceTitle">
+            <settingConfig type="list">
+                <listEntry value="0">@Strings.SourceGps</listEntry>
+                <listEntry value="1">@Strings.SourcePlace</listEntry>
+            </settingConfig>
+        </setting>
+        <setting propertyKey="@Properties.place" title="@Strings.PlaceTitle" prompt="@Strings.PlacePrompt">
+            <settingConfig type="alphaNumeric" maxLength="60" />
+        </setting>
+        <setting propertyKey="@Properties.units" title="@Strings.UnitsTitle">
+            <settingConfig type="list">
+                <listEntry value="0">@Strings.UnitsWatch</listEntry>
+                <listEntry value="1">@Strings.UnitsUs</listEntry>
+                <listEntry value="2">@Strings.UnitsMetric</listEntry>
+            </settingConfig>
+        </setting>
+        <setting propertyKey="@Properties.refresh" title="@Strings.RefreshTitle">
+            <settingConfig type="list">
+                <listEntry value="30">@Strings.Refresh30</listEntry>
+                <listEntry value="60">@Strings.Refresh60</listEntry>
+                <listEntry value="0">@Strings.RefreshOff</listEntry>
+            </settingConfig>
+        </setting>
+        <setting propertyKey="@Properties.warn" title="@Strings.WarnTitle">
+            <settingConfig type="boolean" />
+        </setting>
+    </settings>
+</resources>

@@ -80,6 +80,10 @@ CAT S22 Flip. It installs alongside the main app.
 
 <br clear="right">
 
+### Garmin watches
+
+A small watch app with a glance (temperature, next-hour rain, headline, NWS alerts, hourly and 5-day) for recent Forerunner, fenix, epix, Venu, vivoactive, Instinct, Enduro and MARQ watches. You build it and copy it to the watch yourself: see [docs/GARMIN.md](docs/GARMIN.md).
+
 ## Features
 
 Each card can be turned on or off in Settings. The last column is the default.

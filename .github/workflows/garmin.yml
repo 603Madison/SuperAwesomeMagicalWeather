@@ -1,0 +1,68 @@
+name: Garmin
+
+# Checks the Connect IQ watch app in garmin/. It does not build the .prg:
+# monkeyc needs Garmin's device files, which Garmin only serves to a
+# signed-in Garmin account (through the SDK Manager), and neither a Garmin
+# password nor a zip of those files belongs in this repository's secrets.
+# Build it on a computer instead, see docs/GARMIN.md. This checks what can be
+# checked without them: the resources against the SDK's schema, and that
+# every product in the manifest and the jungle is a device the SDK knows.
+on:
+  push:
+    branches: [main, garmin]
+    paths:
+      - "garmin/**"
+      - ".github/workflows/garmin.yml"
+  pull_request:
+    paths:
+      - "garmin/**"
+      - ".github/workflows/garmin.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SDK_URL: https://developer.garmin.com/downloads/connect-iq/sdks/connectiq-sdk-lin-9.3.0-2026-10-20-95888f262.zip
+  SDK_SHA256: 1653cc98edd70029670a3e3fcd4ad6e746974a8b758a7b736a4e11506dfd8bc8
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Download the Connect IQ SDK (pinned)
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/sdk.zip" "$SDK_URL"
+          echo "$SDK_SHA256  $RUNNER_TEMP/sdk.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/sdk.zip" 'bin/resources.xsd' 'doc/docs/Device_Reference/*' -d "$RUNNER_TEMP/sdk"
+
+      - name: Resources match the SDK's schema
+        run: |
+          command -v xmllint > /dev/null || { sudo apt-get update -q && sudo apt-get install -yq libxml2-utils; }
+          xmllint --noout garmin/manifest.xml
+          find garmin/resources -name '*.xml' -print0 \
+            | xargs -0 -n1 xmllint --noout --schema "$RUNNER_TEMP/sdk/bin/resources.xsd"
+
+      - name: Every watch in the manifest and the jungle is one the SDK knows
+        run: |
+          refs="$RUNNER_TEMP/sdk/doc/docs/Device_Reference"
+          ids=$( (grep -o '<iq:product id="[^"]*"' garmin/manifest.xml | cut -d'"' -f2;
+                  grep -oE '^[a-z0-9_]+\.excludeAnnotations' garmin/monkey.jungle | cut -d. -f1 | grep -v '^base$') | sort -u)
+          missing=0
+          for id in $ids; do
+            if [ ! -f "$refs/$id.html" ]; then
+              echo "::error file=garmin/manifest.xml::Connect IQ SDK 9.3.0 has no device '$id'"
+              missing=1
+            fi
+          done
+          echo "$(echo "$ids" | wc -l) devices checked"
+          exit $missing
+
+      - name: No .prg here
+        run: |
+          echo "::notice title=Garmin app not built in CI::Building a .prg needs Garmin's device files, which require signing in to a Garmin account. Build it with VS Code and the Monkey C extension, see docs/GARMIN.md."
