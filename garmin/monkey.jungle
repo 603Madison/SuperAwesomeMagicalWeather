@@ -1,0 +1,13 @@
+project.manifest = manifest.xml
+
+# Colors: code marked (:mono) is left out on color screens, and code marked
+# (:color) on the black-and-white Instinct screens, where colored text would
+# come out black (see WxText.col).
+base.excludeAnnotations = mono
+instinct2.excludeAnnotations = color
+instinct2s.excludeAnnotations = color
+instinct2x.excludeAnnotations = color
+instinct3solar45mm.excludeAnnotations = color
+instinctcrossover.excludeAnnotations = color
+instincte40mm.excludeAnnotations = color
+instincte45mm.excludeAnnotations = color

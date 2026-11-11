@@ -1,0 +1,12 @@
+<resources>
+    <properties>
+        <!-- 0: the watch's last known position, 1: the saved place below -->
+        <property id="source" type="number">0</property>
+        <property id="place" type="string"></property>
+        <!-- 0: follow the watch, 1: °F/mph, 2: °C/km/h -->
+        <property id="units" type="number">0</property>
+        <!-- minutes between background refreshes; 0 turns them off -->
+        <property id="refresh" type="number">30</property>
+        <property id="warn" type="boolean">true</property>
+    </properties>
+</resources>

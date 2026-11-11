@@ -88,6 +88,10 @@ a glance, 12 hours and 7 days, current location or searched places, plus a tile
 and a watch face complication. Watches have no browser, so install it with
 `adb install` over Wi-Fi debugging; see [docs/WEAR.md](docs/WEAR.md).
 
+### Garmin watches
+
+A small watch app with a glance (temperature, next-hour rain, headline, NWS alerts, hourly and 5-day) for recent Forerunner, fenix, epix, Venu, vivoactive, Instinct, Enduro and MARQ watches. You build it and copy it to the watch yourself: see [docs/GARMIN.md](docs/GARMIN.md).
+
 ## Features
 
 Each card can be turned on or off in Settings. The last column is the default.

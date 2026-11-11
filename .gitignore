@@ -27,3 +27,8 @@ iosApp/Widget/Info.plist
 iosApp/Widget/Widget.entitlements
 xcuserdata/
 DerivedData/
+
+# Garmin watch app: build output and the developer signing key (never commit it)
+garmin/bin/
+garmin/*.der
+garmin/*.pem

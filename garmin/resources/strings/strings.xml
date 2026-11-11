@@ -1,0 +1,18 @@
+<resources>
+    <string id="AppName">SuperAwesomeMagicalWeather</string>
+
+    <string id="SourceTitle">Location</string>
+    <string id="SourceGps">Watch GPS (last known position)</string>
+    <string id="SourcePlace">Saved place</string>
+    <string id="PlaceTitle">Saved place</string>
+    <string id="PlacePrompt">A town ("Portland, ME") or latitude,longitude ("43.66,-70.26")</string>
+    <string id="UnitsTitle">Units</string>
+    <string id="UnitsWatch">Same as the watch</string>
+    <string id="UnitsUs">°F and mph</string>
+    <string id="UnitsMetric">°C and km/h</string>
+    <string id="RefreshTitle">Background refresh</string>
+    <string id="Refresh30">Every 30 minutes</string>
+    <string id="Refresh60">Every hour</string>
+    <string id="RefreshOff">Off</string>
+    <string id="WarnTitle">Offer to open the app for a new NWS warning</string>
+</resources>
