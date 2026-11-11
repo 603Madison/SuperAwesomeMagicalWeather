@@ -457,7 +457,7 @@ class ScreenshotTest {
             app.northvane.core.water.RiverGauge("USGS-01064140", "Presumpscot River near West Falmouth, Maine", 8.0, 448.0, 2.75, 7.5, now.minusSeconds(900), 0.6),
             app.northvane.core.water.TideOutlook(
                 "8418150", "Portland", 1.3,
-                listOf(2L, 8L, 14L, 20L).mapIndexed { i, h -> app.northvane.core.water.TideEvent(now.plusSeconds(h * 3600), i % 2 == 0, if (i % 2 == 0) 2.9 else 0.1) },
+                listOf(-4L, 2L, 8L, 14L, 20L, 26L).mapIndexed { i, h -> app.northvane.core.water.TideEvent(now.plusSeconds(h * 3600), i % 2 == 1, if (i % 2 == 1) 2.9 else 0.1) },
                 waterTempC = 11.5,
             ),
         )
@@ -471,6 +471,46 @@ class ScreenshotTest {
         val settings = st.settings.copy(stormEnabled = true, smokeEnabled = true, waterEnabled = true)
         render(dark = false) { HomeScreen(st.copy(settings = settings), noActions, {}, {}, {}) }
         save("today_storm_smoke")
+    }
+
+    /** A winter storm warning over the snowy hours of [withStormSmokeAndWater], a coastal place, and a trip. */
+    private fun newFeatures(): MainUiState {
+        val now = kotlin.time.Clock.System.now()
+        val s = withStormSmokeAndWater(snapshot())
+        val warning = app.northvane.core.model.WeatherAlert(
+            id = "ws", threadId = "ws", event = "Winter Storm Warning", headline = null, description = null, instruction = null,
+            severity = app.northvane.core.model.AlertSeverity.SEVERE, urgency = "Expected", certainty = "Likely",
+            category = app.northvane.core.model.AlertCategory.WARNING,
+            onset = now.plusSeconds(7 * 3600), ends = now.plusSeconds(22 * 3600),
+        )
+        val today = app.northvane.core.time.LocalDate.now()
+        val log = (1..40).map { d ->
+            val chance = listOf(10, 40, 40, 70, 20)[d % 5]
+            app.northvane.core.outlook.ForecastRecord(today.minusDays(d.toLong()), null, null, chance, observedMm = if (chance == 70 || d % 7 == 0) 5.0 else 0.0)
+        }
+        val trip = app.northvane.core.model.TripStop("t", "Maine coast", today.plusDays(1), today.plusDays(2))
+        val stop = SavedLocation("bh", "Bar Harbor, Maine", 44.39, -68.2, trip = trip)
+        val st = state(s.copy(alerts = listOf(warning)))
+        return st.copy(
+            locations = st.locations + stop,
+            rainCheck = app.northvane.core.outlook.RainCheck.report(log, today),
+            trip = listOf(stop to s),
+        )
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h3600dp-xxhdpi")
+    fun todayNewFeatures() {
+        val st = newFeatures()
+        render(dark = false) { HomeScreen(st, noActions, {}, {}, {}) }
+        save("today_new_features")
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h1400dp-xxhdpi")
+    fun alertsTimeline() {
+        render(dark = true) { AlertsScreen(newFeatures(), onRefresh = {}, onOpenSettings = {}) }
+        save("alerts_timeline_dark")
     }
 
     @Test

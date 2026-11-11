@@ -43,7 +43,7 @@ internal fun RainCheckSection(report: RainCheck.Report, todayChance: Int?, f: Un
     val latest = report.latest ?: return
     WeatherCard("Did it rain?") {
         val day = if (latest.date == time.today().minusDays(1)) "Yesterday" else time.dayName(latest.date)
-        Text("$day: ${latest.verdict(f)}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+        Text("$day: ${latest.verdict(f).replaceFirstChar { it.lowercase() }}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         val recent = report.days.takeLast(14)
         if (recent.size >= 3) {
             val rainy = recent.count { it.rained }

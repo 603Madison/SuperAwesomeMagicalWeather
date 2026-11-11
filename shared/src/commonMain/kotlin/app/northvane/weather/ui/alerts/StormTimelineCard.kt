@@ -33,9 +33,9 @@ import app.northvane.weather.ui.TimeFormat
 
 /** What the timeline's bars measure, in words, for [value]. */
 internal fun StormTimeline.describe(value: Double, f: UnitFormatter): String? = when (hazard) {
-    Hazard.SNOW -> "snow ${f.snow(value)} an hour"
-    Hazard.ICE -> "ice ${f.precipitation(value)} an hour"
-    Hazard.RAIN -> "rain ${f.precipitation(value)} an hour"
+    Hazard.SNOW -> "${f.snow(value)} of snow an hour"
+    Hazard.ICE -> "${f.precipitation(value)} of ice an hour"
+    Hazard.RAIN -> "${f.precipitation(value)} of rain an hour"
     Hazard.WIND -> "gusts to ${f.windSpeed(value)}"
     Hazard.THUNDER -> "${value.toInt()}% chance of thunder"
     Hazard.HEAT -> "feels like ${f.temperature(value)}"
@@ -47,10 +47,10 @@ internal fun StormTimeline.describe(value: Double, f: UnitFormatter): String? = 
 /** One line for the Today banner: when the worst of it is. */
 internal fun StormTimeline.headline(time: TimeFormat, f: UnitFormatter, now: Instant): String? {
     val w = worst ?: return null
-    val span = if (w.from == w.to) time.smart(w.from) else "${time.smart(w.from)}–${time.time(w.to.plusSeconds(3600))}"
+    val span = if (w.from == w.to) time.smart(w.from) else "${time.hour(w.from)}–${time.hour(w.to.plusSeconds(3600))}"
     val what = describe(w.value, f)
     return if (w.from <= now && w.to.plusSeconds(3600) > now) {
-        "Worst now, until ${time.time(w.to.plusSeconds(3600))}" + (what?.let { ": $it" } ?: "")
+        "Worst now, until ${time.hour(w.to.plusSeconds(3600))}" + (what?.let { ": $it" } ?: "")
     } else {
         "Worst $span" + (what?.let { ": $it" } ?: "")
     }
@@ -83,7 +83,7 @@ internal fun StormTimelineCard(timeline: StormTimeline, color: Color, f: UnitFor
                     when {
                         worst == null -> "—"
                         worst.from == worst.to -> time.smart(worst.from)
-                        else -> "${time.smart(worst.from)}–${time.time(worst.to.plusSeconds(3600))}"
+                        else -> "${time.hour(worst.from)}–${time.hour(worst.to.plusSeconds(3600))}"
                     },
                     worst?.let { timeline.describe(it.value, f) },
                     Modifier.weight(1f),

@@ -5,6 +5,12 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- **Tides on Today** for places within about 10 miles of a tide station: rising or falling, the next highs and lows with heights, and the day's curve. During a coastal flood alert, the high tides inside it are picked out. Canadian places get tides from the Canadian Hydrographic Service. Its own switch under Settings › Today; the Outlook's Rivers & tides card stays as it was.
+- **Storm timeline.** During a warning, watch or advisory, the top of Alerts lays it out for your spot: when it starts, its worst hours (snow, ice or rain per hour, gusts, thunder, feels-like temperature, or the high tides for coastal flooding) and when it ends or starts easing, over the hourly forecast, with a button to the radar. The Today alert banner says when the worst is. Switch: Settings › Alerts & notifications.
+- **Did it rain?** A Today card with yesterday's rain chance against what fell, the last two weeks as dots, and, after about a month, how the chances work out at this spot ("25–60%: rain 1 day in 10"), including today's. Rain comes from your WeeWX station when you have one, otherwise NOAA's daily analysis (contiguous US). Four months of records per place, about 6 KB.
+- **Trips.** Any place you search for can be added to a trip with dates (the calendar button next to a search result), as a new trip or the next stop of one, for a route. A stop's Today screen shows every stop on each of its days; alerts for a stop are checked from two days before; stops drop off your places, with their cached weather, the day after the trip.
+
 ## [2.2.1] - 2026-11-10
 
 Bug fixes and security hardening from a full review of the app, Mini and the new iPhone version.
