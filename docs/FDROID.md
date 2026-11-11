@@ -31,7 +31,7 @@ of the Release workflow) and can be started by hand from the Actions tab
 
 1. downloads the APKs from the three newest GitHub releases and checks that
    each is signed with the release key;
-2. adds the store listings from `fastlane/` and `mini/fastlane/` (descriptions,
+2. adds the store listings from `fastlane/`, `mini/fastlane/` and `wear/fastlane/` (descriptions,
    icon, screenshots, changelogs) and the settings in `fdroid/`;
 3. builds and signs the index with [fdroidserver](https://gitlab.com/fdroid/fdroidserver),
    using the release key from the repository secrets;
@@ -51,8 +51,9 @@ usual; a run started by pushing a tag can't deploy the repository.
 ### Every release
 
 Each release needs an F-Droid changelog for its `versionCode` in
-`fastlane/metadata/android/en-US/changelogs/` and
-`mini/fastlane/metadata/android/en-US/changelogs/` (up to 500 characters). The
+`fastlane/metadata/android/en-US/changelogs/`,
+`mini/fastlane/metadata/android/en-US/changelogs/` and
+`wear/fastlane/metadata/android/en-US/changelogs/` (up to 500 characters). The
 release workflow stops if one is missing.
 
 ### Updating fdroidserver

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Picture of the tile for the tile picker: a dark round face with the weather glyph and lines of text. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="192dp"
+    android:height="192dp"
+    android:viewportWidth="192"
+    android:viewportHeight="192">
+    <path
+        android:fillColor="#FF0B1220"
+        android:pathData="M96,0a96,96 0 1,1 0,192a96,96 0 1,1 0,-192z" />
+    <path
+        android:fillColor="#FFFFC83D"
+        android:pathData="M72,58a14,14 0 1,1 0,28a14,14 0 1,1 0,-28z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M74,96C68,96 64,92 64,87C64,82 68,78 73,78C75,72 80,68 87,68C94,68 100,73 101,80C107,80 112,85 112,90C112,94 109,96 105,96Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M120,70h28v20h-28z" />
+    <path
+        android:fillColor="#FF9FB6D9"
+        android:pathData="M52,112h88v8h-88z" />
+    <path
+        android:fillColor="#FF8AB4FF"
+        android:pathData="M60,130h72v8h-72z" />
+</vector>

@@ -80,6 +80,14 @@ CAT S22 Flip. It installs alongside the main app.
 
 <br clear="right">
 
+### SuperAwesomeMagicalWeather for Wear OS
+
+Each release also has **SuperAwesomeMagicalWeather-Wear**, a small standalone
+app for Wear OS 3+ watches: temperature, headline, next-hour rain and alerts at
+a glance, 12 hours and 7 days, current location or searched places, plus a tile
+and a watch face complication. Watches have no browser, so install it with
+`adb install` over Wi-Fi debugging; see [docs/WEAR.md](docs/WEAR.md).
+
 ## Features
 
 Each card can be turned on or off in Settings. The last column is the default.
@@ -222,14 +230,15 @@ platform 37.
 ./gradlew :core:jvmTest                # data layer and security tests
 ./gradlew :app:testDebugUnitTest        # app tests; renders screenshots to app/build/outputs/screenshots
 ./gradlew :mini:testDebugUnitTest       # Mini tests, driven by keys only
-./gradlew :app:lintDebug :mini:lintDebug
-./gradlew :app:assembleDebug :mini:assembleDebug   # installable debug APKs
+./gradlew :wear:testDebugUnitTest       # Wear OS tests; renders watch screenshots to wear/build/outputs/screenshots
+./gradlew :app:lintDebug :mini:lintDebug :wear:lintDebug
+./gradlew :app:assembleDebug :mini:assembleDebug :wear:assembleDebug   # installable debug APKs
 ./gradlew :core:jvmTest -Pnorthvane.live=true   # also hit the real NWS, NOAA and IEM services
 ```
 
 To build signed release APKs, put your key details in a git-ignored
 `keystore.properties` next to `settings.gradle.kts`, then run
-`./gradlew :app:assembleRelease :mini:assembleRelease`:
+`./gradlew :app:assembleRelease :mini:assembleRelease :wear:assembleRelease`:
 
 ```properties
 storeFile=/path/to/release.jks
@@ -246,6 +255,7 @@ keyPassword=…
 | `iosApp/` | The iPhone shell: SwiftUI host, WidgetKit widget, Xcode project spec (XcodeGen); the iOS platform code is in `shared/src/iosMain` |
 | `ui/` | Look and feel shared by every app: weather icons, sky colors, brand colors, the Lexend typeface |
 | `mini/` | The flip-phone app |
+| `wear/` | The Wear OS app: screens, tile, complication |
 | `weewx/` | WeeWX skin and setup guide |
 | `docs/` | How it works, security notes, release process, screenshots |
 

@@ -77,7 +77,7 @@ jobs:
           fi
           # F-Droid shows the changelog for each version code from the fastlane folders.
           VERSION_CODE=$(sed -n 's/.*versionCode = \([0-9]*\).*/\1/p' app/build.gradle.kts)
-          for dir in fastlane mini/fastlane; do
+          for dir in fastlane mini/fastlane wear/fastlane; do
             if [ -d "$dir" ] && [ ! -s "$dir/metadata/android/en-US/changelogs/$VERSION_CODE.txt" ]; then
               echo "::error::Add $dir/metadata/android/en-US/changelogs/$VERSION_CODE.txt (the F-Droid changelog)"
               exit 1
@@ -98,7 +98,10 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0"
 
       - name: Run tests
-        run: ./gradlew --no-daemon :core:jvmTest :app:testDebugUnitTest :app:lintDebug :mini:testDebugUnitTest :mini:lintDebug
+        run: |
+          # The Wear OS app only exists from 2.3.0 on; older releases are rebuilt without it.
+          WEAR_TASKS=$([ -d wear ] && echo ":wear:testDebugUnitTest :wear:lintDebug" || true)
+          ./gradlew --no-daemon :core:jvmTest :app:testDebugUnitTest :app:lintDebug :mini:testDebugUnitTest :mini:lintDebug $WEAR_TASKS
 
       - name: Restore signing key
         env:
@@ -126,11 +129,15 @@ jobs:
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
-          ./gradlew --no-daemon :app:assembleRelease :mini:assembleRelease
+          ./gradlew --no-daemon :app:assembleRelease :mini:assembleRelease $([ -d wear ] && echo :wear:assembleRelease || true)
           cp app/build/outputs/apk/release/app-release.apk "SuperAwesomeMagicalWeather-${TAG}.apk"
           # The Mini app (flip phones) only exists from 1.6.0 on; when it's in the source, its APK must be too.
           if [ -d mini ]; then
             cp mini/build/outputs/apk/release/mini-release.apk "SuperAwesomeMagicalWeather-Mini-${TAG}.apk"
+          fi
+          # Likewise the Wear OS app, from 2.3.0 on.
+          if [ -d wear ]; then
+            cp wear/build/outputs/apk/release/wear-release.apk "SuperAwesomeMagicalWeather-Wear-${TAG}.apk"
           fi
           # Every APK must carry the one release certificate, or installed copies couldn't update.
           EXPECTED=$(git show "$EVENT_SHA:.github/release-certificate.sha256" | tr -d ' \n')

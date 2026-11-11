@@ -34,7 +34,7 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0"
 
       - name: Unit tests, screenshot tests, lint, debug build
-        run: ./gradlew --no-daemon :core:jvmTest :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :mini:testDebugUnitTest :mini:lintDebug :mini:assembleDebug
+        run: ./gradlew --no-daemon :core:jvmTest :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :mini:testDebugUnitTest :mini:lintDebug :mini:assembleDebug :wear:testDebugUnitTest :wear:lintDebug :wear:assembleDebug
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
@@ -43,11 +43,14 @@ jobs:
           path: |
             app/build/outputs/screenshots/
             mini/build/outputs/screenshots/
+            wear/build/outputs/screenshots/
             app/build/reports/lint-results-debug.html
             mini/build/reports/lint-results-debug.html
+            wear/build/reports/lint-results-debug.html
             core/build/reports/tests/
             app/build/reports/tests/
             mini/build/reports/tests/
+            wear/build/reports/tests/
           if-no-files-found: ignore
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -56,6 +59,7 @@ jobs:
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             mini/build/outputs/apk/debug/mini-debug.apk
+            wear/build/outputs/apk/debug/wear-debug.apk
 
   live-services:
     # Weekly check that NWS / NOAA / IEM still behave the way the app expects.

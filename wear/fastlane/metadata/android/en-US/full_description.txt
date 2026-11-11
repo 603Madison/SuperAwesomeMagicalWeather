@@ -1,0 +1,13 @@
+A small standalone weather app for Wear OS 3 and newer watches. It downloads its own forecasts, so it needs no phone app and no Google Play services.
+
+<ul>
+<li>At a glance: temperature, conditions, today's high and low, and the same one-line headline as the phone apps.</li>
+<li>Next-hour rain from a 15-minute forecast: "Rain starting around 3:40" or "Dry for the next hour".</li>
+<li>Severe weather alerts, with notifications for new warnings, watches and advisories.</li>
+<li>The next 12 hours and 7 days, with the full forecast text for each day.</li>
+<li>Current location from the watch's own location service, plus places found by name or ZIP code with the keyboard or your voice.</li>
+<li>A tile and a watch face complication with the temperature, the headline and the next hour's rain, refreshed in the background at most twice an hour.</li>
+<li>Few settings, each feature switchable: units, which place the tile shows, next-hour rain, alert notifications and background updates.</li>
+</ul>
+
+Forecasts and alerts come from the US National Weather Service and Environment and Climate Change Canada; next-hour rain and place search from Open-Meteo. No accounts, ads or tracking.
