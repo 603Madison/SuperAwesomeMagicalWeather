@@ -45,7 +45,11 @@ data class RiverGauge(
 @Serializable
 data class TideEvent(@Serializable(InstantSerializer::class) val time: Instant, val high: Boolean, val heightM: Double)
 
-/** Upcoming high and low tides at the nearest NOAA tide station. */
+/**
+ * High and low tides at the nearest tide station, from about half a day ago
+ * (so the tide now can be worked out) to two days ahead. NOAA in the US, the
+ * Canadian Hydrographic Service in Canada.
+ */
 @Serializable
 data class TideOutlook(
     val stationId: String,
@@ -53,7 +57,19 @@ data class TideOutlook(
     val distanceKm: Double,
     val events: List<TideEvent>,
     val waterTempC: Double? = null,
-)
+    val source: TideSource = TideSource.NOAA,
+) {
+    /** Close enough that the station's tides are this place's tides. */
+    val nearby: Boolean get() = distanceKm <= NEARBY_KM
+
+    companion object {
+        /** Tides change a lot within a few miles up an estuary or around a headland. */
+        const val NEARBY_KM = 15.0
+    }
+}
+
+@Serializable
+enum class TideSource(val label: String) { NOAA("NOAA"), CHS("Canadian Hydrographic Service") }
 
 @Serializable
 data class WaterReport(
@@ -74,17 +90,23 @@ class WaterClient(
     private val http: HttpEngine,
     private val usgsBase: String = USGS_BASE,
     private val coopsBase: String = COOPS_BASE,
+    private val chsBase: String = CHS_BASE,
 ) {
     /** Site names hardly ever change: looked up once per gauge while the app runs. */
     private val siteNames = SyncMap<String, String>()
 
-    suspend fun report(point: GeoPoint, now: Instant): WaterReport = coroutineScope {
-        val river = async { attempt { river(point, now) } }
-        val tide = async { attempt { tide(point, now) } }
-        val r = river.await()
-        val t = tide.await()
-        if (r.isFailure && t.isFailure) throw r.exceptionOrNull()!!
-        WaterReport(now, r.getOrNull(), t.getOrNull())
+    /**
+     * Rivers (US only) when [rivers] is set, and tides when [tides] is set:
+     * NOAA's in the US, or the Canadian Hydrographic Service's when [canada].
+     */
+    suspend fun report(point: GeoPoint, now: Instant, rivers: Boolean = true, tides: Boolean = true, canada: Boolean = false): WaterReport = coroutineScope {
+        val river = if (rivers && !canada) async { attempt { river(point, now) } } else null
+        val tide = if (tides) async { attempt { if (canada) canadianTide(point, now) else tide(point, now) } } else null
+        val r = river?.await()
+        val t = tide?.await()
+        val failures = listOfNotNull(r, t)
+        if (failures.isNotEmpty() && failures.all { it.isFailure }) throw failures.first().exceptionOrNull()!!
+        WaterReport(now, r?.getOrNull(), t?.getOrNull())
     }
 
     suspend fun river(point: GeoPoint, now: Instant): RiverGauge? {
@@ -131,8 +153,9 @@ class WaterClient(
             .addQueryParameter("product", "predictions")
             .addQueryParameter("datum", "MLLW")
             .addQueryParameter("station", station.id)
-            .addQueryParameter("begin_date", BEGIN.format(now.atOffset(ZoneOffset.UTC)))
-            .addQueryParameter("range", "48")
+            // From before the last high or low, so the tide now can be worked out.
+            .addQueryParameter("begin_date", BEGIN.format(now.minusSeconds(LOOKBACK_HOURS * 3600L).atOffset(ZoneOffset.UTC)))
+            .addQueryParameter("range", "${LOOKBACK_HOURS + 48}")
             .addQueryParameter("interval", "hilo")
             .addQueryParameter("units", "metric")
             .addQueryParameter("time_zone", "gmt")
@@ -143,6 +166,28 @@ class WaterClient(
         // Reference stations have sensors; subordinate ones are predictions only.
         val temp = if (station.reference) attempt { waterTemp(station.id) }.getOrNull() else null
         return TideOutlook(station.id, station.name, station.distanceKm, events, temp)
+    }
+
+    /** Canadian stations with tide predictions; the list is large (~750 KB), so it's read once per run. */
+    private var canadianStations: List<TideStation>? = null
+
+    suspend fun canadianTide(point: GeoPoint, now: Instant): TideOutlook? {
+        val stations = canadianStations ?: run {
+            val url = "$chsBase/api/v1/stations".toHttpUrl().newBuilder().addQueryParameter("time-series-code", "wlp-hilo").build()
+            val response = http.fetch(Request.Builder().url(url.toString()).build(), maxBytes = 3L * 1024 * 1024)
+            if (response.code !in 200..299) throw HttpStatusException(response.code, "Canadian Hydrographic Service")
+            parseCanadianStations(response.body).also { canadianStations = it }
+        }
+        val station = stations.map { it.copy(distanceKm = point.distanceKm(GeoPoint(it.latitude, it.longitude))) }
+            .filter { it.distanceKm <= MAX_TIDE_KM }.minByOrNull { it.distanceKm } ?: return null
+        val iso = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")
+        val url = "$chsBase/api/v1/stations/${station.id}/data".toHttpUrl().newBuilder()
+            .addQueryParameter("time-series-code", "wlp-hilo")
+            .addQueryParameter("from", iso.format(now.minusSeconds(LOOKBACK_HOURS * 3600L).atOffset(ZoneOffset.UTC)))
+            .addQueryParameter("to", iso.format(now.plusSeconds(48 * 3600L).atOffset(ZoneOffset.UTC)))
+            .build()
+        val events = parseCanadianPredictions(get(url.toString(), "Canadian Hydrographic Service"))
+        return TideOutlook(station.id, station.name, station.distanceKm, events, source = TideSource.CHS)
     }
 
     private suspend fun waterTemp(stationId: String): Double? {
@@ -164,11 +209,21 @@ class WaterClient(
         return response.body
     }
 
-    internal data class TideStation(val id: String, val name: String, val distanceKm: Double, val reference: Boolean)
+    internal data class TideStation(
+        val id: String,
+        val name: String,
+        val distanceKm: Double,
+        val reference: Boolean,
+        val latitude: Double = 0.0,
+        val longitude: Double = 0.0,
+    )
 
     companion object {
         const val USGS_BASE = "https://api.waterdata.usgs.gov/ogcapi/v0"
         const val COOPS_BASE = "https://api.tidesandcurrents.noaa.gov"
+        const val CHS_BASE = "https://api-iwls.dfo-mpo.gc.ca"
+        /** Hours of past predictions to fetch: enough to include the last high or low. */
+        private const val LOOKBACK_HOURS = 13
         private const val DISCHARGE = "00060"
         private const val GAGE_HEIGHT = "00065"
         private const val WATER_TEMP = "00010"
@@ -252,6 +307,37 @@ class WaterClient(
                 val time = o.str("t")?.let { runCatching { LocalDateTime.parse(it, COOPS_TIME).toInstant(ZoneOffset.UTC) }.getOrNull() } ?: return@mapNotNull null
                 val height = o.str("v")?.toDoubleOrNull() ?: return@mapNotNull null
                 TideEvent(time, high = o.str("type") == "H", heightM = height)
+            }
+        }
+
+        internal fun parseCanadianStations(json: String): List<TideStation> {
+            val list = runCatching { NorthvaneJson.parseToJsonElement(json) as? kotlinx.serialization.json.JsonArray }.getOrNull()
+                ?: throw ParseException("Unexpected response from the Canadian Hydrographic Service")
+            return list.mapNotNull { s ->
+                val o = s.asObj() ?: return@mapNotNull null
+                val lat = o.dbl("latitude") ?: return@mapNotNull null
+                val lon = o.dbl("longitude") ?: return@mapNotNull null
+                if (lat !in -90.0..90.0 || lon !in -180.0..180.0) return@mapNotNull null
+                // Ids go into a URL path: hex only.
+                val id = o.str("id")?.takeIf { it.isNotEmpty() && it.all { c -> c in '0'..'9' || c in 'a'..'f' || c in 'A'..'F' } } ?: return@mapNotNull null
+                val name = o.str("officialName") ?: return@mapNotNull null
+                TideStation(id, tidyName(name), 0.0, reference = false, latitude = lat, longitude = lon)
+            }
+        }
+
+        /** CHS lists the highs and lows without saying which is which: a high is above its neighbours. */
+        fun parseCanadianPredictions(json: String): List<TideEvent> {
+            val list = runCatching { NorthvaneJson.parseToJsonElement(json) as? kotlinx.serialization.json.JsonArray }.getOrNull()
+                ?: throw ParseException("Unexpected response from the Canadian Hydrographic Service")
+            val points = list.mapNotNull { e ->
+                val o = e.asObj() ?: return@mapNotNull null
+                val time = o.str("eventDate")?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: return@mapNotNull null
+                val value = o.dbl("value") ?: return@mapNotNull null
+                time to value
+            }.sortedBy { it.first }
+            return points.mapIndexed { i, (time, value) ->
+                val neighbour = points.getOrNull(i + 1)?.second ?: points.getOrNull(i - 1)?.second ?: value
+                TideEvent(time, high = value > neighbour, heightM = value)
             }
         }
 

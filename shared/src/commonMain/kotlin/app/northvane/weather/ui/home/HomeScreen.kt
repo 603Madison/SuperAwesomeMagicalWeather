@@ -437,6 +437,10 @@ private fun HomeContent(
                         } else if (snapshot.daily.isNotEmpty()) {
                             hidden += "daily forecast"
                         }
+                        val tide = snapshot.water?.tide
+                        if (settings.tidesEnabled && tide != null && tide.nearby && state.shows(Section.WATER)) {
+                            cards[TodayCard.TIDES] = { TideSection(tide, snapshot.alerts, formatter, time, now) }
+                        }
                         val aurora = snapshot.aurora
                         val lat0 = snapshot.latitude ?: location?.latitude
                         if (settings.auroraEnabled && aurora != null && state.shows(Section.AURORA)) {

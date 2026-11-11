@@ -240,7 +240,7 @@ private fun TodayPage(state: MainUiState, container: AppContainer, onBack: () ->
             Hint(
                 "Long-press a card and drag it to change the order; switch off the ones you don't want. Air quality, UV and pollen " +
                     "sit as small chips at the top until they matter (AQI over 50, UV 6 or more, high pollen). Each card's ⋮ menu " +
-                    "on Today does the same.",
+                    "on Today does the same. Tides shows only for places within about 10 miles of a tide station.",
             )
             val cards = s.todayOrder.filter { (it != TodayCard.FORECASTERS && it != TodayCard.ASK) || s.aiEnabled }
             ReorderableColumn(cards, key = { it }, onReorder = { order ->

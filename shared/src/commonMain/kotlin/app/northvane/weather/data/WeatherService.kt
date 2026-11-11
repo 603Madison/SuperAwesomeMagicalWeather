@@ -69,6 +69,7 @@ class WeatherService(
                 aurora = appSettings.auroraEnabled,
                 smoke = appSettings.smokeEnabled,
                 water = appSettings.waterEnabled,
+                tides = appSettings.tidesEnabled,
                 // Fail fast with an explanation rather than waiting out a blocked connection.
                 weewxBlockedReason = if (station != null && platform.localNetworkBlocked(station.url)) {
                     platform.localNetworkDeniedMessage

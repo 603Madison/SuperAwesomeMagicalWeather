@@ -82,8 +82,10 @@ data class SourceConfig(
     val aurora: Boolean = false,
     /** Download NOAA HRRR's wildfire smoke forecast (about 2 MB). */
     val smoke: Boolean = false,
-    /** Download the nearest river gauge and tide predictions. */
+    /** Download the nearest river gauge (for the Outlook card and paddling). */
     val water: Boolean = false,
+    /** Download tide predictions (the Today tides card, and the Outlook card when [water]). */
+    val tides: Boolean = false,
 )
 
 @Serializable
@@ -184,8 +186,12 @@ class WeatherRepository(
         val smokeJob = smoke?.takeIf { config.smoke && wants(Section.SMOKE) && inContiguousUs(point) }?.let { client ->
             async { attempt { client.outlook(point, now) } }
         }
-        val waterJob = water?.takeIf { config.water && wants(Section.WATER) && !outsideNws }?.let { client ->
-            async { attempt { client.report(point, now) } }
+        // Rivers are USGS (US only); tides are NOAA's, or the Canadian Hydrographic Service's in Canada.
+        val canada = outsideNws && EcccClient.mayBeInCanada(point)
+        val waterJob = water?.takeIf { (config.water || config.tides) && wants(Section.WATER) && (!outsideNws || canada) }?.let { client ->
+            val rivers = config.water && !canada
+            val tides = config.tides || config.water
+            async { attempt { client.report(point, now, rivers = rivers, tides = tides, canada = canada) } }
         }
         val pollenJob = config.pollenApiKey?.takeIf { wants(Section.POLLEN) }?.let { key ->
             pollen?.let { client -> async { attempt { client.forecast(point, key, now, config.pollenRestriction) } } }
