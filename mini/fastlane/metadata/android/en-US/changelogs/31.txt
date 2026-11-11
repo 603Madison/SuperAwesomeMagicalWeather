@@ -1,0 +1,1 @@
+No changes to Mini in this release; the main app gained tides, a storm timeline, a rain check and trips, and there are new Wear OS and Garmin watch apps.
