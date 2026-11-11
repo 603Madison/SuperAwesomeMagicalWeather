@@ -64,7 +64,7 @@ jobs:
 
       - name: Store listings and repo icon
         run: |
-          for app in app.northvane.weather:fastlane app.northvane.mini:mini/fastlane; do
+          for app in app.northvane.weather:fastlane app.northvane.mini:mini/fastlane app.northvane.wear:wear/fastlane; do
             id=${app%%:*}; src=${app#*:}
             mkdir -p "fdroid/metadata/$id"
             cp -r "$src/metadata/android/en-US" "fdroid/metadata/$id/"

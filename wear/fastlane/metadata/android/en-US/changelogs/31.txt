@@ -1,0 +1,1 @@
+First release of SuperAwesomeMagicalWeather for Wear OS: temperature, headline, next-hour rain, alerts with notifications, 12 hours and 7 days, current location or searched places, plus a tile and a watch face complication.

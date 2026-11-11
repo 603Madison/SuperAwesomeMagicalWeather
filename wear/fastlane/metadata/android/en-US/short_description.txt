@@ -1,0 +1,1 @@
+Glanceable weather on your watch: headline, next-hour rain, alerts and a tile.

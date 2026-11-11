@@ -4,7 +4,7 @@
 # passwords come from environment variables and are never stored here.
 repo_name: SuperAwesomeMagicalWeather
 repo_description: >-
-  SuperAwesomeMagicalWeather and SuperAwesomeMagicalWeather Mini, the same
+  SuperAwesomeMagicalWeather, SuperAwesomeMagicalWeather Mini and the Wear OS app, the same
   developer-signed APKs as on the project's GitHub releases.
 repo_icon: icon.png
 # Only the versions downloaded from the newest releases; no archive repository.

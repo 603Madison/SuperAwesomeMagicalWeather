@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SuperAwesomeMagicalWeather</string>
+    <string name="tile_label">Weather</string>
+    <string name="tile_description">Temperature, today\'s headline and the next hour\'s rain</string>
+    <string name="complication_label">Weather</string>
+    <string name="channel_alerts">Weather alerts</string>
+    <string name="channel_alerts_desc">NWS and Environment Canada warnings, watches and advisories for the tile\'s place.</string>
+</resources>

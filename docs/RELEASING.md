@@ -30,9 +30,10 @@ unsigned or debug-signed APK.
 2. Move the Unreleased notes in `CHANGELOG.md` under a new `## [x.y.z] - date`
    heading. The release uses that section as its notes.
 3. Write the F-Droid changelog for the new `versionCode` in
-   `fastlane/metadata/android/en-US/changelogs/` and
-   `mini/fastlane/metadata/android/en-US/changelogs/` (up to 500 characters;
-   the release workflow checks for both).
+   `fastlane/metadata/android/en-US/changelogs/`,
+   `mini/fastlane/metadata/android/en-US/changelogs/` and
+   `wear/fastlane/metadata/android/en-US/changelogs/` (up to 500 characters;
+   the release workflow checks for all three).
 4. Commit and push to `main`.
 5. Start **Actions › Release › Run workflow** on `main` with the version (for example
    `v1.4.3`), or `gh workflow run release.yml -f version=v1.4.3`. Pushing a
@@ -41,7 +42,10 @@ unsigned or debug-signed APK.
    repository ([docs/FDROID.md](FDROID.md)).
 
 The workflow checks that the version matches `versionName`, runs the tests and
-lint, builds the signed APK, writes `SHA256SUMS.txt` and publishes the release.
+lint, builds the signed APKs (`SuperAwesomeMagicalWeather-vX.Y.Z.apk`, the
+`-Mini-` flip-phone app and, from 2.3.0, the `-Wear-` watch app), writes
+`SHA256SUMS.txt` and publishes the release. All three share the version from
+`app/build.gradle.kts` and the one signing key.
 Only the highest version is marked Latest, which is where the README's download
 link points. Versions with a hyphen (for example `v1.5.0-beta.1`) are marked as
 pre-releases. Running it again for a version that already has a release replaces
