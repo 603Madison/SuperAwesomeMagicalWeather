@@ -67,7 +67,7 @@ class StormTimelineTest {
         assertEquals(90.0, worst.value)
         assertEquals(h(4), worst.from) // 85 and 80 are within a fifth of 90; 70 isn't
         assertEquals(h(6), worst.to)
-        assertEquals(h(8), t.tapering) // first hour under 30% of the peak
+        assertEquals(h(9), t.tapering) // first hour under 30% of the peak (27): 20 at hour 9
         assertTrue(t.hours.first().time <= h(0))
     }
 
