@@ -99,6 +99,8 @@ data class AppSettings(
     val waterEnabled: Boolean = true,
     /** Tides card on the Today screen, for places with a tide station close by. */
     val tidesEnabled: Boolean = true,
+    /** During a warning, watch or advisory: when it starts, its worst hours and when it ends, on Alerts and Today. */
+    val stormTimelineEnabled: Boolean = true,
     /** A morning briefing notification at [briefingMinutes] after midnight. */
     val briefingEnabled: Boolean = false,
     val briefingMinutes: Int = 7 * 60,
@@ -199,6 +201,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
         val storm = booleanPreferencesKey("storm_enabled")
         val smoke = booleanPreferencesKey("smoke_enabled")
         val tides = booleanPreferencesKey("tides_enabled")
+        val stormTimeline = booleanPreferencesKey("storm_timeline_enabled")
         val water = booleanPreferencesKey("water_enabled")
         val briefing = booleanPreferencesKey("briefing_enabled")
         val briefingMinutes = intPreferencesKey("briefing_minutes")
@@ -294,6 +297,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
                 stormEnabled = p[Keys.storm] ?: d.stormEnabled,
                 smokeEnabled = p[Keys.smoke] ?: d.smokeEnabled,
                 tidesEnabled = p[Keys.tides] ?: d.tidesEnabled,
+                stormTimelineEnabled = p[Keys.stormTimeline] ?: d.stormTimelineEnabled,
                 waterEnabled = p[Keys.water] ?: d.waterEnabled,
                 briefingEnabled = p[Keys.briefing] ?: d.briefingEnabled,
                 briefingMinutes = p[Keys.briefingMinutes]?.coerceIn(0, 24 * 60 - 1) ?: d.briefingMinutes,
@@ -388,6 +392,7 @@ class SettingsRepository(private val store: DataStore<Preferences>) {
     suspend fun setStorm(enabled: Boolean) = store.edit { it[Keys.storm] = enabled }
     suspend fun setSmoke(enabled: Boolean) = store.edit { it[Keys.smoke] = enabled }
     suspend fun setTides(enabled: Boolean) = store.edit { it[Keys.tides] = enabled }
+    suspend fun setStormTimeline(enabled: Boolean) = store.edit { it[Keys.stormTimeline] = enabled }
     suspend fun setWater(enabled: Boolean) = store.edit { it[Keys.water] = enabled }
     suspend fun setBriefing(enabled: Boolean) = store.edit { it[Keys.briefing] = enabled }
     suspend fun setBriefingMinutes(minutes: Int) = store.edit { it[Keys.briefingMinutes] = minutes.coerceIn(0, 24 * 60 - 1) }

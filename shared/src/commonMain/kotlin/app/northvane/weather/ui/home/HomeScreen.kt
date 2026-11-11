@@ -90,6 +90,7 @@ import app.northvane.core.model.Units
 import app.northvane.core.model.WeatherAlert
 import app.northvane.core.model.WeatherCondition
 import app.northvane.core.model.WeatherSnapshot
+import app.northvane.weather.ui.alerts.headline
 import app.northvane.core.util.UnitFormatter
 import app.northvane.weather.data.DataSaverMode
 import app.northvane.weather.data.SatelliteFeature
@@ -349,7 +350,16 @@ private fun HomeContent(
                             if (headline.isNotEmpty()) item(key = "headline") { HeadlineCard(headline) }
                         }
                         if (snapshot.alerts.isNotEmpty() && state.shows(Section.ALERTS)) {
-                            item(key = "alerts") { AlertBanner(snapshot.alerts, time, onOpenAlerts, state.selected?.point, formatter) }
+                            item(key = "alerts") {
+                                AlertBanner(
+                                    snapshot.alerts, time, onOpenAlerts, state.selected?.point, formatter,
+                                    timeline = if (settings.stormTimelineEnabled) {
+                                        { top -> worstLine(top, snapshot, formatter, time) }
+                                    } else {
+                                        null
+                                    },
+                                )
+                            }
                         }
 
                         // At a glance: air, UV, pollen and the sun as chips, unless one of them matters today.
@@ -781,7 +791,15 @@ internal fun stationLabel(name: String): String {
 }
 
 @Composable
-private fun AlertBanner(alerts: List<WeatherAlert>, time: TimeFormat, onClick: () -> Unit, place: GeoPoint? = null, f: UnitFormatter? = null) {
+private fun AlertBanner(
+    alerts: List<WeatherAlert>,
+    time: TimeFormat,
+    onClick: () -> Unit,
+    place: GeoPoint? = null,
+    f: UnitFormatter? = null,
+    /** When the worst of [WeatherAlert] is, from the storm timeline, if it's on. */
+    timeline: ((WeatherAlert) -> String?)? = null,
+) {
     val top = AlertClassifier.mostUrgent(alerts) ?: return
     val color = alertColor(top.category)
     // Warnings get a solid banner; watches, advisories and statements keep the light tint.
@@ -805,6 +823,8 @@ private fun AlertBanner(alerts: List<WeatherAlert>, time: TimeFormat, onClick: (
                 spot?.let {
                     Text(it, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = onBanner)
                 }
+                val worst = remember(top, timeline) { timeline?.invoke(top) }
+                worst?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = onBanner) }
                 Text(
                     listOfNotNull(until, more).joinToString(" · ").ifEmpty { "Tap for details" },
                     style = MaterialTheme.typography.bodySmall,
@@ -813,6 +833,14 @@ private fun AlertBanner(alerts: List<WeatherAlert>, time: TimeFormat, onClick: (
             }
         }
     }
+}
+
+/** "Worst 9 PM–1 AM: gusts to 55 mph" for [alert], when it's a timed event with numbers in the forecast. */
+private fun worstLine(alert: WeatherAlert, snapshot: WeatherSnapshot, f: UnitFormatter, time: TimeFormat): String? {
+    if (alert.category !in setOf(AlertCategory.WARNING, AlertCategory.WATCH, AlertCategory.ADVISORY)) return null
+    val now = kotlin.time.Clock.System.now()
+    val timeline = app.northvane.core.alerts.StormTimeline.build(alert, snapshot.hourly, snapshot.water?.tide?.events.orEmpty(), now)
+    return timeline.headline(time, f, now)
 }
 
 /** The finer numbers, shown under "Details" in the top card. */

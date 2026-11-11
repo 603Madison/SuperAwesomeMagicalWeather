@@ -288,6 +288,7 @@ private fun NorthvaneRootContent(
                     onRefresh = { vm.refresh() },
                     onExplain = vm::explainAlert,
                     onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                    onOpenRadar = { navController.navigateToTab(Routes.RADAR) },
                 )
             }
             composable(Routes.LOCATIONS) {

@@ -68,7 +68,13 @@ import app.northvane.core.util.UnitFormatter
 import app.northvane.core.time.*
 
 @Composable
-fun AlertsScreen(state: MainUiState, onRefresh: () -> Unit, onOpenSettings: () -> Unit, onExplain: (WeatherAlert) -> Unit = {}) {
+fun AlertsScreen(
+    state: MainUiState,
+    onRefresh: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onExplain: (WeatherAlert) -> Unit = {},
+    onOpenRadar: () -> Unit = {},
+) {
     val is24 = is24HourClock()
     val snapshot = state.snapshot
     val zone = remember(snapshot?.timeZoneId) {
@@ -77,6 +83,14 @@ fun AlertsScreen(state: MainUiState, onRefresh: () -> Unit, onOpenSettings: () -
     val time = remember(zone) { TimeFormat(zone, is24) }
     val platform = LocalPlatform.current
     val notificationsAllowed = remember(state.settings) { platform.notifications.canNotify() }
+    val now = kotlin.time.Clock.System.now()
+    val timeline = remember(snapshot, state.settings.stormTimelineEnabled, now.epochSeconds / 300) {
+        snapshot?.takeIf { state.settings.stormTimelineEnabled }?.let { snap ->
+            app.northvane.core.alerts.StormTimeline.pick(snap.alerts, now)?.let { alert ->
+                app.northvane.core.alerts.StormTimeline.build(alert, snap.hourly, snap.water?.tide?.events.orEmpty(), now)
+            }
+        }
+    }
 
     Scaffold(
         containerColor = Color.Transparent,
@@ -124,6 +138,11 @@ fun AlertsScreen(state: MainUiState, onRefresh: () -> Unit, onOpenSettings: () -
                     snapshot.alerts.isEmpty() -> item { NoAlerts(snapshot.placeName ?: state.selected?.name) }
                     else -> {
                         val canExplain = state.settings.aiEnabled && state.settings.aiAlerts && state.settings.aiModel.isNotBlank()
+                        timeline?.let { t ->
+                            item(key = "timeline") {
+                                StormTimelineCard(t, alertColor(t.alert.category), UnitFormatter(state.settings.units), time, now, onOpenRadar)
+                            }
+                        }
                         items(snapshot.alerts, key = { it.id }) { alert ->
                             val spot = state.selected?.point?.let { AlertAreas.spot(alert, it) }
                                 ?.describe(alert) { km -> UnitFormatter(state.settings.units).distance(km) }

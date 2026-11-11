@@ -404,6 +404,8 @@ private fun AlertsPage(state: MainUiState, container: AppContainer, onBack: () -
             if (s.alertsEnabled) {
                 ChoiceDropdown("Check every", listOf(15, 30, 60), s.alertCheckMinutes, { "$it minutes" }, { m -> updateAlerts { setAlertInterval(m) } })
             }
+            LabeledSwitch("Storm timeline", s.stormTimelineEnabled, { on -> scope.launch { container.settings.setStormTimeline(on) } },
+                subtitle = "During a warning, watch or advisory: when it starts, its worst hours for your spot and when it ends, on Alerts and Today")
         }
         SectionCard("Daily & rain") {
             LabeledSwitch("Morning briefing", s.briefingEnabled, { on ->
