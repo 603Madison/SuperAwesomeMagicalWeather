@@ -248,6 +248,9 @@ private enum class Tone { NORMAL, ACCENT, ERROR, MUTED }
 private fun TransformingLazyColumnScope.paragraph(text: String, tone: Tone = Tone.NORMAL, center: Boolean = false) {
     item {
         val colors = MaterialTheme.colorScheme
+        // Long text reaches the curved edge as it scrolls past the top and bottom of a round screen.
+        val config = androidx.compose.ui.platform.LocalConfiguration.current
+        val side = if (config.isScreenRound) (config.screenWidthDp * 0.1f).dp else 8.dp
         Text(
             text,
             style = MaterialTheme.typography.bodyMedium,
@@ -258,7 +261,7 @@ private fun TransformingLazyColumnScope.paragraph(text: String, tone: Tone = Ton
                 Tone.MUTED -> colors.onSurfaceVariant
             },
             textAlign = if (center) TextAlign.Center else TextAlign.Start,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = side),
         )
     }
 }
