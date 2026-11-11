@@ -48,8 +48,11 @@ lint, builds the signed APKs (`SuperAwesomeMagicalWeather-vX.Y.Z.apk`, the
 `app/build.gradle.kts` and the one signing key.
 Only the highest version is marked Latest, which is where the README's download
 link points. Versions with a hyphen (for example `v1.5.0-beta.1`) are marked as
-pre-releases. Running it again for a version that already has a release replaces
-that release's APK.
+pre-releases. The release is published only once everything is built, the APKs
+and the iPhone `.ipa`, because this repository's releases are immutable: once
+published, files can't be added or replaced. Running the workflow again for a
+version that's already released stops with an error; release a new version
+instead.
 
 Releases before 1.4.3 were debug-signed (package `app.northvane.weather.debug`)
 and can't be re-signed, because their code doesn't read the signing secrets.

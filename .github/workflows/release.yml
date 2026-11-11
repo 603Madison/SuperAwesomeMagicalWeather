@@ -26,12 +26,16 @@ concurrency:
 env:
   TAG: ${{ inputs.version || github.ref_name }}
 
+# Releases are immutable once published (nothing can be added or replaced), so
+# everything is built first: the APKs (build), the iPhone app (ios), and only
+# then is the release published with all of them and one SHA256SUMS.txt (release).
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     outputs:
       commit: ${{ steps.pick.outputs.commit }}
+      latest: ${{ steps.notes.outputs.latest }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -147,12 +151,16 @@ jobs:
               exit 1
             fi
           done
-          sha256sum SuperAwesomeMagicalWeather-*.apk | tee SHA256SUMS.txt
+          sha256sum SuperAwesomeMagicalWeather-*.apk
 
       - name: Release notes
+        id: notes
         env:
           EVENT_SHA: ${{ github.sha }}
         run: |
+          # Only the highest version is marked Latest, whatever order releases are made in.
+          newest=$( (git tag -l 'v*'; echo "$TAG") | grep -v -- '-' | sort -V | tail -n 1)
+          echo "latest=$([ "$TAG" = "$newest" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           # Notes come from the latest branch so older releases can be (re)published too.
           git show "$EVENT_SHA:CHANGELOG.md" | awk -v tag="${TAG#v}" '
             $0 ~ "^## \\[" tag "\\]" {found=1; next}
@@ -161,52 +169,51 @@ jobs:
           ' > release-notes.md
           [ -s release-notes.md ] || echo "See CHANGELOG.md." > release-notes.md
 
-      - name: Publish release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            # Replace the files; drop debug-signed APKs left from before signing was set up.
-            gh release view "$TAG" --json assets --jq '.assets[].name' | grep -- '-debug\.apk$' \
-              | while read -r old; do gh release delete-asset "$TAG" "$old" --yes; done
-            gh release upload "$TAG" SuperAwesomeMagicalWeather-*.apk SHA256SUMS.txt --clobber
-          else
-            # Only the highest version is marked Latest, whatever order releases are made in.
-            newest=$( (git tag -l 'v*'; echo "$TAG") | grep -v -- '-' | sort -V | tail -n 1)
-            gh release create "$TAG" SuperAwesomeMagicalWeather-*.apk SHA256SUMS.txt --target "$COMMIT" \
-              --title "SuperAwesomeMagicalWeather ${TAG}" --notes-file release-notes.md \
-              --latest=$([ "$TAG" = "$newest" ] && echo true || echo false) \
-              $(echo "$TAG" | grep -q -- '-' && echo --prerelease)
-          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-files
+          path: |
+            SuperAwesomeMagicalWeather-*.apk
+            release-notes.md
+          if-no-files-found: error
+          retention-days: 7
 
   # The iPhone app from the same commit, as an unsigned .ipa (see docs/IOS.md).
   ios:
-    needs: release
+    needs: build
     uses: ./.github/workflows/ios.yml
     with:
-      ref: ${{ needs.release.outputs.commit }}
+      ref: ${{ needs.build.outputs.commit }}
       version: ${{ inputs.version || github.ref_name }}
 
-  ios-publish:
-    needs: [release, ios]
+  # Publishes the release once, with every file: a published release can't be changed.
+  release:
+    needs: [build, ios]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
+          name: release-files
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
           name: ios-ipa
-      - name: Attach the .ipa to the release
+      - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          COMMIT: ${{ needs.build.outputs.commit }}
+          LATEST: ${{ needs.build.outputs.latest }}
         run: |
-          ls SuperAwesomeMagicalWeather-*.ipa
-          # Add its checksum to the release's list next to the APKs'.
-          gh release download "$TAG" --pattern SHA256SUMS.txt --clobber
-          grep -v '\.ipa$' SHA256SUMS.txt > sums.txt || true
-          sha256sum SuperAwesomeMagicalWeather-*.ipa >> sums.txt
-          mv sums.txt SHA256SUMS.txt
-          gh release upload "$TAG" SuperAwesomeMagicalWeather-*.ipa SHA256SUMS.txt --clobber
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::$TAG is already published, and published releases can't be changed. Release a new version instead."
+            exit 1
+          fi
+          ls SuperAwesomeMagicalWeather-*.apk SuperAwesomeMagicalWeather-*.ipa
+          sha256sum SuperAwesomeMagicalWeather-*.apk SuperAwesomeMagicalWeather-*.ipa | tee SHA256SUMS.txt
+          gh release create "$TAG" SuperAwesomeMagicalWeather-*.apk SuperAwesomeMagicalWeather-*.ipa SHA256SUMS.txt \
+            --target "$COMMIT" --title "SuperAwesomeMagicalWeather ${TAG}" --notes-file release-notes.md \
+            --latest="$LATEST" $(echo "$TAG" | grep -q -- '-' && echo --prerelease)
 
   # Updates the F-Droid repository on GitHub Pages with the new release.
   fdroid-repo:
