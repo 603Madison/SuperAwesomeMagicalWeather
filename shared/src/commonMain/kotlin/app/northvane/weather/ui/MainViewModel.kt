@@ -62,6 +62,8 @@ data class MainUiState(
     val nowcast: List<MinutePrecip> = emptyList(),
     /** How the forecast has done here lately, once there's a week to compare. */
     val accuracy: String? = null,
+    /** Rain chances against the rain that fell here, once a day has been measured. */
+    val rainCheck: app.northvane.core.outlook.RainCheck.Report? = null,
 ) {
     /**
      * Under satellite limits, cards only show data downloaded in the last 12
@@ -88,14 +90,16 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
     /** The 15-minute rain forecast per place, for the headline's "rain in 20 minutes". */
     private val nowcasts = MutableStateFlow<Map<String, Pair<Instant, List<MinutePrecip>>>>(emptyMap())
     /** "Forecast, last 7 days: highs ran about 3° warm…" per place. */
-    private val accuracy = MutableStateFlow<Map<String, String>>(emptyMap())
+    private val accuracy = MutableStateFlow<Map<String, Accuracy>>(emptyMap())
+
+    private data class Accuracy(val text: String?, val rain: app.northvane.core.outlook.RainCheck.Report?)
     private val extras = combine(climates, aiJobs.states, nowcasts, accuracy) { c, a, n, acc -> Extras(c, a, n, acc) }
 
     private data class Extras(
         val climates: Map<String, FrostClimate>,
         val ai: Map<String, AiUiState>,
         val nowcasts: Map<String, Pair<Instant, List<MinutePrecip>>>,
-        val accuracy: Map<String, String>,
+        val accuracy: Map<String, Accuracy>,
     )
     private var refreshJob: Job? = null
     private var refreshingId: String? = null
@@ -124,7 +128,8 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
             frostClimate = selected?.let { climateMap[it.id] },
             ai = selected?.let { aiMap[it.id] } ?: AiUiState(),
             nowcast = selected?.let { nowcastMap[it.id]?.second }.orEmpty(),
-            accuracy = selected?.let { accuracyMap[it.id] },
+            accuracy = selected?.let { accuracyMap[it.id]?.text },
+            rainCheck = selected?.let { accuracyMap[it.id]?.rain },
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, MainUiState())
 
@@ -288,14 +293,17 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         val snapshot = snapshots.value[location.id] ?: return
         viewModelScope.launch {
             val zone = runCatching { app.northvane.core.time.ZoneId.of(snapshot.timeZoneId) }.getOrDefault(app.northvane.core.time.ZoneId.systemDefault())
-            val summary = app.northvane.core.outlook.ForecastAccuracy.summarize(
-                container.weatherCache.forecastLog(location.id), snapshot.history, app.northvane.core.time.LocalDate.now(zone),
-            ) ?: return@launch
+            val log = container.weatherCache.forecastLog(location.id)
+            val today = app.northvane.core.time.LocalDate.now(zone)
+            val summary = app.northvane.core.outlook.ForecastAccuracy.summarize(log, snapshot.history, today)
             val units = state.value.settings.units
-            val text = app.northvane.core.outlook.ForecastAccuracy.describe(
-                summary, app.northvane.core.util.UnitFormatter(units), imperial = units == app.northvane.core.model.UnitSystem.IMPERIAL,
-            )
-            accuracy.update { it + (location.id to text) }
+            val text = summary?.let {
+                app.northvane.core.outlook.ForecastAccuracy.describe(
+                    it, app.northvane.core.util.UnitFormatter(units), imperial = units == app.northvane.core.model.UnitSystem.IMPERIAL,
+                )
+            }
+            val rain = app.northvane.core.outlook.RainCheck.report(log, today)
+            accuracy.update { it + (location.id to Accuracy(text, rain)) }
         }
     }
 

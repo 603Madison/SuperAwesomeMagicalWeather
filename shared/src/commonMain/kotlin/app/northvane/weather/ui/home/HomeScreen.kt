@@ -451,6 +451,12 @@ private fun HomeContent(
                         if (settings.tidesEnabled && tide != null && tide.nearby && state.shows(Section.WATER)) {
                             cards[TodayCard.TIDES] = { TideSection(tide, snapshot.alerts, formatter, time, now) }
                         }
+                        val rainCheck = state.rainCheck
+                        // Only while it's news: the last measured day within the past few days.
+                        if (settings.rainCheckEnabled && rainCheck?.latest?.date?.let { !it.isBefore(time.today().minusDays(3)) } == true) {
+                            val todayChance = snapshot.daily.firstOrNull { it.date == time.today() }?.precipitationChance
+                            cards[TodayCard.RAIN_CHECK] = { RainCheckSection(rainCheck, todayChance, formatter, time) }
+                        }
                         val aurora = snapshot.aurora
                         val lat0 = snapshot.latitude ?: location?.latitude
                         if (settings.auroraEnabled && aurora != null && state.shows(Section.AURORA)) {

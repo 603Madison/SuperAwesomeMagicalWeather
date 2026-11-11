@@ -10,6 +10,7 @@ enum class TodayCard(val label: String, val hideable: Boolean) {
     HOURLY("Hourly", false),
     DAILY("7-day forecast", false),
     TIDES("Tides", true),
+    RAIN_CHECK("Did it rain?", true),
     AURORA("Aurora", true),
     AIR("Air quality", true),
     UV("UV index", true),
@@ -59,6 +60,7 @@ fun AppSettings.isOn(card: TodayCard): Boolean = when (card) {
     TodayCard.STORM -> stormEnabled
     TodayCard.SMOKE -> smokeEnabled
     TodayCard.TIDES -> tidesEnabled
+    TodayCard.RAIN_CHECK -> rainCheckEnabled
     TodayCard.HOURLY, TodayCard.DAILY -> true
     TodayCard.AURORA -> auroraEnabled
     TodayCard.AIR -> airQualityEnabled

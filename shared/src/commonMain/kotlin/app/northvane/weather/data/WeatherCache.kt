@@ -48,7 +48,7 @@ class WeatherCache(private val files: TextFiles) {
 
     private fun logFile(locationId: String) = files.path("weather", "${safeName(locationId)}.forecasts.json")
 
-    /** What the forecast said about recent days, for the accuracy line (about 1 KB per place). */
+    /** What the forecast said about recent days and the rain that fell, for the accuracy line and "did it rain?" (about 6 KB per place). */
     suspend fun forecastLog(locationId: String): List<app.northvane.core.outlook.ForecastRecord> = withContext(Dispatchers.Default) {
         mutex.withLock { readLog(locationId) }
     }
