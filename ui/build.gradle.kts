@@ -16,6 +16,10 @@ kotlin {
     }
     iosArm64()
     iosSimulatorArm64()
+    // The Linux desktop app.
+    jvm("desktop") {
+        compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
+    }
 
     compilerOptions {
         optIn.add("kotlin.time.ExperimentalTime")

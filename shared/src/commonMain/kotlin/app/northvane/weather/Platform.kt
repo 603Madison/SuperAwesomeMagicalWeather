@@ -65,6 +65,9 @@ interface Platform {
     /** Whether the app can wake often enough for short-notice heads-ups (rain starting soon, northern lights now). */
     val frequentBackgroundChecks: Boolean get() = true
 
+    /** Whether the device can say where it is ("Use my location"); computers usually can't. */
+    val hasDeviceLocation: Boolean get() = true
+
     /** Whether times show as 13:00 rather than 1 PM. */
     fun is24HourClock(): Boolean = false
 }

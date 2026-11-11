@@ -204,7 +204,8 @@ private fun AppearancePage(state: MainUiState, container: AppContainer, onBack: 
                 onSelect = { units -> update { setUnits(units) } },
             )
         }
-        SectionCard("Home-screen widget") {
+        // Linux desktops have no widget to add.
+        if (LocalPlatform.current.name != "Linux") SectionCard("Home-screen widget") {
             Hint(
                 if (LocalPlatform.current.name == "iOS") {
                     "Touch and hold your Home Screen or Lock Screen, tap Edit › Add Widget and pick SuperAwesomeMagicalWeather. It shows the place on your Today screen."
@@ -458,7 +459,13 @@ private fun AlertsPage(state: MainUiState, container: AppContainer, onBack: () -
                 }
             }
             SectionCard("Test") {
-                Hint(if (LocalPlatform.current.name == "iOS") "iOS decides when background checks run, usually within the hour, and the app checks whenever you open it. Warnings are time-sensitive notifications." else "Android may delay background checks to save battery. Warnings use a high-priority channel; adjust sounds per channel in system settings.")
+                Hint(
+                    when (LocalPlatform.current.name) {
+                        "iOS" -> "iOS decides when background checks run, usually within the hour, and the app checks whenever you open it. Warnings are time-sensitive notifications."
+                        "Linux" -> "While the app is open it checks itself; when it's closed, a background check runs every 15 minutes (a systemd timer for your user). Warnings stay on screen until you dismiss them."
+                        else -> "Android may delay background checks to save battery. Warnings use a high-priority channel; adjust sounds per channel in system settings."
+                    },
+                )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     FilledTonalButton(onClick = {
                         val sent = container.platform.notifications.sendTest(state.selected?.id, state.selected?.displayName)

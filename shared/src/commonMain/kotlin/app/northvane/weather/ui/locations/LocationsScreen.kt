@@ -207,7 +207,7 @@ fun LocationsScreen(state: MainUiState, vm: MainViewModel, container: AppContain
             }
             item {
                 Spacer(Modifier.height(8.dp))
-                FilledTonalButton(
+                if (LocalPlatform.current.hasDeviceLocation) FilledTonalButton(
                     onClick = {
                         if (granted(Permission.LOCATION)) {
                             locating = true

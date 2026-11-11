@@ -1,0 +1,1 @@
+New: SuperAwesomeMagicalWeather for Linux, with packages for Ubuntu (.deb) and Fedora (.rpm). No changes to the Android app itself in this release.

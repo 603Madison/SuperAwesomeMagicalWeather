@@ -34,7 +34,7 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;37.0.0"
 
       - name: Unit tests, screenshot tests, lint, debug build
-        run: ./gradlew --no-daemon :core:jvmTest :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :mini:testDebugUnitTest :mini:lintDebug :mini:assembleDebug :wear:testDebugUnitTest :wear:lintDebug :wear:assembleDebug
+        run: ./gradlew --no-daemon :core:jvmTest :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :mini:testDebugUnitTest :mini:lintDebug :mini:assembleDebug :wear:testDebugUnitTest :wear:lintDebug :wear:assembleDebug :desktop:compileKotlinJvm
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()

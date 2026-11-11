@@ -5,6 +5,16 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-11-11
+
+SuperAwesomeMagicalWeather for Linux.
+
+### Added
+- **Linux desktop app**, the same app as on Android and iPhone in a window, with a `.deb` for Ubuntu 22.04+ (and Debian, Mint, Pop!_OS) and a `.rpm` for Fedora (and RHEL, openSUSE) in each release, each with its own Java runtime. Alerts, the morning briefing and Tonight keep coming when the app is closed, from a systemd timer for your user that runs a quick check every 15 minutes. Notifications go through the desktop's own; API keys and passwords are kept in the login keyring (GNOME Keyring or KWallet). The radar map is drawn by the app over the USGS National Map. Places are added by search, since computers have no location service the app can rely on. See docs/LINUX.md.
+
+### Changed
+- Releases are published once everything is built (APKs, the iPhone `.ipa`, the Linux packages), since published releases can't be changed. 2.2.0 and 2.3.0 went out without their `.ipa` because of this.
+
 ## [2.3.0] - 2026-11-11
 
 Tides, a storm timeline, "did it rain?", trips, and apps for Wear OS and Garmin watches.

@@ -80,6 +80,17 @@ CAT S22 Flip. It installs alongside the main app.
 
 <br clear="right">
 
+### SuperAwesomeMagicalWeather for Linux
+
+<img src="docs/screenshots/linux-today.png" width="200" align="right" alt="The app on a Linux desktop">
+
+The whole app in a desktop window, with a `.deb` for Ubuntu (22.04 and newer)
+and a `.rpm` for Fedora in each release: `sudo apt install ./file.deb` or
+`sudo dnf install ./file.rpm`. Alerts and reminders keep coming when it's
+closed. See [docs/LINUX.md](docs/LINUX.md).
+
+<br clear="right">
+
 ### SuperAwesomeMagicalWeather for Wear OS
 
 Each release also has **SuperAwesomeMagicalWeather-Wear**, a small standalone

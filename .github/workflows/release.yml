@@ -153,6 +153,15 @@ jobs:
           done
           sha256sum SuperAwesomeMagicalWeather-*.apk
 
+      # The Linux app, from 2.4.0 on: a .deb for Ubuntu and a .rpm for Fedora.
+      - name: Build Linux packages
+        run: |
+          [ -d desktop ] || exit 0
+          sudo apt-get install -yq rpm fakeroot > /dev/null
+          ./gradlew --no-daemon :desktop:packageDeb :desktop:packageRpm
+          cp desktop/build/compose/binaries/main/deb/*.deb desktop/build/compose/binaries/main/rpm/*.rpm .
+          ls -la ./*.deb ./*.rpm
+
       - name: Release notes
         id: notes
         env:
@@ -174,6 +183,8 @@ jobs:
           name: release-files
           path: |
             SuperAwesomeMagicalWeather-*.apk
+            superawesomemagicalweather*.deb
+            superawesomemagicalweather*.rpm
             release-notes.md
           if-no-files-found: error
           retention-days: 7
@@ -209,9 +220,11 @@ jobs:
             echo "::error::$TAG is already published, and published releases can't be changed. Release a new version instead."
             exit 1
           fi
-          ls SuperAwesomeMagicalWeather-*.apk SuperAwesomeMagicalWeather-*.ipa
-          sha256sum SuperAwesomeMagicalWeather-*.apk SuperAwesomeMagicalWeather-*.ipa | tee SHA256SUMS.txt
-          gh release create "$TAG" SuperAwesomeMagicalWeather-*.apk SuperAwesomeMagicalWeather-*.ipa SHA256SUMS.txt \
+          shopt -s nullglob
+          files=(SuperAwesomeMagicalWeather-*.apk SuperAwesomeMagicalWeather-*.ipa superawesomemagicalweather*.deb superawesomemagicalweather*.rpm)
+          ls -la "${files[@]}"
+          sha256sum "${files[@]}" | tee SHA256SUMS.txt
+          gh release create "$TAG" "${files[@]}" SHA256SUMS.txt \
             --target "$COMMIT" --title "SuperAwesomeMagicalWeather ${TAG}" --notes-file release-notes.md \
             --latest="$LATEST" $(echo "$TAG" | grep -q -- '-' && echo --prerelease)
 

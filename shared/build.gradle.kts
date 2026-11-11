@@ -16,6 +16,10 @@ kotlin {
         minSdk = 26
         androidResources { enable = true }
     }
+    // The Linux desktop app (see :desktop).
+    jvm("desktop") {
+        compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
+    }
     listOf(iosArm64(), iosSimulatorArm64()).forEach { target ->
         target.binaries.framework {
             baseName = "Shared"
@@ -39,6 +43,12 @@ kotlin {
             api(libs.cmp.lifecycle.runtime.compose)
             implementation(libs.cmp.navigation.compose)
             api(libs.datastore.preferences.core)
+        }
+        val desktopMain by getting {
+            dependencies {
+                implementation(compose.desktop.common)
+                implementation(libs.zxing.core)
+            }
         }
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)

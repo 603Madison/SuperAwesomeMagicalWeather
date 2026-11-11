@@ -1057,19 +1057,28 @@ private fun Onboarding(
             }
         }
         Spacer(Modifier.height(24.dp))
-        Button(onClick = onUseLocation, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Filled.LocationOn, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text("Use my location")
-        }
-        Spacer(Modifier.height(12.dp))
-        OutlinedButton(onClick = onSearch, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Filled.Search, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
-            Text("Search for a place")
+        val canLocate = app.northvane.weather.ui.LocalPlatform.current.hasDeviceLocation
+        if (canLocate) {
+            Button(onClick = onUseLocation, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.LocationOn, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Use my location")
+            }
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(onClick = onSearch, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.Search, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Search for a place")
+            }
+        } else {
+            Button(onClick = onSearch, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.Search, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Search for a place")
+            }
         }
         Spacer(Modifier.height(16.dp))
-        Text(
+        if (canLocate) Text(
             "Your location is only used while the app is open.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
