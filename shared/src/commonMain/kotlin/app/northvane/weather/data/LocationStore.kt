@@ -85,6 +85,24 @@ class LocationStore(private val store: DataStore<Preferences>) {
         )
     }
 
+    /** Removes trip stops whose trip is over; returns their IDs (to clear their caches). */
+    suspend fun removeEndedTrips(today: app.northvane.core.time.LocalDate): List<String> {
+        var removed = emptyList<String>()
+        store.edit { p ->
+            val current = savedLocations(p) ?: return@edit
+            val ended = current.filter { it.tripOver(today) }
+            if (ended.isEmpty()) return@edit
+            removed = ended.map { it.id }
+            p[locationsKey] = NorthvaneJson.encodeToString(locationList, current - ended.toSet())
+            val stations = savedStations(p) ?: return@edit
+            p[stationsKey] = NorthvaneJson.encodeToString(
+                stationList,
+                stations.map { if (it.linkedLocationId in removed) it.copy(linkedLocationId = null) else it },
+            )
+        }
+        return removed
+    }
+
     suspend fun upsertStation(station: WeeWxStation) = store.edit { p ->
         val current = savedStations(p) ?: return@edit
         val updated = if (current.any { it.id == station.id }) {

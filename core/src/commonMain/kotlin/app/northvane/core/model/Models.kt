@@ -71,11 +71,32 @@ data class SavedLocation(
     val notify: Boolean = true,
     /** US ZIP code, looked up on the device, for EPA's UV index forecast. */
     val postalCode: String? = null,
+    /** Set for a stop on a trip: the place is only kept until the trip is over. */
+    val trip: TripStop? = null,
 ) {
     val displayName: String get() = nickname?.takeIf { it.isNotBlank() } ?: name
 
+    /** A trip stop whose last day has passed, due to be removed. */
+    fun tripOver(today: LocalDate): Boolean = trip != null && today.isAfter(trip.end)
+
+    /** Whether background alert checks should cover this place today: trip stops from two days before. */
+    fun alertsWanted(today: LocalDate): Boolean =
+        notify && (trip == null || (!today.isBefore(trip.start.minusDays(2)) && !today.isAfter(trip.end)))
+
     val point: GeoPoint get() = GeoPoint(latitude, longitude)
 }
+
+/**
+ * A place on a trip: [tripId] and [tripName] are shared by all its stops (a
+ * weekend place, or a route's stops), [start]..[end] are this stop's days.
+ */
+@Serializable
+data class TripStop(
+    val tripId: String,
+    val tripName: String,
+    @Serializable(app.northvane.core.json.LocalDateSerializer::class) val start: LocalDate,
+    @Serializable(app.northvane.core.json.LocalDateSerializer::class) val end: LocalDate,
+)
 
 @Serializable
 data class CurrentConditions(

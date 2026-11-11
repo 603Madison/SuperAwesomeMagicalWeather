@@ -34,12 +34,13 @@ class AlertCheckWorker(appContext: Context, params: WorkerParameters) : Coroutin
 
     override suspend fun doWork(): Result {
         val container = (applicationContext as NorthvaneApp).container
+        app.northvane.weather.work.Background.pruneTrips(container)
         val settings = container.settings.settings.first()
         if (!settings.alertsEnabled || (settings.alertCategories.isEmpty() && !(settings.gardenEnabled && settings.gardenFrostAlerts))) return Result.success()
         // Respect the user's satellite settings for background checks.
         if (!isAllowed(SatelliteFeature.BACKGROUND_ALERTS, settings, container.connectivity.current())) return Result.success()
 
-        val locations = container.locations.locations.first().filter { it.notify }.take(MAX_LOCATIONS)
+        val locations = container.locations.locations.first().filter { it.alertsWanted(app.northvane.core.time.LocalDate.now()) }.take(MAX_LOCATIONS)
         if (locations.isEmpty()) return Result.success()
 
         val tracker = AlertTracker()

@@ -23,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -94,6 +95,7 @@ fun LocationsScreen(state: MainUiState, vm: MainViewModel, container: AppContain
     var searchJob by remember { mutableStateOf<Job?>(null) }
     var sendToMini by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<SavedLocation?>(null) }
+    var tripFor by remember { mutableStateOf<PlaceResult?>(null) }
     var locating by remember { mutableStateOf(false) }
     // The location callback can arrive after the user already left this screen; don't navigate then.
     var onScreen by remember { mutableStateOf(true) }
@@ -180,7 +182,14 @@ fun LocationsScreen(state: MainUiState, vm: MainViewModel, container: AppContain
                     headlineContent = { Text(place.name) },
                     supportingContent = { Text("${GeoPoint.format(place.latitude)}, ${GeoPoint.format(place.longitude)}") },
                     leadingContent = { Icon(Icons.Filled.Place, contentDescription = null) },
-                    trailingContent = { Icon(Icons.Filled.Add, contentDescription = "Add") },
+                    trailingContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { tripFor = place }) {
+                                Icon(Icons.Filled.DateRange, contentDescription = "Add ${place.name} to a trip")
+                            }
+                            Icon(Icons.Filled.Add, contentDescription = "Add")
+                        }
+                    },
                     modifier = Modifier.clickable {
                         vm.addPlace(place)
                         onBack()
@@ -270,6 +279,19 @@ fun LocationsScreen(state: MainUiState, vm: MainViewModel, container: AppContain
         )
     }
 
+    tripFor?.let { place ->
+        TripDialog(
+            place = place,
+            trips = state.locations.mapNotNull { it.trip },
+            onDismiss = { tripFor = null },
+            onSave = { tripId, name, start, end ->
+                vm.addTripStop(place, tripId, name, start, end)
+                tripFor = null
+                onBack()
+            },
+        )
+    }
+
     pendingDelete?.let { location ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
@@ -301,6 +323,7 @@ private fun SavedLocationRow(
     val details = buildList {
         if (location.nickname != null && !location.name.equals(location.nickname, ignoreCase = true)) add(location.name)
         if (location.isDeviceLocation) add("Follows your location")
+        location.trip?.let { add("${it.tripName}: ${tripDates(it.start, it.end)}") }
         if (!location.notify) add("Alerts off")
     }.joinToString(" · ")
     ListItem(

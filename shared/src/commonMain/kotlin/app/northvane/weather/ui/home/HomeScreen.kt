@@ -403,6 +403,9 @@ private fun HomeContent(
                             }
                             PollenSection(pollen, hasKey = true, time = time, onOpenSources = onOpenSources, allergyContent = allergy)
                         }
+                        if (state.trip.isNotEmpty()) {
+                            item(key = "trip") { TripSection(state.trip, state.selected?.id, formatter, time, actions.selectLocation) }
+                        }
                         if (chips.isNotEmpty()) {
                             item(key = "glance") { GlanceRow(chips, openGlance, onToggle = { g -> openGlance = if (openGlance == g) null else g }) }
                             openGlance?.takeIf { g -> chips.any { it.glance == g } }?.let { g ->

@@ -48,7 +48,7 @@ class AuroraWatchWorker(appContext: Context, params: WorkerParameters) : Corouti
         val settings = container.settings.settings.first()
         if (!settings.auroraEnabled || !settings.auroraNotify) return Result.success()
         if (!isAllowed(SatelliteFeature.AURORA, settings, container.connectivity.current())) return Result.success()
-        val locations = container.locations.locations.first().filter { it.notify }.take(MAX_LOCATIONS)
+        val locations = container.locations.locations.first().filter { it.alertsWanted(app.northvane.core.time.LocalDate.now()) }.take(MAX_LOCATIONS)
         if (locations.isEmpty()) return Result.success()
 
         val now = kotlin.time.Clock.System.now()

@@ -149,7 +149,7 @@ class TonightWorker(appContext: Context, params: WorkerParameters) : CoroutineWo
             val settings = container.settings.settings.first()
             if (!settings.tonightEnabled || !AlertNotifier.canNotify(applicationContext)) return Result.success()
             val now = kotlin.time.Clock.System.now()
-            for (location in container.locations.locations.first().filter { it.notify }.take(5)) {
+            for (location in container.locations.locations.first().filter { it.alertsWanted(app.northvane.core.time.LocalDate.now()) }.take(5)) {
                 // The last forecast if it's recent, otherwise a fresh one (within Backwoods limits).
                 val snapshot = container.weatherCache.read(location.id)?.takeIf { Duration.between(it.fetchedAt, now) < Duration.ofHours(3) }
                     ?: attempt { container.weather.refresh(location) }.getOrNull()
@@ -258,7 +258,7 @@ class RainSoonWorker(appContext: Context, params: WorkerParameters) : CoroutineW
         val settings = container.settings.settings.first()
         if (!settings.rainSoonEnabled || !AlertNotifier.canNotify(applicationContext)) return Result.success()
         if (!isAllowed(SatelliteFeature.RAIN_SOON, settings, container.connectivity.current())) return Result.success()
-        val locations = container.locations.locations.first().filter { it.notify }.take(MAX_LOCATIONS)
+        val locations = container.locations.locations.first().filter { it.alertsWanted(app.northvane.core.time.LocalDate.now()) }.take(MAX_LOCATIONS)
         val prefs = applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val now = kotlin.time.Clock.System.now()
         for (location in locations) {

@@ -258,7 +258,8 @@ object IosApp {
         } else {
             IosNotifications.cancel("briefing")
         }
-        val locations = container.locations.locations.first().filter { it.notify }
+        val today = app.northvane.core.time.LocalDate.now()
+        val locations = container.locations.locations.first().filter { it.alertsWanted(today) }
         // Places removed, or with notifications turned off, keep nothing booked.
         IosNotifications.cancelOthers("tonight-", locations.map { "tonight-${it.id}" }.toSet())
         for (location in locations) {

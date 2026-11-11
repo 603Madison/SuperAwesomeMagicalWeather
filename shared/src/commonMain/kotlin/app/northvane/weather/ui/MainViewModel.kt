@@ -64,6 +64,8 @@ data class MainUiState(
     val accuracy: String? = null,
     /** Rain chances against the rain that fell here, once a day has been measured. */
     val rainCheck: app.northvane.core.outlook.RainCheck.Report? = null,
+    /** When the selected place is a trip stop: every stop of its trip, in order, with its forecast if loaded. */
+    val trip: List<Pair<SavedLocation, WeatherSnapshot?>> = emptyList(),
 ) {
     /**
      * Under satellite limits, cards only show data downloaded in the last 12
@@ -130,10 +132,20 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
             nowcast = selected?.let { nowcastMap[it.id]?.second }.orEmpty(),
             accuracy = selected?.let { accuracyMap[it.id]?.text },
             rainCheck = selected?.let { accuracyMap[it.id]?.rain },
+            trip = selected?.trip?.let { t ->
+                locations.filter { it.trip?.tripId == t.tripId }.sortedBy { it.trip!!.start }.map { it to snaps[it.id] }
+            }.orEmpty(),
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, MainUiState())
 
     init {
+        viewModelScope.launch { app.northvane.weather.work.Background.pruneTrips(container) }
+        // A trip stop's Today shows the whole trip: load the other stops' forecasts (cached, or fetched one at a time).
+        viewModelScope.launch {
+            state.map { st -> st.selected?.trip?.tripId?.let { id -> st.locations.filter { it.trip?.tripId == id } }.orEmpty() }
+                .distinctUntilChanged { a, b -> a.map { it.id } == b.map { it.id } }
+                .collect { stops -> loadTripStops(stops) }
+        }
         // Forecasters' notes: checked when the place or forecast changes, rewritten only when the office issues a new discussion.
         viewModelScope.launch {
             state.map { st -> Triple(st.selected, st.snapshot?.fetchedAt, with(st.settings) { listOf(aiEnabled, aiDiscussion, aiProvider, aiBaseUrl, aiModel) }) }
@@ -172,6 +184,36 @@ class MainViewModel(private val container: AppContainer) : ViewModel() {
         }
         val interval = container.weather.refreshInterval(container.weather.currentPlan(container.settings.settings.first()))
         if (cached == null || Duration.between(cached.fetchedAt, kotlin.time.Clock.System.now()) > interval) refresh(location)
+    }
+
+    private suspend fun loadTripStops(stops: List<SavedLocation>) {
+        for (stop in stops) {
+            if (stop.id == state.value.selected?.id) continue
+            val cached = snapshots.value[stop.id] ?: container.weather.cached(stop.id)
+            val fresh = cached != null && Duration.between(cached.fetchedAt, kotlin.time.Clock.System.now()) < Duration.ofHours(3)
+            val snapshot = if (fresh) cached else attempt { container.weather.refresh(stop) }.getOrNull() ?: cached
+            if (snapshot != null && state.value.locations.any { it.id == stop.id }) snapshots.update { it + (stop.id to snapshot) }
+        }
+    }
+
+    /**
+     * Adds [place] as a stop on a trip from [start] to [end]: on the trip
+     * [tripId] when given (a route's next stop), otherwise a new trip called
+     * [tripName]. Trip stops drop off the day after their last day.
+     */
+    fun addTripStop(place: PlaceResult, tripId: String?, tripName: String, start: app.northvane.core.time.LocalDate, end: app.northvane.core.time.LocalDate) {
+        viewModelScope.launch {
+            val existing = tripId?.let { id -> state.value.locations.firstOrNull { it.trip?.tripId == id }?.trip }
+            val stop = app.northvane.core.model.TripStop(
+                tripId = existing?.tripId ?: randomUuid(),
+                tripName = existing?.tripName ?: tripName.trim().take(40).ifEmpty { place.name.substringBefore(",") },
+                start = minOf(start, end),
+                end = maxOf(start, end),
+            )
+            val location = SavedLocation(randomUuid(), place.name, place.latitude, place.longitude, trip = stop)
+            container.locations.upsertLocation(location)
+            container.settings.setSelectedLocation(location.id)
+        }
     }
 
     /** Called when the app returns to the foreground. */

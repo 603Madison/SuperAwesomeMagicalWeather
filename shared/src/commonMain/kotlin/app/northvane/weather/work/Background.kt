@@ -44,10 +44,12 @@ object Background {
 
     /** New and updated alerts worth a notification; also refreshes each place's cached alerts. */
     suspend fun checkAlerts(container: AppContainer, canNotify: Boolean): List<AppNotification> {
+        pruneTrips(container)
         val settings = container.settings.settings.first()
         if (!settings.alertsEnabled || (settings.alertCategories.isEmpty() && !(settings.gardenEnabled && settings.gardenFrostAlerts))) return emptyList()
         if (!isAllowed(SatelliteFeature.BACKGROUND_ALERTS, settings, container.connectivity.current())) return emptyList()
-        val locations = container.locations.locations.first().filter { it.notify }.take(MAX_LOCATIONS)
+        val today = app.northvane.core.time.LocalDate.now()
+        val locations = container.locations.locations.first().filter { it.alertsWanted(today) }.take(MAX_LOCATIONS)
         if (locations.isEmpty()) return emptyList()
 
         return container.alertState.exclusive { check(container, settings, locations, canNotify) }
@@ -92,6 +94,11 @@ object Background {
             kind = if (alert.category == app.northvane.core.model.AlertCategory.WARNING) AppNotification.Kind.WARNING else AppNotification.Kind.ALERT,
             quiet = item.isUpdateOfNotified && alert.category != app.northvane.core.model.AlertCategory.WARNING,
         )
+    }
+
+    /** Trip stops drop off the day after their trip ends, with their cached weather. */
+    suspend fun pruneTrips(container: AppContainer) {
+        container.locations.removeEndedTrips(app.northvane.core.time.LocalDate.now()).forEach { container.weatherCache.delete(it) }
     }
 
     /** The place on the Today screen and its forecast: fresh if the network allows, else a recent cached one. */
