@@ -32,6 +32,9 @@ kotlin {
         jvmMain.dependencies {
             api(libs.okhttp)
             implementation(libs.anthropic.java)
+            // Jackson and OpenTelemetry with their security fixes, over the older ones the SDK asks for.
+            implementation(project.dependencies.platform(libs.jackson.bom))
+            implementation(project.dependencies.platform(libs.opentelemetry.bom))
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.core)

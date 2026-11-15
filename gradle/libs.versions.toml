@@ -15,6 +15,9 @@ maplibre = "13.7.1"
 junit = "4.13.2"
 robolectric = "4.17"
 anthropic = "3.6.0"
+# Security floors: the Anthropic SDK brings Jackson 2.19 and OpenTelemetry 1.62.
+jackson = "2.21.8"
+opentelemetry = "1.68.0"
 zxing = "3.5.4"
 datetime = "0.8.0"
 kotlinxIo = "0.9.2"
@@ -71,6 +74,8 @@ atomicfu = { module = "org.jetbrains.kotlinx:atomicfu", version.ref = "atomicfu"
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 # Anthropic's official SDK, for the Claude provider (MIT).
+jackson-bom = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "jackson" }
+opentelemetry-bom = { module = "io.opentelemetry:opentelemetry-bom", version.ref = "opentelemetry" }
 anthropic-java = { module = "com.anthropic:anthropic-java", version.ref = "anthropic" }
 # QR codes for handing saved places to Mini (Apache 2.0).
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
