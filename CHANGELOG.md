@@ -5,6 +5,13 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-11-22
+
+Security updates.
+
+### Security
+- Jackson 2.21.8 and OpenTelemetry 1.68.0 under Anthropic's SDK (used by Ask with Claude), over the Jackson 2.19.4 and OpenTelemetry 1.62.0 it brings: fixes CVE-2026-54512 and CVE-2026-54513 (polymorphic type validator bypasses), CVE-2026-89407, CVE-2026-89425, CVE-2026-91776, CVE-2026-91777 and CVE-2026-68497 (denial of service), CVE-2026-54514 and CVE-2026-77310 (DNS lookups while reading), and CVE-2026-118259 in OpenTelemetry.
+
 ## [2.4.0] - 2026-11-11
 
 SuperAwesomeMagicalWeather for Linux.

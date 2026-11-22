@@ -73,9 +73,9 @@ kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.re
 atomicfu = { module = "org.jetbrains.kotlinx:atomicfu", version.ref = "atomicfu" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
-# Anthropic's official SDK, for the Claude provider (MIT).
 jackson-bom = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "jackson" }
 opentelemetry-bom = { module = "io.opentelemetry:opentelemetry-bom", version.ref = "opentelemetry" }
+# Anthropic's official SDK, for the Claude provider (MIT).
 anthropic-java = { module = "com.anthropic:anthropic-java", version.ref = "anthropic" }
 # QR codes for handing saved places to Mini (Apache 2.0).
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }

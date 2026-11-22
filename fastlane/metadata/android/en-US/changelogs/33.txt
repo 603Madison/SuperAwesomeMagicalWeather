@@ -1,0 +1,1 @@
+2.4.1: security updates to the libraries under Ask with Claude (Jackson, OpenTelemetry).
